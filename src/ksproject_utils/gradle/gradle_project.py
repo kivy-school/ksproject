@@ -53,11 +53,11 @@ class GradleProject:
         kivy_school = self.pyproject.tool.kivy_school
         if kivy_school is None:
             raise GradleProjectError(
-                "[tool.kivy_school] section is missing in pyproject.toml"
+                "[tool.kivy-school] section is missing in pyproject.toml"
             )
         if kivy_school.android is None:
             raise GradleProjectError(
-                "[tool.kivy_school.android] section is missing in pyproject.toml"
+                "[tool.kivy-school.android] section is missing in pyproject.toml"
             )
 
         self.builder = GradleProjectBuilder(self.pyproject, project_path)

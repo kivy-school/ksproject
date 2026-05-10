@@ -25,7 +25,7 @@ class GradleProjectBuilder:
 
         kivy_school = pyproject.tool.kivy_school
         if kivy_school is None:
-            raise ValueError("[tool.kivy_school] is missing in pyproject.toml")
+            raise ValueError("[tool.kivy-school] is missing in pyproject.toml")
 
         self.kivy_school = kivy_school
         self.android = kivy_school.android
@@ -45,7 +45,7 @@ class GradleProjectBuilder:
         pyproject_path = uv_dir / "pyproject.toml"
         pyproject = PyProjectToml(str(pyproject_path))
         if pyproject.tool.kivy_school is None:
-            raise ValueError("[tool.kivy_school] is missing")
+            raise ValueError("[tool.kivy-school] is missing")
         builder = cls(pyproject, uv_dir)
         builder.generate()
         return builder

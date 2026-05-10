@@ -62,7 +62,7 @@ class ToolData:
 
     def __init__(self, data: dict):
         self.kivy_school = (
-            KivySchoolData(data["kivy_school"]) if "kivy_school" in data else None
+            KivySchoolData(data["kivy-school"]) if "kivy-school" in data else None
         )
 
 

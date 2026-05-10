@@ -1,7 +1,7 @@
 """Resolves the Android SDK, NDK, and Java paths needed to build the project.
 
 Priority order for each tool:
-  1. Explicit path set in [tool.kivy_school.android] (sdk_path / ndk_path / java_path)
+  1. Explicit path set in [tool.kivy-school.android] (sdk_path / ndk_path / java_path)
   2. ksproject-managed install under <project_dir>/.kivyschool/android-sdk
   3. System environment variables (ANDROID_HOME, ANDROID_NDK_ROOT, JAVA_HOME)
 """
@@ -104,7 +104,7 @@ def _resolve_ndk(
 
     raise AndroidToolchainError(
         f"Android NDK {ndk_version} not found. Set ndk_path in "
-        f"[tool.kivy_school.android] or ensure sdkmanager installed it."
+        f"[tool.kivy-school.android] or ensure sdkmanager installed it."
     )
 
 
@@ -268,7 +268,7 @@ def _install_java_via_sdkman() -> str:
     if not installed.exists():
         raise AndroidToolchainError(
             "Java installation via sdkman failed. Set java_path in "
-            "[tool.kivy_school.android] to point to an existing JDK."
+            "[tool.kivy-school.android] to point to an existing JDK."
         )
     print(f"[ksproject] Java installed at {installed}")
     return str(installed)

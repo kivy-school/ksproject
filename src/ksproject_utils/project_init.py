@@ -46,7 +46,7 @@ class ProjectInit:
             self._uv_init()
 
         if self._already_kivyschool():
-            print(f"[ksproject] {self.pyproject_path} already has [tool.kivy_school]; skipping toml updates")
+            print(f"[ksproject] {self.pyproject_path} already has [tool.kivy-school]; skipping toml updates")
         else:
             self._append_kivyschool_config()
 
@@ -74,7 +74,7 @@ class ProjectInit:
         with self.pyproject_path.open("r") as f:
             data = toml.load(f)
         tool = data.get("tool", {})
-        return "kivy_school" in tool
+        return "kivy-school" in tool
 
     def _append_kivyschool_config(self) -> None:
         existing = self.pyproject_path.read_text()
@@ -99,10 +99,10 @@ find-links = ["./wheelhouse"]
 
 #### kivy-school configuration ####
 
-[tool.kivy_school]
+[tool.kivy-school]
 app_name = "{self.app_name}"
 
-[tool.kivy_school.android]
+[tool.kivy-school.android]
 archs = ["arm64-v8a", "x86_64"]
 package_name = "org.example.{self.module_name}"
 api = 35
