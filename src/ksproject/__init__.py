@@ -5,7 +5,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from ksproject_utils.gradle import GradleProject
+from ksproject_utils.gradle.gradle_project import GradleProject
 from ksproject_utils.project_init import ProjectInit
 
 

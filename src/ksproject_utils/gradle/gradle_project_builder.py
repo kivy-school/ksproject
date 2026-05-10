@@ -65,10 +65,9 @@ class GradleProjectBuilder:
         GradleBuildFiles.write_root_build_gradle(dist_dir)
         GradleBuildFiles.write_settings_gradle(dist_dir, self.app_name)
         GradleBuildFiles.write_gradle_properties(dist_dir)
-        GradleBuildFiles.write_gradle_wrapper(dist_dir, toolchain.java_path)
         GradleBuildFiles.write_local_properties(dist_dir, toolchain.sdk_path)
 
-        # app module
+        # app module (must exist before `gradle wrapper` evaluates settings.gradle.kts)
         app_dir = dist_dir / "app"
         app_dir.mkdir(parents=True, exist_ok=True)
         GradleBuildFiles.write_app_build_gradle(
@@ -88,6 +87,9 @@ class GradleProjectBuilder:
             package_name=self.package_name,
             app_name=self.app_name,
         )
+
+        # Generate the wrapper now that the app module exists on disk
+        GradleBuildFiles.write_gradle_wrapper(dist_dir, toolchain.java_path)
 
         # Build CPython for Android (cached in .kivyschool/)
         install_cpython_android(

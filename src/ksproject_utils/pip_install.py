@@ -25,6 +25,6 @@ class PipInstaller:
             "--target", site_packages
         ]
         try:
-            subprocess.check_call(["pip", "install", uv_src, *pip_args], executable=UV)
+            subprocess.check_call([UV, "pip", "install", uv_src, *pip_args])
         except subprocess.CalledProcessError as e:
             raise PipInstallError(f"Failed to install '{uv_src}': {e}")
