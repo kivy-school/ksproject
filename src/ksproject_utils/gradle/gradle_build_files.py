@@ -164,6 +164,19 @@ android {{
         ndk {{
             abiFilters += setOf({abi_filters})
         }}
+
+        externalNativeBuild {{
+            cmake {{
+                arguments += listOf("-DANDROID_STL=c++_static")
+            }}
+        }}
+    }}
+
+    externalNativeBuild {{
+        cmake {{
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }}
     }}
 
     buildTypes {{
@@ -191,17 +204,20 @@ dependencies {{
 // ── site-packages copy tasks ─────────────────────────────────────────────────
 val sitePackagesAbis = listOf({arch_list_kts})
 
-tasks.register<Copy>("copySitePackagesToAssets") {{
-    group = "python"
-    description = "Sync site-packages into assets before each build (excludes .libs, .java, .kotlin)"
-    val srcDir = sitePackagesAbis.map {{ file("../site_packages/$it") }}.firstOrNull {{ it.exists() }}
-    if (srcDir != null) {{
+// Copy each ABI's site-packages into assets/python{python_version}/site-packages/<abi>/
+// At runtime the app loads from the subdirectory matching its ABI.
+val copySitePackagesTasks = sitePackagesAbis.map {{ abi ->
+    tasks.register<Copy>("copySitePackages_${{abi}}") {{
+        group = "python"
+        description = "Copy site-packages for $abi into assets"
+        val srcDir = file("../site_packages/$abi")
+        onlyIf {{ srcDir.exists() }}
         from(srcDir) {{
             exclude(".libs/**")
             exclude(".java/**")
             exclude(".kotlin/**")
         }}
-        into("src/main/assets/python{python_version}/site-packages")
+        into("src/main/assets/site-packages/$abi")
     }}
 }}
 
@@ -225,8 +241,23 @@ tasks.register<Copy>("copySitePackagesKotlin") {{
     }}
 }}
 
+// Copy .libs/<abi>/ → src/main/jniLibs/<abi>/ (libSDL2.so etc. ship inside the wheel)
+val copySitePackagesNativeLibsTasks = sitePackagesAbis.map {{ abi ->
+    tasks.register<Copy>("copySitePackagesNativeLibs_${{abi}}") {{
+        group = "python"
+        description = "Copy .libs/$abi native libraries into jniLibs/$abi"
+        val srcDir = file("../site_packages/$abi/.libs/$abi")
+        onlyIf {{ srcDir.exists() }}
+        from(srcDir) {{
+            include("*.so")
+        }}
+        into("src/main/jniLibs/$abi")
+    }}
+}}
+
 tasks.named("preBuild") {{
-    dependsOn("copySitePackagesToAssets")
+    copySitePackagesTasks.forEach {{ dependsOn(it) }}
+    copySitePackagesNativeLibsTasks.forEach {{ dependsOn(it) }}
     dependsOn("copySitePackagesJava")
     dependsOn("copySitePackagesKotlin")
 }}
@@ -268,3 +299,247 @@ tasks.named("preBuild") {{
 </manifest>
 """
         (main_dir / "AndroidManifest.xml").write_text(content)
+
+    # -------------------------------------------------------------------------
+    # MainActivity.java — extends SDLActivity (SDL2 AAR provides the class)
+    # -------------------------------------------------------------------------
+
+    @staticmethod
+    def write_main_activity(
+        main_dir: Path, package_name: str, python_version: str
+    ) -> None:
+        java_dir = main_dir / "java" / Path(*package_name.split("."))
+        java_dir.mkdir(parents=True, exist_ok=True)
+        content = f"""\
+package {package_name};
+
+import android.content.res.AssetManager;
+import android.os.Bundle;
+import android.util.Log;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import org.libsdl.app.SDLActivity;
+
+public class MainActivity extends SDLActivity {{
+    private static final String TAG = "ksproject";
+
+    @Override
+    protected String[] getLibraries() {{
+        return new String[] {{
+            "SDL2",
+            "python3",
+            "main",
+        }};
+    }}
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {{
+        File appDir = new File(getFilesDir(), "app");
+        if (!appDir.exists()) {{
+            appDir.mkdirs();
+            try {{
+                unpackAsset(getAssets(), "python{python_version}", appDir);
+                unpackAsset(getAssets(), "site-packages", appDir);
+            }} catch (IOException e) {{
+                Log.e(TAG, "asset unpack failed", e);
+            }}
+        }}
+        String appPath = appDir.getAbsolutePath();
+        SDLActivity.nativeSetenv("ANDROID_APP_PATH", appPath);
+        SDLActivity.nativeSetenv("ANDROID_ARGUMENT", appPath);
+        SDLActivity.nativeSetenv("ANDROID_UNPACK", appPath);
+        SDLActivity.nativeSetenv("ANDROID_ENTRYPOINT", "__main__.py");
+        SDLActivity.nativeSetenv("PYTHONHOME", appPath);
+        SDLActivity.nativeSetenv("PYTHONNOUSERSITE", "1");
+        SDLActivity.nativeSetenv("PYTHONUNBUFFERED", "1");
+        super.onCreate(savedInstanceState);
+    }}
+
+    private static void unpackAsset(AssetManager am, String src, File destRoot)
+            throws IOException {{
+        String[] entries = am.list(src);
+        if (entries == null || entries.length == 0) {{
+            File outFile = new File(destRoot, src);
+            File parent = outFile.getParentFile();
+            if (parent != null) parent.mkdirs();
+            try (InputStream in = am.open(src);
+                 OutputStream out = new FileOutputStream(outFile)) {{
+                byte[] buf = new byte[8192];
+                int n;
+                while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+            }}
+            return;
+        }}
+        File dir = new File(destRoot, src);
+        dir.mkdirs();
+        for (String child : entries) {{
+            unpackAsset(am, src + "/" + child, destRoot);
+        }}
+    }}
+}}
+"""
+        dest = java_dir / "MainActivity.java"
+        dest.write_text(content)
+
+    # -------------------------------------------------------------------------
+    # Native bootstrap — libmain.so (provides SDL_main → CPython)
+    # -------------------------------------------------------------------------
+
+    @staticmethod
+    def write_main_c(cpp_dir: Path, python_version: str) -> None:
+        cpp_dir.mkdir(parents=True, exist_ok=True)
+        content = f"""\
+/* ksproject native bootstrap: SDL_main -> CPython
+ * SDL_main.h #defines main as SDL_main; SDLActivity's native thread calls
+ * SDL_main after System.loadLibrary("main"). We initialize CPython, set
+ * up module search paths against the unpacked assets, then run main.py.
+ */
+#define PY_SSIZE_T_CLEAN
+#include <Python.h>
+#include <SDL.h>
+#include <SDL_main.h>
+#include <android/log.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <wchar.h>
+
+#define LOGI(...) __android_log_print(ANDROID_LOG_INFO,  "ksproject", __VA_ARGS__)
+#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "ksproject", __VA_ARGS__)
+
+static PyObject *androidembed_log(PyObject *self, PyObject *args) {{
+    const char *s;
+    if (!PyArg_ParseTuple(args, "s", &s)) return NULL;
+    __android_log_write(ANDROID_LOG_INFO, "python", s);
+    Py_RETURN_NONE;
+}}
+
+static PyMethodDef AndroidEmbedMethods[] = {{
+    {{"log", androidembed_log, METH_VARARGS, "log to android logcat"}},
+    {{NULL, NULL, 0, NULL}}
+}};
+
+static struct PyModuleDef androidembed_mod = {{
+    PyModuleDef_HEAD_INIT, "androidembed", NULL, -1, AndroidEmbedMethods
+}};
+
+PyMODINIT_FUNC PyInit_androidembed(void) {{
+    return PyModule_Create(&androidembed_mod);
+}}
+
+static const char *REDIRECT_STDIO =
+    "import sys, androidembed\\n"
+    "class _LogFile:\\n"
+    "    def __init__(self): self._buf = ''\\n"
+    "    def write(self, s):\\n"
+    "        self._buf += s\\n"
+    "        while '\\n' in self._buf:\\n"
+    "            i = self._buf.index('\\n')\\n"
+    "            androidembed.log(self._buf[:i])\\n"
+    "            self._buf = self._buf[i+1:]\\n"
+    "    def flush(self):\\n"
+    "        if self._buf:\\n"
+    "            androidembed.log(self._buf); self._buf = ''\\n"
+    "sys.stdout = sys.stderr = _LogFile()\\n";
+
+int main(int argc, char *argv[]) {{
+    (void)argc; (void)argv;
+    LOGI("SDL_main entered");
+
+    const char *app_path = getenv("ANDROID_APP_PATH");
+    const char *entrypoint = getenv("ANDROID_ENTRYPOINT");
+    if (!app_path || !entrypoint) {{
+        LOGE("missing ANDROID_APP_PATH / ANDROID_ENTRYPOINT");
+        return 1;
+    }}
+    if (chdir(app_path) != 0) {{
+        LOGE("chdir(%s) failed", app_path);
+    }}
+
+    PyImport_AppendInittab("androidembed", PyInit_androidembed);
+
+    PyConfig config;
+    PyConfig_InitIsolatedConfig(&config);
+    config.parse_argv = 0;
+    config.install_signal_handlers = 0;
+    config.write_bytecode = 0;
+    config.use_environment = 1;
+
+    wchar_t w_stdlib[1024];
+    wchar_t w_site[1024];
+    wchar_t w_app[1024];
+    swprintf(w_stdlib, 1024, L"%s/python{python_version}", app_path);
+    swprintf(w_site,   1024, L"%s/site-packages", app_path);
+    swprintf(w_app,    1024, L"%s", app_path);
+    config.module_search_paths_set = 1;
+    PyWideStringList_Append(&config.module_search_paths, w_stdlib);
+    PyWideStringList_Append(&config.module_search_paths, w_site);
+    PyWideStringList_Append(&config.module_search_paths, w_app);
+
+    PyStatus status = Py_InitializeFromConfig(&config);
+    PyConfig_Clear(&config);
+    if (PyStatus_Exception(status)) {{
+        LOGE("Py_InitializeFromConfig failed: %s",
+             status.err_msg ? status.err_msg : "(no message)");
+        return 1;
+    }}
+    LOGI("Python initialized");
+
+    PyRun_SimpleString(REDIRECT_STDIO);
+
+    char ep_path[1024];
+    snprintf(ep_path, sizeof(ep_path), "%s/%s", app_path, entrypoint);
+    FILE *fp = fopen(ep_path, "r");
+    if (!fp) {{
+        LOGE("cannot open entrypoint: %s", ep_path);
+        Py_FinalizeEx();
+        return 1;
+    }}
+    int ret = PyRun_SimpleFile(fp, ep_path);
+    fclose(fp);
+
+    if (PyErr_Occurred()) PyErr_Print();
+    Py_FinalizeEx();
+    LOGI("python exit %d", ret);
+    return ret;
+}}
+"""
+        (cpp_dir / "main.c").write_text(content)
+
+    @staticmethod
+    def write_cmake_lists(cpp_dir: Path) -> None:
+        cpp_dir.mkdir(parents=True, exist_ok=True)
+        content = """\
+cmake_minimum_required(VERSION 3.22)
+project(ksproject_main C)
+
+set(CMAKE_C_STANDARD 11)
+
+# SDL2 headers extracted from the SDL2 source tarball.
+set(SDL2_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/sdl2_include")
+
+# Python headers — per-ABI (each arch has its own pyconfig.h).
+set(PYTHON_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/python_include/${ANDROID_ABI}")
+
+# Pre-built shared libs live in jniLibs/<abi>/ alongside this build.
+set(JNI_LIBS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../jniLibs/${ANDROID_ABI}")
+
+add_library(SDL2 SHARED IMPORTED)
+set_target_properties(SDL2 PROPERTIES
+    IMPORTED_LOCATION "${JNI_LIBS_DIR}/libSDL2.so")
+
+add_library(python3 SHARED IMPORTED)
+set_target_properties(python3 PROPERTIES
+    IMPORTED_LOCATION "${JNI_LIBS_DIR}/libpython3.so")
+
+add_library(main SHARED main.c)
+target_include_directories(main PRIVATE
+    "${SDL2_INCLUDE_DIR}"
+    "${PYTHON_INCLUDE_DIR}")
+target_link_libraries(main SDL2 python3 log android)
+"""
+        (cpp_dir / "CMakeLists.txt").write_text(content)

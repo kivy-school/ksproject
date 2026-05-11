@@ -2,6 +2,9 @@
 from __future__ import annotations
 
 import shutil
+import tarfile
+import tempfile
+import urllib.request
 from pathlib import Path
 
 from ..pyproject_toml import KivySchoolData, PyProjectToml
@@ -87,6 +90,16 @@ class GradleProjectBuilder:
             package_name=self.package_name,
             app_name=self.app_name,
         )
+        GradleBuildFiles.write_main_activity(
+            main_dir, self.package_name, PY_VERSION
+        )
+        _install_sdl2_java(main_dir, self.working_dir)
+        _install_sdl2_headers(main_dir, self.working_dir)
+
+        # Native bootstrap (libmain.so) — provides SDL_main → CPython
+        cpp_dir = main_dir / "cpp"
+        GradleBuildFiles.write_main_c(cpp_dir, PY_VERSION)
+        GradleBuildFiles.write_cmake_lists(cpp_dir)
 
         # Generate the wrapper now that the app module exists on disk
         GradleBuildFiles.write_gradle_wrapper(dist_dir, toolchain.java_path)
@@ -108,13 +121,9 @@ class GradleProjectBuilder:
 
             src_lib = prefix / f"lib/libpython{PY_VERSION}.so"
             if src_lib.exists():
-                dst_lib = jni_abi / f"libpython{PY_VERSION}.so"
+                dst_lib = jni_abi / "libpython3.so"
                 if not dst_lib.exists():
                     shutil.copy2(src_lib, dst_lib)
-                # SDLActivity getLibraries() loads "python3" → libpython3.so
-                dst_lib_short = jni_abi / "libpython3.so"
-                if not dst_lib_short.exists():
-                    shutil.copy2(src_lib, dst_lib_short)
 
             lib_dynload = prefix / f"lib/python{PY_VERSION}/lib-dynload"
             if lib_dynload.exists():
@@ -123,6 +132,12 @@ class GradleProjectBuilder:
                         dst = jni_abi / so_file.name
                         if not dst.exists():
                             shutil.copy2(so_file, dst)
+
+            # Python headers for the native bootstrap (per-ABI: pyconfig.h differs)
+            py_inc_src = prefix / f"include/python{PY_VERSION}"
+            py_inc_dst = main_dir / "cpp" / "python_include" / arch.value
+            if py_inc_src.exists() and not py_inc_dst.exists():
+                shutil.copytree(py_inc_src, py_inc_dst)
 
         # Copy pure Python stdlib once (no .so, no lib-dynload)
         first_prefix = android_prefix(self.working_dir, self.archs[0].value)
@@ -144,12 +159,91 @@ class GradleProjectBuilder:
         print(f"Build with: cd {dist_dir} && ./gradlew assembleDebug")
 
 
+_SDL2_VERSION = "2.32.10"
+_SDL2_JAVA_PREFIX = f"SDL2-{_SDL2_VERSION}/android-project/app/src/main/java/org/libsdl/app/"
+_SDL2_INCLUDE_PREFIX = f"SDL2-{_SDL2_VERSION}/include/"
+_SDL2_TARBALL_URL = (
+    f"https://github.com/libsdl-org/SDL/releases/download/"
+    f"release-{_SDL2_VERSION}/SDL2-{_SDL2_VERSION}.tar.gz"
+)
+
+
+def _sdl2_cache_root(working_dir: Path) -> Path:
+    return working_dir / ".kivyschool" / f"sdl2-{_SDL2_VERSION}"
+
+
+def _populate_sdl2_cache(working_dir: Path) -> None:
+    """Download SDL2 source tarball once and extract Java + include/ to cache."""
+    cache = _sdl2_cache_root(working_dir)
+    java_cache = cache / "java"
+    include_cache = cache / "include"
+    if java_cache.exists() and include_cache.exists():
+        return
+    cache.mkdir(parents=True, exist_ok=True)
+    java_cache.mkdir(parents=True, exist_ok=True)
+    include_cache.mkdir(parents=True, exist_ok=True)
+    print(f"[ksproject] Downloading SDL2 {_SDL2_VERSION} source...")
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tarball = Path(tmpdir) / f"SDL2-{_SDL2_VERSION}.tar.gz"
+        urllib.request.urlretrieve(_SDL2_TARBALL_URL, tarball)
+        with tarfile.open(tarball, "r:gz") as tar:
+            for member in tar.getmembers():
+                if member.isdir():
+                    continue
+                if (
+                    member.name.startswith(_SDL2_JAVA_PREFIX)
+                    and member.name.endswith(".java")
+                ):
+                    filename = member.name[len(_SDL2_JAVA_PREFIX):]
+                    f = tar.extractfile(member)
+                    if f is not None:
+                        (java_cache / filename).write_bytes(f.read())
+                elif (
+                    member.name.startswith(_SDL2_INCLUDE_PREFIX)
+                    and member.name.endswith(".h")
+                ):
+                    rel = member.name[len(_SDL2_INCLUDE_PREFIX):]
+                    dst = include_cache / rel
+                    dst.parent.mkdir(parents=True, exist_ok=True)
+                    f = tar.extractfile(member)
+                    if f is not None:
+                        dst.write_bytes(f.read())
+    print(f"[ksproject] SDL2 source cached at {cache}")
+
+
+def _install_sdl2_java(main_dir: Path, working_dir: Path) -> None:
+    """Copy SDL2 Java source files (SDLActivity etc) into src/main/java/org/libsdl/app/."""
+    dest_dir = main_dir / "java" / "org" / "libsdl" / "app"
+    if dest_dir.exists() and any(f.suffix == ".java" for f in dest_dir.iterdir()):
+        return
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    _populate_sdl2_cache(working_dir)
+    for java_file in (_sdl2_cache_root(working_dir) / "java").iterdir():
+        if java_file.suffix == ".java":
+            shutil.copy2(java_file, dest_dir / java_file.name)
+    print(f"[ksproject] SDL2 Java source installed to {dest_dir}")
+
+
+def _install_sdl2_headers(main_dir: Path, working_dir: Path) -> None:
+    """Copy SDL2 C headers into src/main/cpp/sdl2_include/ for the NDK build."""
+    dest_dir = main_dir / "cpp" / "sdl2_include"
+    if dest_dir.exists() and any(dest_dir.iterdir()):
+        return
+    _populate_sdl2_cache(working_dir)
+    src = _sdl2_cache_root(working_dir) / "include"
+    shutil.copytree(src, dest_dir)
+    print(f"[ksproject] SDL2 headers installed to {dest_dir}")
+
+
 def _copy_pure_python(src: Path, dst: Path) -> None:
+    _SKIP_DIRS = {"lib-dynload", "test", "tests", "__pycache__", "site-packages"}
     dst.mkdir(parents=True, exist_ok=True)
     for child in src.iterdir():
         if child.is_dir():
-            if child.name == "lib-dynload":
+            if child.name in _SKIP_DIRS:
                 continue
             _copy_pure_python(child, dst / child.name)
-        elif child.suffix != ".so":
+        elif child.suffix not in {".so", ".pyc"}:
             shutil.copy2(child, dst / child.name)
+
+
