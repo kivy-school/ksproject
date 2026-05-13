@@ -146,7 +146,9 @@ def _try_install_prebuilt(
         f"libpython-{android_version}-{PREBUILT_BUILD_TAG}-py3-none-"
         f"android_{PREBUILT_API}_{arch.replace('-', '_')}.whl"
     )
-    wheel_url = PREBUILT_INDEX_URL.rstrip("/") + "/" + wheel_name
+    wheel_url = (
+        PREBUILT_INDEX_URL.rstrip("/") + f"/{android_version}/" + wheel_name
+    )
 
     cache_dir = working_dir / ".kivyschool" / "prebuilt-cache"
     cache_dir.mkdir(parents=True, exist_ok=True)

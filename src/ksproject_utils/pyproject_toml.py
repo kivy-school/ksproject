@@ -36,6 +36,8 @@ class KivySchoolData:
         sdk_path: Path | None
         ndk_path: Path | None
         java_path: Path | None
+        icon: str | None
+        presplash: str | None
 
         def __init__(self, data: dict):
             self.package_name = data["package_name"]
@@ -50,6 +52,8 @@ class KivySchoolData:
             self.sdk_path = Path(data["sdk_path"]) if data.get("sdk_path") else None
             self.ndk_path = Path(data["ndk_path"]) if data.get("ndk_path") else None
             self.java_path = Path(data["java_path"]) if data.get("java_path") else None
+            self.icon = data.get("icon")
+            self.presplash = data.get("presplash")
 
         class Arch(Enum):
             ARM64_V8A = "arm64-v8a"

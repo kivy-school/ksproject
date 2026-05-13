@@ -5,6 +5,7 @@ omitted — generated projects are pure AGP."""
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -121,6 +122,7 @@ zipStorePath=wrapper/dists
         min_sdk: int = 24,
         target_sdk: int = 35,
         python_version: str = "3.13",
+        ndk_version: str | None = None,
     ) -> None:
         (app_dir / "build.gradle.kts").write_text(
             GradleBuildFiles._app_build_gradle_content(
@@ -130,6 +132,7 @@ zipStorePath=wrapper/dists
                 min_sdk=min_sdk,
                 target_sdk=target_sdk,
                 python_version=python_version,
+                ndk_version=ndk_version,
             )
         )
         (app_dir / "libs").mkdir(parents=True, exist_ok=True)
@@ -142,9 +145,11 @@ zipStorePath=wrapper/dists
         min_sdk: int,
         target_sdk: int,
         python_version: str,
+        ndk_version: str | None = None,
     ) -> str:
         abi_filters = ", ".join(f'"{a.value}"' for a in archs)
         arch_list_kts = ", ".join(f'"{a.value}"' for a in archs)
+        ndk_line = f'    ndkVersion = "{ndk_version}"\n' if ndk_version else ""
         return f"""\
 plugins {{
     id("com.android.application")
@@ -153,7 +158,7 @@ plugins {{
 android {{
     namespace = "{package_name}"
     compileSdk = {compile_sdk}
-
+{ndk_line}
     defaultConfig {{
         applicationId = "{package_name}"
         minSdk = {min_sdk}
@@ -292,6 +297,7 @@ tasks.named("preBuild") {{
 
     <application
         android:label="{app_name}"
+        android:icon="@mipmap/ic_launcher"
         android:allowBackup="true"
         android:supportsRtl="true"
         android:hardwareAccelerated="true"
@@ -312,6 +318,16 @@ tasks.named("preBuild") {{
 </manifest>
 """
         (main_dir / "AndroidManifest.xml").write_text(content)
+
+    # -------------------------------------------------------------------------
+    # Icon
+    # -------------------------------------------------------------------------
+
+    @staticmethod
+    def write_icon(res_dir: Path, icon_src: Path) -> None:
+        mipmap_dir = res_dir / "mipmap"
+        mipmap_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(icon_src, mipmap_dir / "ic_launcher.png")
 
     # -------------------------------------------------------------------------
     # MainActivity.java — extends SDLActivity (SDL2 AAR provides the class)

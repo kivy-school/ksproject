@@ -26,6 +26,7 @@ _CMDLINE_TOOLS_URLS = {
 SDKMAN_INSTALL_URL = "https://get.sdkman.io"
 DEFAULT_SDK_VERSION = "35"
 DEFAULT_NDK_VERSION = "27.3.13750724"
+DEFAULT_CMAKE_VERSION = "3.22.1"
 
 
 def host_emulator_abi() -> str:
@@ -45,6 +46,7 @@ class AndroidToolchain:
     sdk_path: str
     ndk_path: str
     java_path: str
+    ndk_version: str = ""
 
     @staticmethod
     def kivyschool_sdk_root(project_dir: Path) -> Path:
@@ -72,7 +74,12 @@ class AndroidToolchain:
         ndk_path = _resolve_ndk(android, sdk_path, ndk_version)
         _ensure_emulator(sdk_path, sdk_version, java_path)
 
-        return cls(sdk_path=sdk_path, ndk_path=ndk_path, java_path=java_path)
+        return cls(
+            sdk_path=sdk_path,
+            ndk_path=ndk_path,
+            java_path=java_path,
+            ndk_version=ndk_version,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -93,6 +100,12 @@ def _resolve_sdk(
     platforms_dir = managed / "platforms" / f"android-{sdk_version}"
     if not platforms_dir.exists():
         _install_sdk(managed, sdk_version, ndk_version, java_path)
+    # CMake is required by AGP's externalNativeBuild but wasn't always
+    # installed in older runs. Top it up if missing.
+    if not (managed / "cmake" / DEFAULT_CMAKE_VERSION / "bin" / "cmake").exists():
+        _sdkmanager_install(
+            managed, java_path, [f"cmake;{DEFAULT_CMAKE_VERSION}"]
+        )
     return str(managed)
 
 
@@ -155,6 +168,7 @@ def _install_sdk(
         f"platforms;android-{sdk_version}",
         f"build-tools;{sdk_version}.0.0",
         f"ndk;{ndk_version}",
+        f"cmake;{DEFAULT_CMAKE_VERSION}",
         f"system-images;android-{sdk_version};google_apis;{host_emulator_abi()}",
     ]
 
@@ -172,6 +186,22 @@ def _install_sdk(
         _run_sdkmanager(str(sdkmanager), ["--install", pkg], env=env)
 
     print(f"[ksproject] Android toolchain installed at {sdk_root}")
+
+
+def _sdkmanager_install(
+    sdk_root: Path, java_path: str, packages: list[str]
+) -> None:
+    sdkmanager = sdk_root / "cmdline-tools" / "latest" / "bin" / "sdkmanager"
+    if not sdkmanager.exists():
+        raise AndroidToolchainError(
+            f"sdkmanager not found at {sdkmanager}; reinstall the SDK"
+        )
+    env = os.environ.copy()
+    env["ANDROID_HOME"] = str(sdk_root)
+    env["JAVA_HOME"] = java_path
+    print(f"[ksproject] Installing missing SDK packages: {', '.join(packages)}")
+    for pkg in packages:
+        _run_sdkmanager(str(sdkmanager), ["--install", pkg], env=env)
 
 
 def _run_sdkmanager(

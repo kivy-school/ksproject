@@ -54,6 +54,33 @@ class GradleProjectBuilder:
         return builder
 
     # ------------------------------------------------------------------
+    # Asset resolution
+    # ------------------------------------------------------------------
+
+    def _resolve_asset(self, name: str) -> Path:
+        """Return the path to a user-supplied asset or the bundled template fallback.
+
+        ``name`` is e.g. ``"icon"`` — looks up ``android.icon`` in pyproject.toml
+        and falls back to ``ksproject_utils/templates/<name>.png`` (then ``.jpg``).
+        """
+        user_value: str | None = (
+            getattr(self.android, name, None) if self.android else None
+        )
+        if user_value:
+            p = Path(user_value)
+            if not p.is_absolute():
+                p = self.working_dir / p
+            return p
+        templates = Path(__file__).parent.parent / "templates"
+        for ext in ("png", "jpg"):
+            candidate = templates / f"{name}.{ext}"
+            if candidate.exists():
+                return candidate
+        raise FileNotFoundError(
+            f"No template found for '{name}' in {templates}"
+        )
+
+    # ------------------------------------------------------------------
     # Generation
     # ------------------------------------------------------------------
 
@@ -81,6 +108,7 @@ class GradleProjectBuilder:
             min_sdk=(self.android.min_api if self.android and self.android.min_api else 24),
             target_sdk=(self.android.api if self.android and self.android.api else 35),
             python_version=PY_VERSION,
+            ndk_version=toolchain.ndk_version,
         )
 
         main_dir = app_dir / "src" / "main"
@@ -90,6 +118,8 @@ class GradleProjectBuilder:
             package_name=self.package_name,
             app_name=self.app_name,
         )
+        res_dir = main_dir / "res"
+        GradleBuildFiles.write_icon(res_dir, self._resolve_asset("icon"))
         GradleBuildFiles.write_main_activity(
             main_dir, self.package_name, PY_VERSION, self.app_name
         )
