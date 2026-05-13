@@ -65,7 +65,10 @@ class GradleProject:
             self.builder.android, project_path
         )
         self.adb = ADB(self.toolchain.sdk_path)
-        self.emulator = AndroidEmulator(self.toolchain.sdk_path)
+        sdk_version = str(
+            (self.builder.android.api if self.builder.android else None) or 35
+        )
+        self.emulator = AndroidEmulator(self.toolchain.sdk_path, sdk_version)
 
     # ------------------------------------------------------------------
     # Build pipeline
@@ -95,23 +98,22 @@ class GradleProject:
                 site_packages=platform.site_packages,
             )
 
-    def build(self, variant: str = "debug") -> Path:
-        """Run full pipeline: generate → pip install → gradlew assemble<Variant>.
-
-        Returns the path to the produced APK.
-        """
+    def gradle_assemble(self, variant: str = "debug") -> Path:
+        """Run only `gradlew assemble<Variant>` and return the produced APK."""
         if variant not in ("debug", "release"):
             raise GradleProjectError(
                 f"Unknown variant {variant!r}; expected 'debug' or 'release'"
             )
 
-        self.generate()
-        self.install_site_packages()
-
         task = "assembleDebug" if variant == "debug" else "assembleRelease"
         env = os.environ.copy()
         env["JAVA_HOME"] = self.toolchain.java_path
         gradlew = self.gradle_dir / "gradlew"
+        if not gradlew.exists():
+            raise GradleProjectError(
+                f"Gradle project not generated yet: {gradlew} missing. "
+                "Run `ksproject android build` first."
+            )
         result = subprocess.run(
             [str(gradlew), task],
             cwd=self.gradle_dir,
@@ -130,6 +132,15 @@ class GradleProject:
         if not apk.exists():
             raise GradleProjectError(f"Expected APK not found at {apk}")
         return apk
+
+    def build(self, variant: str = "debug") -> Path:
+        """Run full pipeline: generate → pip install → gradlew assemble<Variant>.
+
+        Returns the path to the produced APK.
+        """
+        self.generate()
+        self.install_site_packages()
+        return self.gradle_assemble(variant)
 
     # ------------------------------------------------------------------
     # Devices / run
@@ -160,6 +171,6 @@ class GradleProject:
             assert name is not None
             serial = self.emulator.boot_and_wait(name, self.adb)
 
-        apk = self.build(variant)
+        apk = self.gradle_assemble(variant)
         self.adb.install(apk, serial)
         self.adb.start_app(serial, self.builder.package_name)

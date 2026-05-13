@@ -8,6 +8,7 @@ Priority order for each tool:
 from __future__ import annotations
 
 import os
+import platform
 import subprocess
 import sys
 import urllib.request
@@ -25,6 +26,14 @@ _CMDLINE_TOOLS_URLS = {
 SDKMAN_INSTALL_URL = "https://get.sdkman.io"
 DEFAULT_SDK_VERSION = "35"
 DEFAULT_NDK_VERSION = "27.3.13750724"
+
+
+def host_emulator_abi() -> str:
+    """Pick a system-image ABI that matches the host CPU."""
+    machine = platform.machine().lower()
+    if machine in ("arm64", "aarch64"):
+        return "arm64-v8a"
+    return "x86_64"
 
 
 class AndroidToolchainError(Exception):
@@ -61,6 +70,7 @@ class AndroidToolchain:
             android, sdk_version, ndk_version, java_path, project_dir
         )
         ndk_path = _resolve_ndk(android, sdk_path, ndk_version)
+        _ensure_emulator(sdk_path, sdk_version, java_path)
 
         return cls(sdk_path=sdk_path, ndk_path=ndk_path, java_path=java_path)
 
@@ -141,9 +151,11 @@ def _install_sdk(
 
     packages = [
         "platform-tools",
+        "emulator",
         f"platforms;android-{sdk_version}",
         f"build-tools;{sdk_version}.0.0",
         f"ndk;{ndk_version}",
+        f"system-images;android-{sdk_version};google_apis;{host_emulator_abi()}",
     ]
 
     print(
@@ -177,6 +189,46 @@ def _run_sdkmanager(
     if result.returncode != 0:
         raise AndroidToolchainError(
             f"sdkmanager '{' '.join(args)}' exited with code {result.returncode}"
+        )
+
+
+def _ensure_emulator(sdk_path: str, sdk_version: str, java_path: str) -> None:
+    """Install the emulator + a host-arch system image if missing.
+
+    Allows users who installed the SDK earlier (without emulator support) to
+    pick up the new packages on next invocation.
+    """
+    sdk_root = Path(sdk_path)
+    emulator_bin = sdk_root / "emulator" / "emulator"
+    abi = host_emulator_abi()
+    sysimg_dir = (
+        sdk_root / "system-images" / f"android-{sdk_version}" / "google_apis" / abi
+    )
+    if emulator_bin.exists() and sysimg_dir.exists():
+        return
+
+    sdkmanager = sdk_root / "cmdline-tools" / "latest" / "bin" / "sdkmanager"
+    if not sdkmanager.exists():
+        # No SDK manager — skip silently; callers needing the emulator will
+        # surface a clearer error.
+        return
+
+    env = os.environ.copy()
+    env["ANDROID_HOME"] = str(sdk_root)
+    env["JAVA_HOME"] = java_path
+
+    print(f"[ksproject] Installing Android emulator + system image ({abi})...")
+    if not emulator_bin.exists():
+        _run_sdkmanager(str(sdkmanager), ["--install", "emulator"], env=env)
+    if not sysimg_dir.exists():
+        _run_sdkmanager(
+            str(sdkmanager),
+            [
+                "--install",
+                f"system-images;android-{sdk_version};google_apis;{abi}",
+            ],
+            env=env,
+            stdin_input="y\n",
         )
 
 
