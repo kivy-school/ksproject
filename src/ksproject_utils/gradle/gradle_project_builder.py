@@ -91,8 +91,10 @@ class GradleProjectBuilder:
             app_name=self.app_name,
         )
         GradleBuildFiles.write_main_activity(
-            main_dir, self.package_name, PY_VERSION
+            main_dir, self.package_name, PY_VERSION, self.app_name
         )
+        GradleBuildFiles.write_renpy_hardware(main_dir, self.package_name)
+        GradleBuildFiles.write_kivy_python_activity(main_dir, self.package_name)
         _install_sdl2_java(main_dir, self.working_dir)
         _install_sdl2_headers(main_dir, self.working_dir)
 
@@ -125,11 +127,19 @@ class GradleProjectBuilder:
                 if not dst_lib.exists():
                     shutil.copy2(src_lib, dst_lib)
 
+            # Extension modules go into assets/lib-dynload/<abi> so they can be
+            # unpacked to a writable filesystem path at runtime (AGP 8 keeps
+            # native libs compressed inside the APK, and only files matching
+            # lib*.so are exposed via nativeLibraryDir).
             lib_dynload = prefix / f"lib/python{PY_VERSION}/lib-dynload"
             if lib_dynload.exists():
+                dynload_dst = (
+                    main_dir / "assets" / "lib-dynload" / arch.value
+                )
+                dynload_dst.mkdir(parents=True, exist_ok=True)
                 for so_file in lib_dynload.iterdir():
                     if so_file.suffix == ".so":
-                        dst = jni_abi / so_file.name
+                        dst = dynload_dst / so_file.name
                         if not dst.exists():
                             shutil.copy2(so_file, dst)
 
@@ -159,7 +169,7 @@ class GradleProjectBuilder:
         print(f"Build with: cd {dist_dir} && ./gradlew assembleDebug")
 
 
-_SDL2_VERSION = "2.32.10"
+_SDL2_VERSION = "2.30.11"
 _SDL2_JAVA_PREFIX = f"SDL2-{_SDL2_VERSION}/android-project/app/src/main/java/org/libsdl/app/"
 _SDL2_INCLUDE_PREFIX = f"SDL2-{_SDL2_VERSION}/include/"
 _SDL2_TARBALL_URL = (

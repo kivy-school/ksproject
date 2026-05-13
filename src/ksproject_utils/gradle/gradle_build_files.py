@@ -189,6 +189,17 @@ android {{
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }}
+
+    // CPython stdlib and packages contain underscore-prefixed directories
+    // (e.g. zipfile/_path) that AGP's default aapt ignore pattern strips.
+    // Override to keep them.
+    androidResources {{
+        ignoreAssetsPatterns.clear()
+        ignoreAssetsPatterns.addAll(listOf(
+            "!.svn", "!.git", "!.ds_store", "!*.scc",
+            "!CVS", "!thumbs.db", "!picasa.ini", "!*~"
+        ))
+    }}
 }}
 
 dependencies {{
@@ -283,12 +294,14 @@ tasks.named("preBuild") {{
         android:label="{app_name}"
         android:allowBackup="true"
         android:supportsRtl="true"
-        android:hardwareAccelerated="true">
+        android:hardwareAccelerated="true"
+        android:theme="@android:style/Theme.NoTitleBar.Fullscreen">
 
         <activity
             android:name=".MainActivity"
             android:label="{app_name}"
             android:configChanges="orientation|screenSize|keyboardHidden"
+            android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -306,7 +319,10 @@ tasks.named("preBuild") {{
 
     @staticmethod
     def write_main_activity(
-        main_dir: Path, package_name: str, python_version: str
+        main_dir: Path,
+        package_name: str,
+        python_version: str,
+        python_module: str,
     ) -> None:
         java_dir = main_dir / "java" / Path(*package_name.split("."))
         java_dir.mkdir(parents=True, exist_ok=True)
@@ -314,7 +330,10 @@ tasks.named("preBuild") {{
 package {package_name};
 
 import android.content.res.AssetManager;
+import android.os.Build;
 import android.os.Bundle;
+import android.system.ErrnoException;
+import android.system.Os;
 import android.util.Log;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -322,10 +341,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import org.libsdl.app.SDLActivity;
+import org.kivy.android.PythonActivity;
 
 public class MainActivity extends SDLActivity {{
     private static final String TAG = "ksproject";
-
+    public static MainActivity mActivity;
     @Override
     protected String[] getLibraries() {{
         return new String[] {{
@@ -337,25 +357,73 @@ public class MainActivity extends SDLActivity {{
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {{
+        mActivity = this;
+        PythonActivity.mActivity = this;
         File appDir = new File(getFilesDir(), "app");
         if (!appDir.exists()) {{
             appDir.mkdirs();
             try {{
                 unpackAsset(getAssets(), "python{python_version}", appDir);
-                unpackAsset(getAssets(), "site-packages", appDir);
+                String abi = pickAbi(getAssets(), "site-packages");
+                if (abi != null) {{
+                    File sitePackages = new File(appDir, "site-packages");
+                    sitePackages.mkdirs();
+                    unpackAssetTree(
+                        getAssets(),
+                        "site-packages/" + abi,
+                        sitePackages
+                    );
+                }} else {{
+                    Log.e(TAG, "no matching ABI found in assets/site-packages");
+                }}
+                String dynAbi = pickAbi(getAssets(), "lib-dynload");
+                if (dynAbi != null) {{
+                    File dynload = new File(
+                        appDir, "python{python_version}/lib-dynload"
+                    );
+                    dynload.mkdirs();
+                    unpackAssetTree(
+                        getAssets(),
+                        "lib-dynload/" + dynAbi,
+                        dynload
+                    );
+                }}
             }} catch (IOException e) {{
                 Log.e(TAG, "asset unpack failed", e);
             }}
         }}
         String appPath = appDir.getAbsolutePath();
-        SDLActivity.nativeSetenv("ANDROID_APP_PATH", appPath);
-        SDLActivity.nativeSetenv("ANDROID_ARGUMENT", appPath);
-        SDLActivity.nativeSetenv("ANDROID_UNPACK", appPath);
-        SDLActivity.nativeSetenv("ANDROID_ENTRYPOINT", "__main__.py");
-        SDLActivity.nativeSetenv("PYTHONHOME", appPath);
-        SDLActivity.nativeSetenv("PYTHONNOUSERSITE", "1");
-        SDLActivity.nativeSetenv("PYTHONUNBUFFERED", "1");
+        setEnv("ANDROID_APP_PATH", appPath);
+        setEnv("ANDROID_ARGUMENT", appPath);
+        setEnv("ANDROID_UNPACK", appPath);
+        setEnv("ANDROID_ENTRYPOINT", "{python_module}");
+        setEnv("ANDROID_NATIVE_LIB_DIR",
+               getApplicationInfo().nativeLibraryDir);
+        setEnv("PYTHONHOME", appPath);
+        setEnv("PYTHONNOUSERSITE", "1");
+        setEnv("PYTHONUNBUFFERED", "1");
+        setEnv("P4A_BOOTSTRAP", "SDL2");
         super.onCreate(savedInstanceState);
+    }}
+
+    private static String pickAbi(AssetManager am, String root)
+            throws IOException {{
+        String[] available = am.list(root);
+        if (available == null) return null;
+        for (String supported : Build.SUPPORTED_ABIS) {{
+            for (String entry : available) {{
+                if (entry.equals(supported)) return supported;
+            }}
+        }}
+        return null;
+    }}
+
+    private static void setEnv(String name, String value) {{
+        try {{
+            Os.setenv(name, value, true);
+        }} catch (ErrnoException e) {{
+            Log.e(TAG, "setenv " + name + " failed", e);
+        }}
     }}
 
     private static void unpackAsset(AssetManager am, String src, File destRoot)
@@ -379,10 +447,96 @@ public class MainActivity extends SDLActivity {{
             unpackAsset(am, src + "/" + child, destRoot);
         }}
     }}
+
+    /** Like unpackAsset but strips the leading {{srcRoot}} so that
+     *  assets/site-packages/x86_64/foo lands as destRoot/foo. */
+    private static void unpackAssetTree(
+        AssetManager am, String srcRoot, File destRoot
+    ) throws IOException {{
+        unpackAssetTreeRec(am, srcRoot, srcRoot, destRoot);
+    }}
+
+    private static void unpackAssetTreeRec(
+        AssetManager am, String srcRoot, String current, File destRoot
+    ) throws IOException {{
+        String[] entries = am.list(current);
+        if (entries == null || entries.length == 0) {{
+            String rel = current.length() > srcRoot.length()
+                ? current.substring(srcRoot.length() + 1)
+                : "";
+            File outFile = new File(destRoot, rel);
+            File parent = outFile.getParentFile();
+            if (parent != null) parent.mkdirs();
+            try (InputStream in = am.open(current);
+                 OutputStream out = new FileOutputStream(outFile)) {{
+                byte[] buf = new byte[8192];
+                int n;
+                while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+            }}
+            return;
+        }}
+        for (String child : entries) {{
+            unpackAssetTreeRec(am, srcRoot, current + "/" + child, destRoot);
+        }}
+    }}
 }}
 """
         dest = java_dir / "MainActivity.java"
         dest.write_text(content)
+
+    # -------------------------------------------------------------------------
+    # Hardware.java — org.renpy.android.Hardware shim for Kivy SDL2 metrics
+    # -------------------------------------------------------------------------
+
+    @staticmethod
+    def write_renpy_hardware(main_dir: Path, package_name: str) -> None:
+        """Minimal org.renpy.android.Hardware that Kivy 2.3 (SDL2) calls into
+        for DPI / display metrics. Delegates to MainActivity.mActivity."""
+        java_dir = main_dir / "java" / "org" / "renpy" / "android"
+        java_dir.mkdir(parents=True, exist_ok=True)
+        content = f"""\
+package org.renpy.android;
+
+import android.util.DisplayMetrics;
+import {package_name}.MainActivity;
+
+public class Hardware {{
+    public static DisplayMetrics metrics = new DisplayMetrics();
+
+    public static int getDPI() {{
+        MainActivity.mActivity.getWindowManager()
+            .getDefaultDisplay().getMetrics(metrics);
+        return metrics.densityDpi;
+    }}
+}}
+"""
+        (java_dir / "Hardware.java").write_text(content)
+
+    # -------------------------------------------------------------------------
+    # PythonActivity.java — org.kivy.android.PythonActivity shim
+    # -------------------------------------------------------------------------
+
+    @staticmethod
+    def write_kivy_python_activity(main_dir: Path, package_name: str) -> None:
+        """Minimal org.kivy.android.PythonActivity that exposes mActivity to
+        Kivy's fontscale lookup via pyjnius."""
+        java_dir = main_dir / "java" / "org" / "kivy" / "android"
+        java_dir.mkdir(parents=True, exist_ok=True)
+        content = f"""\
+package org.kivy.android;
+
+import android.app.Activity;
+import {package_name}.MainActivity;
+
+public class PythonActivity {{
+    public static Activity mActivity;
+
+    public static Activity getActivity() {{
+        return mActivity;
+    }}
+}}
+"""
+        (java_dir / "PythonActivity.java").write_text(content)
 
     # -------------------------------------------------------------------------
     # Native bootstrap — libmain.so (provides SDL_main → CPython)
@@ -437,8 +591,8 @@ static const char *REDIRECT_STDIO =
     "    def __init__(self): self._buf = ''\\n"
     "    def write(self, s):\\n"
     "        self._buf += s\\n"
-    "        while '\\n' in self._buf:\\n"
-    "            i = self._buf.index('\\n')\\n"
+    "        while chr(10) in self._buf:\\n"
+    "            i = self._buf.index(chr(10))\\n"
     "            androidembed.log(self._buf[:i])\\n"
     "            self._buf = self._buf[i+1:]\\n"
     "    def flush(self):\\n"
@@ -470,15 +624,24 @@ int main(int argc, char *argv[]) {{
     config.use_environment = 1;
 
     wchar_t w_stdlib[1024];
+    wchar_t w_dynload[1024];
     wchar_t w_site[1024];
     wchar_t w_app[1024];
-    swprintf(w_stdlib, 1024, L"%s/python{python_version}", app_path);
-    swprintf(w_site,   1024, L"%s/site-packages", app_path);
-    swprintf(w_app,    1024, L"%s", app_path);
+    swprintf(w_stdlib,  1024, L"%s/python{python_version}", app_path);
+    swprintf(w_dynload, 1024, L"%s/python{python_version}/lib-dynload", app_path);
+    swprintf(w_site,    1024, L"%s/site-packages", app_path);
+    swprintf(w_app,     1024, L"%s", app_path);
     config.module_search_paths_set = 1;
     PyWideStringList_Append(&config.module_search_paths, w_stdlib);
+    PyWideStringList_Append(&config.module_search_paths, w_dynload);
     PyWideStringList_Append(&config.module_search_paths, w_site);
     PyWideStringList_Append(&config.module_search_paths, w_app);
+    const char *native_lib_dir = getenv("ANDROID_NATIVE_LIB_DIR");
+    if (native_lib_dir) {{
+        wchar_t w_native[1024];
+        swprintf(w_native, 1024, L"%s", native_lib_dir);
+        PyWideStringList_Append(&config.module_search_paths, w_native);
+    }}
 
     PyStatus status = Py_InitializeFromConfig(&config);
     PyConfig_Clear(&config);
@@ -491,18 +654,42 @@ int main(int argc, char *argv[]) {{
 
     PyRun_SimpleString(REDIRECT_STDIO);
 
-    char ep_path[1024];
-    snprintf(ep_path, sizeof(ep_path), "%s/%s", app_path, entrypoint);
-    FILE *fp = fopen(ep_path, "r");
-    if (!fp) {{
-        LOGE("cannot open entrypoint: %s", ep_path);
+    /* Run `python -m <entrypoint>` via runpy. The entrypoint env var is the
+     * importable package or module name, not a filesystem path. */
+    PyObject *runpy = PyImport_ImportModule("runpy");
+    if (!runpy) {{
+        LOGE("import runpy failed");
+        if (PyErr_Occurred()) PyErr_Print();
         Py_FinalizeEx();
         return 1;
     }}
-    int ret = PyRun_SimpleFile(fp, ep_path);
-    fclose(fp);
+    PyObject *func = PyObject_GetAttrString(runpy, "run_module");
+    if (!func) {{
+        LOGE("runpy has no run_module");
+        Py_DECREF(runpy);
+        Py_FinalizeEx();
+        return 1;
+    }}
+    PyObject *args_tuple = PyTuple_Pack(1, PyUnicode_FromString(entrypoint));
+    PyObject *kwargs = Py_BuildValue("{{s:s, s:i}}",
+                                     "run_name", "__main__",
+                                     "alter_sys", 1);
+    LOGI("running module: %s", entrypoint);
+    PyObject *result = PyObject_Call(func, args_tuple, kwargs);
+    Py_DECREF(args_tuple);
+    Py_DECREF(kwargs);
+    Py_DECREF(func);
+    Py_DECREF(runpy);
 
-    if (PyErr_Occurred()) PyErr_Print();
+    int ret = 0;
+    if (!result) {{
+        LOGE("python entrypoint raised");
+        PyErr_Print();
+        ret = 1;
+    }} else {{
+        Py_DECREF(result);
+    }}
+
     Py_FinalizeEx();
     LOGI("python exit %d", ret);
     return ret;
