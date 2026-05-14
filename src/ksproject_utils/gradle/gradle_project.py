@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 from ..pip_install import PipInstaller
@@ -108,6 +109,8 @@ class GradleProject:
         task = "assembleDebug" if variant == "debug" else "assembleRelease"
         env = os.environ.copy()
         env["JAVA_HOME"] = self.toolchain.java_path
+        if sys.platform == "linux" and "JAVA_TOOL_OPTIONS" not in env:
+            env["JAVA_TOOL_OPTIONS"] = "-XX:TieredStopAtLevel=1 -Xshare:off"
         gradlew = self.gradle_dir / "gradlew"
         if not gradlew.exists():
             raise GradleProjectError(

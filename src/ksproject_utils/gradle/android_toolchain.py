@@ -216,6 +216,14 @@ def _run_sdkmanager(
     env: dict[str, str],
     stdin_input: str | None = None,
 ) -> None:
+    # On Linux without KVM (e.g. QEMU software emulation) the JVM's C2 JIT
+    # compiles crypto code using AES-NI / SHA CPU intrinsics that QEMU doesn't
+    # implement, causing SIGSEGV in sun.security.jca / libjvm.  Limiting
+    # tiered compilation to level 1 (client compiler only, no C2) avoids
+    # the crash.  JAVA_TOOL_OPTIONS is honoured by all JVM invocations.
+    if sys.platform == "linux" and "JAVA_TOOL_OPTIONS" not in env:
+        env["JAVA_TOOL_OPTIONS"] = "-XX:TieredStopAtLevel=1 -Xshare:off"
+
     result = subprocess.run(
         [sdkmanager, *args],
         env=env,
