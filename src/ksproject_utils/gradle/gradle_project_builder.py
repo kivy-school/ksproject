@@ -84,7 +84,7 @@ class GradleProjectBuilder:
     # Generation
     # ------------------------------------------------------------------
 
-    def generate(self) -> None:
+    def generate(self, aar: bool = False) -> None:
         dist_dir = self.working_dir / "project_dist" / "gradle"
         dist_dir.mkdir(parents=True, exist_ok=True)
 
@@ -109,6 +109,7 @@ class GradleProjectBuilder:
             target_sdk=(self.android.api if self.android and self.android.api else 35),
             python_version=PY_VERSION,
             ndk_version=toolchain.ndk_version,
+            aar=aar,
         )
 
         main_dir = app_dir / "src" / "main"

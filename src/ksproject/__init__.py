@@ -42,6 +42,11 @@ class KSProjectCLI:
             default="debug",
             choices=["debug", "release"],
         )
+        p_build.add_argument(
+            "--aar",
+            action="store_true",
+            help="Build an AAR library instead of an APK",
+        )
         p_build.set_defaults(func=self.android_build)
 
         p_devices = asub.add_parser("devices", help="List devices and AVDs")
@@ -72,8 +77,9 @@ class KSProjectCLI:
 
     def android_build(self, args: argparse.Namespace) -> int:
         project = GradleProject(Path.cwd())
-        apk = project.build(args.variant)
-        print(f"APK: {apk}")
+        output = project.build(args.variant, aar=args.aar)
+        label = "AAR" if args.aar else "APK"
+        print(f"{label}: {output}")
         return 0
 
     def android_devices(self, args: argparse.Namespace) -> int:

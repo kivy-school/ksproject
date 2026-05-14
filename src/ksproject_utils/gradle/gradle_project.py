@@ -79,9 +79,9 @@ class GradleProject:
     def gradle_dir(self) -> Path:
         return self.project_path / "project_dist" / "gradle"
 
-    def generate(self) -> None:
+    def generate(self, aar: bool = False) -> None:
         """Write Gradle files, build CPython, copy stdlib + jniLibs."""
-        self.builder.generate()
+        self.builder.generate(aar=aar)
 
     def install_site_packages(self) -> None:
         """Install the project (and its deps) into per-arch site_packages dirs."""
@@ -99,8 +99,8 @@ class GradleProject:
                 site_packages=platform.site_packages,
             )
 
-    def gradle_assemble(self, variant: str = "debug") -> Path:
-        """Run only `gradlew assemble<Variant>` and return the produced APK."""
+    def gradle_assemble(self, variant: str = "debug", aar: bool = False) -> Path:
+        """Run only `gradlew assemble<Variant>` and return the produced APK or AAR."""
         if variant not in ("debug", "release"):
             raise GradleProjectError(
                 f"Unknown variant {variant!r}; expected 'debug' or 'release'"
@@ -127,23 +127,32 @@ class GradleProject:
                 f"./gradlew {task} exited with code {result.returncode}"
             )
 
-        apk = (
-            self.gradle_dir
-            / "app" / "build" / "outputs" / "apk"
-            / variant / f"app-{variant}.apk"
-        )
-        if not apk.exists():
-            raise GradleProjectError(f"Expected APK not found at {apk}")
-        return apk
+        if aar:
+            output = (
+                self.gradle_dir
+                / "app" / "build" / "outputs" / "aar"
+                / f"app-{variant}.aar"
+            )
+            if not output.exists():
+                raise GradleProjectError(f"Expected AAR not found at {output}")
+        else:
+            output = (
+                self.gradle_dir
+                / "app" / "build" / "outputs" / "apk"
+                / variant / f"app-{variant}.apk"
+            )
+            if not output.exists():
+                raise GradleProjectError(f"Expected APK not found at {output}")
+        return output
 
-    def build(self, variant: str = "debug") -> Path:
+    def build(self, variant: str = "debug", aar: bool = False) -> Path:
         """Run full pipeline: generate → pip install → gradlew assemble<Variant>.
 
-        Returns the path to the produced APK.
+        Returns the path to the produced APK or AAR.
         """
-        self.generate()
+        self.generate(aar=aar)
         self.install_site_packages()
-        return self.gradle_assemble(variant)
+        return self.gradle_assemble(variant, aar=aar)
 
     # ------------------------------------------------------------------
     # Devices / run
