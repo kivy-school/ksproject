@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import platform
+import re
 import subprocess
 import sys
 import urllib.request
@@ -27,6 +28,11 @@ SDKMAN_INSTALL_URL = "https://get.sdkman.io"
 DEFAULT_SDK_VERSION = "35"
 DEFAULT_NDK_VERSION = "27.3.13750724"
 DEFAULT_CMAKE_VERSION = "3.22.1"
+
+# sdkmanager (Android cmdline-tools) is known to crash (SIGSEGV) on Java >= 22.
+# Pin sdkman installs to this LTS identifier and reject newer detections.
+_SDKMAN_JAVA_ID = "21.0.7-tem"  # Temurin 21 LTS — update when new patch ships
+_SDKMANAGER_MAX_JAVA = 21
 
 
 def host_emulator_abi() -> str:
@@ -266,21 +272,54 @@ def _ensure_emulator(sdk_path: str, sdk_version: str, java_path: str) -> None:
 # Java
 # ---------------------------------------------------------------------------
 
+def _java_major_version(java_home: str) -> int | None:
+    """Return the major Java version number for the JDK at *java_home*, or None."""
+    java_bin = Path(java_home) / "bin" / "java"
+    if not java_bin.exists():
+        return None
+    try:
+        result = subprocess.run(
+            [str(java_bin), "-version"], capture_output=True, text=True
+        )
+        for line in (result.stderr + result.stdout).splitlines():
+            if "version" in line:
+                m = re.search(r'"(\d+)', line)
+                if m:
+                    return int(m.group(1))
+    except Exception:
+        pass
+    return None
+
+
+def _is_java_compatible(java_home: str) -> bool:
+    major = _java_major_version(java_home)
+    return major is not None and 17 <= major <= _SDKMANAGER_MAX_JAVA
+
+
 def _resolve_java(android: KivySchoolData.AndroidData | None) -> str:
     if android and android.java_path:
         return str(android.java_path)
 
     sdkman_current = Path.home() / ".sdkman" / "candidates" / "java" / "current"
-    if sdkman_current.exists():
+    if sdkman_current.exists() and _is_java_compatible(str(sdkman_current)):
         return str(sdkman_current)
 
     env = os.environ.get("JAVA_HOME")
-    if env:
+    if env and _is_java_compatible(env):
         return env
 
     detected = _detect_system_java_home()
-    if detected:
+    if detected and _is_java_compatible(detected):
         return detected
+
+    incompatible = detected or os.environ.get("JAVA_HOME")
+    if incompatible:
+        major = _java_major_version(incompatible)
+        print(
+            f"[ksproject] Detected Java {major} at {incompatible} — "
+            f"sdkmanager requires Java <= {_SDKMANAGER_MAX_JAVA}. "
+            f"Installing compatible JDK via sdkman..."
+        )
 
     return _install_java_via_sdkman()
 
@@ -333,12 +372,12 @@ def _install_java_via_sdkman() -> str:
                 f"sdkman installer exited with code {proc.returncode}"
             )
 
-    print("[ksproject] Installing Java (Temurin LTS) via sdkman...")
+    print(f"[ksproject] Installing Java {_SDKMAN_JAVA_ID} via sdkman...")
     proc = subprocess.run(
         [
             "/bin/bash",
             "-c",
-            f'source "{sdkman_init}" && sdk install java',
+            f'source "{sdkman_init}" && sdk install java {_SDKMAN_JAVA_ID}',
         ],
     )
     if proc.returncode != 0:
