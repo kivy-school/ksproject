@@ -161,8 +161,13 @@ def _install_sdk(
             unpacked.rename(cmdline_tools_dir / "latest")
         cmdline_tools_zip.unlink(missing_ok=True)
 
-        # Restore exec bit lost on some unzip paths
-        os.chmod(sdkmanager, 0o755)
+        # Restore exec bit lost on some unzip paths for all binaries.
+        # Skip Windows-only scripts (.bat, .cmd) that are not used on this platform.
+        non_exec_suffixes = {".bat", ".cmd"}
+        bin_dir = cmdline_tools_dir / "latest" / "bin"
+        for tool in bin_dir.iterdir():
+            if tool.is_file() and tool.suffix.lower() not in non_exec_suffixes:
+                os.chmod(tool, 0o755)
 
     env = os.environ.copy()
     env["ANDROID_HOME"] = str(sdk_root)
