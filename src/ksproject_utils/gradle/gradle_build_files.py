@@ -100,11 +100,16 @@ android.nonTransitiveRClass=true
         (wrapper_dir / "gradle-wrapper.properties").write_text(properties)
 
         jar_path = wrapper_dir / "gradle-wrapper.jar"
-        if jar_path.exists():
+        gradlew_path = dir / "gradlew"
+        if jar_path.exists() and gradlew_path.exists():
             return
 
-        print(f"[ksproject] Downloading Gradle {_GRADLE_VERSION} wrapper jar...")
+        _gh = f"https://raw.githubusercontent.com/gradle/gradle/refs/tags/v{_GRADLE_VERSION}"
+        print(f"[ksproject] Downloading Gradle {_GRADLE_VERSION} wrapper files...")
         urllib.request.urlretrieve(_GRADLE_WRAPPER_JAR_URL, jar_path)
+        urllib.request.urlretrieve(f"{_gh}/gradlew", gradlew_path)
+        gradlew_path.chmod(0o755)
+        urllib.request.urlretrieve(f"{_gh}/gradlew.bat", dir / "gradlew.bat")
 
     # -------------------------------------------------------------------------
     # App module
