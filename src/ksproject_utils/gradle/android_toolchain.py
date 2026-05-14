@@ -1,9 +1,9 @@
 """Resolves the Android SDK, NDK, and Java paths needed to build the project.
 
 Priority order for each tool:
-  1. Explicit path set in [tool.kivy-school.android] (sdk_path / ndk_path / java_path)
-  2. ksproject-managed install under <project_dir>/.kivyschool/android-sdk
-  3. System environment variables (ANDROID_HOME, ANDROID_NDK_ROOT, JAVA_HOME)
+  1. System environment variables (ANDROID_HOME, ANDROID_NDK_ROOT, JAVA_HOME)
+  2. Explicit path set in [tool.kivy-school.android] (sdk_path / ndk_path / java_path)
+  3. ksproject-managed install under <project_dir>/.kivyschool/android-sdk
 """
 from __future__ import annotations
 
@@ -77,7 +77,7 @@ class AndroidToolchain:
         sdk_path = _resolve_sdk(
             android, sdk_version, ndk_version, java_path, project_dir
         )
-        ndk_path = _resolve_ndk(android, sdk_path, ndk_version)
+        ndk_path = _resolve_ndk(android, sdk_path, ndk_version, java_path)
         _ensure_emulator(sdk_path, sdk_version, java_path)
 
         return cls(
@@ -99,6 +99,10 @@ def _resolve_sdk(
     java_path: str,
     project_dir: Path,
 ) -> str:
+    env = os.environ.get("ANDROID_HOME")
+    if env:
+        return env
+
     if android and android.sdk_path:
         return str(android.sdk_path)
 
@@ -119,7 +123,12 @@ def _resolve_ndk(
     android: KivySchoolData.AndroidData | None,
     sdk_path: str,
     ndk_version: str,
+    java_path: str,
 ) -> str:
+    env = os.environ.get("ANDROID_NDK_ROOT")
+    if env:
+        return env
+
     if android and android.ndk_path:
         return str(android.ndk_path)
 
@@ -127,14 +136,13 @@ def _resolve_ndk(
     if ndk_in_sdk.exists():
         return str(ndk_in_sdk)
 
-    env = os.environ.get("ANDROID_NDK_ROOT")
-    if env:
-        return env
-
-    raise AndroidToolchainError(
-        f"Android NDK {ndk_version} not found. Set ndk_path in "
-        f"[tool.kivy-school.android] or ensure sdkmanager installed it."
-    )
+    _sdkmanager_install(Path(sdk_path), java_path, [f"ndk;{ndk_version}"])
+    if not ndk_in_sdk.exists():
+        raise AndroidToolchainError(
+            f"Android NDK {ndk_version} install appeared to succeed but "
+            f"{ndk_in_sdk} still not found."
+        )
+    return str(ndk_in_sdk)
 
 
 def _install_sdk(
@@ -310,16 +318,16 @@ def _is_java_compatible(java_home: str) -> bool:
 
 
 def _resolve_java(android: KivySchoolData.AndroidData | None) -> str:
+    env = os.environ.get("JAVA_HOME")
+    if env and _is_java_compatible(env):
+        return env
+
     if android and android.java_path:
         return str(android.java_path)
 
     sdkman_current = Path.home() / ".sdkman" / "candidates" / "java" / "current"
     if sdkman_current.exists() and _is_java_compatible(str(sdkman_current)):
         return str(sdkman_current)
-
-    env = os.environ.get("JAVA_HOME")
-    if env and _is_java_compatible(env):
-        return env
 
     detected = _detect_system_java_home()
     if detected and _is_java_compatible(detected):
