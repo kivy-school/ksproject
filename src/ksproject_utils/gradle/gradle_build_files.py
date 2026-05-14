@@ -4,14 +4,21 @@ Swift-specific tasks (SwiftPM build / copy / Swift activity) are intentionally
 omitted — generated projects are pure AGP."""
 from __future__ import annotations
 
-import os
 import shutil
-import subprocess
+import urllib.request
 from pathlib import Path
 
 from ..pyproject_toml import KivySchoolData
 
 Arch = KivySchoolData.AndroidData.Arch
+
+_GRADLE_VERSION = "9.5.0"
+# Gradle commits the wrapper jar to their own repo; download it directly so
+# ksproject never needs a system-installed `gradle`.
+_GRADLE_WRAPPER_JAR_URL = (
+    "https://raw.githubusercontent.com/gradle/gradle"
+    f"/refs/tags/v{_GRADLE_VERSION}/gradle/wrapper/gradle-wrapper.jar"
+)
 
 
 class GradleBuildError(Exception):
@@ -81,33 +88,23 @@ android.nonTransitiveRClass=true
         wrapper_dir = dir / "gradle" / "wrapper"
         wrapper_dir.mkdir(parents=True, exist_ok=True)
 
-        properties = """\
-distributionBase=GRADLE_USER_HOME
-distributionPath=wrapper/dists
-distributionUrl=https\\://services.gradle.org/distributions/gradle-9.5.0-bin.zip
-networkTimeout=10000
-validateDistributionUrl=true
-zipStoreBase=GRADLE_USER_HOME
-zipStorePath=wrapper/dists
-"""
+        properties = (
+            "distributionBase=GRADLE_USER_HOME\n"
+            "distributionPath=wrapper/dists\n"
+            f"distributionUrl=https\\://services.gradle.org/distributions/gradle-{_GRADLE_VERSION}-bin.zip\n"
+            "networkTimeout=10000\n"
+            "validateDistributionUrl=true\n"
+            "zipStoreBase=GRADLE_USER_HOME\n"
+            "zipStorePath=wrapper/dists\n"
+        )
         (wrapper_dir / "gradle-wrapper.properties").write_text(properties)
 
         jar_path = wrapper_dir / "gradle-wrapper.jar"
         if jar_path.exists():
             return
 
-        print("[ksproject] Generating Gradle wrapper (requires system gradle)...")
-        env = os.environ.copy()
-        env["JAVA_HOME"] = java_path
-        result = subprocess.run(
-            ["gradle", "wrapper", "--gradle-version", "9.5.0"],
-            cwd=dir,
-            env=env,
-        )
-        if result.returncode != 0:
-            raise GradleBuildError(
-                f"gradle wrapper generation exited with code {result.returncode}"
-            )
+        print(f"[ksproject] Downloading Gradle {_GRADLE_VERSION} wrapper jar...")
+        urllib.request.urlretrieve(_GRADLE_WRAPPER_JAR_URL, jar_path)
 
     # -------------------------------------------------------------------------
     # App module
