@@ -183,6 +183,8 @@ android {{
     namespace = "{package_name}"
     compileSdk = {compile_sdk}
 {ndk_line}
+    ndkPath = "{ndk_path}"
+
     defaultConfig {{
 {app_id_lines}        minSdk = {min_sdk}
         targetSdk = {target_sdk}
@@ -190,7 +192,6 @@ android {{
         ndk {{
             abiFilters += setOf({abi_filters})
         }}
-        ndkPath = {ndk_path}
 
         externalNativeBuild {{
             cmake {{
@@ -451,7 +452,7 @@ public class MainActivity extends PythonActivity {{
         setEnv("PYTHONUNBUFFERED", "1");
         setEnv("P4A_BOOTSTRAP", "SDL2");
         setEnv("APP_ACTIVITY", "{package_name}.MainActivity");
-        SDLActivity.nativeSetenv("PYTHONOPTIMIZE", "2");
+        setEnv("PYTHONOPTIMIZE", "2");
         super.onCreate(savedInstanceState);
     }}
 
@@ -574,6 +575,7 @@ public class Hardware {{
         content = f"""\
 package org.kivy.android;
 
+import android.app.Activity;
 import org.libsdl.app.SDLActivity;
 import android.content.pm.PackageManager;
 import android.util.Log;
@@ -633,16 +635,6 @@ public class PythonActivity extends SDLActivity {{
 
     public void requestPermissions(String[] permissions) {{
         requestPermissionsWithRequestCode(permissions, 1);
-    }}
-
-    public static void changeKeyboard(int inputType) {{
-        if (SDLActivity.keyboardInputType != inputType) {{
-            SDLActivity.keyboardInputType = inputType;
-            InputMethodManager imm =
-                    (InputMethodManager)
-                            getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
-            imm.restartInput(mTextEdit);
-        }}
     }}
 }}
 """
