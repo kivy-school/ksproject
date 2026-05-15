@@ -217,4 +217,9 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 .DS_Store
+
+
+
+# Python
 uv.lock
+.build-target

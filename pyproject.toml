@@ -10,11 +10,18 @@ urls = { "Homepage" = "https://kivyschool.com" }
 requires-python = ">=3.13"
 dependencies = [
     "kivy==2.3.1",
+    #"kivy-reloader[desktop]",
+    "toml>=0.10.2",
 ]
 
 [project.scripts]
 ksproject = "ksproject:main"
 ksproject-gui = "ksproject_gui:main"
+
+[tool.uv.sources]
+
+[tool.uv.build-backend]
+module-name = ["ksproject", "ksproject_gui", "ksproject_utils"]
 
 [build-system]
 requires = ["uv_build>=0.11.3,<0.12.0"]
