@@ -94,7 +94,7 @@ class GradleProjectBuilder:
         # Root Gradle files
         GradleBuildFiles.write_root_build_gradle(dist_dir)
         GradleBuildFiles.write_settings_gradle(dist_dir, self.app_name)
-        GradleBuildFiles.write_gradle_properties(dist_dir)
+        GradleBuildFiles.write_gradle_properties(dist_dir, toolchain.ndk_path)
         GradleBuildFiles.write_local_properties(dist_dir, toolchain.sdk_path)
 
         # app module (must exist before `gradle wrapper` evaluates settings.gradle.kts)
