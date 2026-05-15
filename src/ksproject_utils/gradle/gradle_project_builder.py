@@ -109,6 +109,7 @@ class GradleProjectBuilder:
             target_sdk=(self.android.api if self.android and self.android.api else 35),
             python_version=PY_VERSION,
             ndk_version=toolchain.ndk_version,
+            nkd_path=toolchain.ndk_path,
             aar=aar,
             gradle_dependencies=(self.android.gradle_dependencies if self.android else []),
         )
@@ -125,7 +126,7 @@ class GradleProjectBuilder:
         res_dir = main_dir / "res"
         GradleBuildFiles.write_icon(res_dir, self._resolve_asset("icon"))
         GradleBuildFiles.write_main_activity(
-            main_dir, self.package_name, PY_VERSION, self.app_name
+            main_dir, self.package_name, PY_VERSION, self.pyproject.project.name
         )
         GradleBuildFiles.write_renpy_hardware(main_dir, self.package_name)
         GradleBuildFiles.write_kivy_python_activity(main_dir, self.package_name)
