@@ -588,6 +588,11 @@ public class PythonActivity extends SDLActivity {{
     public static Activity getActivity() {{
         return mActivity;
     }}
+
+    public void removeLoadingScreen() {{
+        // currently does nothing
+    }}
+    
     /**
      * Used by android.permissions module to register a call back after requesting runtime
      * permissions
