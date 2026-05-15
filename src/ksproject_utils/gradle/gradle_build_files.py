@@ -126,6 +126,7 @@ include(":app")
         target_sdk: int = 35,
         python_version: str = "3.13",
         ndk_version: str | None = None,
+        ndk_path: str | None | Path = None,
         aar: bool = False,
         gradle_dependencies: list[str] | None = None,
     ) -> None:
@@ -138,6 +139,7 @@ include(":app")
                 target_sdk=target_sdk,
                 python_version=python_version,
                 ndk_version=ndk_version,
+                ndk_path=ndk_path,
                 aar=aar,
                 gradle_dependencies=gradle_dependencies or [],
             )
@@ -153,6 +155,7 @@ include(":app")
         target_sdk: int,
         python_version: str,
         ndk_version: str | None = None,
+        ndk_path: str | None | Path = None,
         aar: bool = False,
         gradle_dependencies: list[str] | None = None,
     ) -> str:
@@ -187,6 +190,7 @@ android {{
         ndk {{
             abiFilters += setOf({abi_filters})
         }}
+        ndkPath = {ndk_path}
 
         externalNativeBuild {{
             cmake {{
