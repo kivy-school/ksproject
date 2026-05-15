@@ -110,6 +110,7 @@ def _resolve_sdk(
     platforms_dir = managed / "platforms" / f"android-{sdk_version}"
     if not platforms_dir.exists():
         _install_sdk(managed, sdk_version, ndk_version, java_path)
+    _restore_cmdline_tools_exec_bits(managed)
     # CMake is required by AGP's externalNativeBuild but wasn't always
     # installed in older runs. Top it up if missing.
     if not (managed / "cmake" / DEFAULT_CMAKE_VERSION / "bin" / "cmake").exists():
@@ -169,13 +170,7 @@ def _install_sdk(
             unpacked.rename(cmdline_tools_dir / "latest")
         cmdline_tools_zip.unlink(missing_ok=True)
 
-        # Restore exec bit lost on some unzip paths for all binaries.
-        # Skip Windows-only scripts (.bat, .cmd) that are not used on this platform.
-        non_exec_suffixes = {".bat", ".cmd"}
-        bin_dir = cmdline_tools_dir / "latest" / "bin"
-        for tool in bin_dir.iterdir():
-            if tool.is_file() and tool.suffix.lower() not in non_exec_suffixes:
-                os.chmod(tool, 0o755)
+        _restore_cmdline_tools_exec_bits(sdk_root)
 
     env = os.environ.copy()
     env["ANDROID_HOME"] = str(sdk_root)
@@ -205,6 +200,26 @@ def _install_sdk(
         _run_sdkmanager(str(sdkmanager), ["--install", pkg], env=env)
 
     print(f"[ksproject] Android toolchain installed at {sdk_root}")
+
+
+def _restore_cmdline_tools_exec_bits(sdk_root: Path) -> None:
+    """Restore executable bits for all shell wrappers in cmdline-tools/latest/bin.
+
+    Python's zipfile extraction does not preserve Unix executable bits from
+    Google's cmdline-tools zip. Any file starting with a shebang is a shell
+    wrapper intended to be run directly.
+    """
+    bin_dir = sdk_root / "cmdline-tools" / "latest" / "bin"
+    if not bin_dir.is_dir():
+        return
+    for tool in bin_dir.iterdir():
+        if not tool.is_file():
+            continue
+        try:
+            if tool.read_bytes()[:2] == b"#!":
+                os.chmod(tool, tool.stat().st_mode | 0o111)
+        except OSError as exc:
+            raise AndroidToolchainError(f"Unable to chmod {tool}: {exc}") from exc
 
 
 def _sdkmanager_install(
