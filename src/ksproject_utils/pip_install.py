@@ -33,14 +33,14 @@ class PipInstaller:
         # Copy .java / .libs / .kotlin from local dep source trees into site_packages.
         # These dot-directories are not included in wheels, so ksproject collects them.
         sp = Path(site_packages)
-        for local_path in _collect_local_paths(project_dir):
+        for local_path in collect_local_paths(project_dir):
             for dot_dir in (".java", ".libs", ".kotlin"):
                 src = local_path / dot_dir
                 if src.is_dir():
                     shutil.copytree(src, sp / dot_dir, dirs_exist_ok=True)
 
 
-def _collect_local_paths(project_dir: Path, visited: set[Path] | None = None) -> list[Path]:
+def collect_local_paths(project_dir: Path, visited: set[Path] | None = None) -> list[Path]:
     """Recursively collect all local path and workspace dependency directories."""
     if visited is None:
         visited = set()
@@ -79,12 +79,12 @@ def _collect_local_paths(project_dir: Path, visited: set[Path] | None = None) ->
         if "path" in source:
             local_path = (project_dir / source["path"]).resolve()
             result.append(local_path)
-            result.extend(_collect_local_paths(local_path, visited))
+            result.extend(collect_local_paths(local_path, visited))
         elif source.get("workspace"):
             member_path = workspace_map.get(_normalize(pkg_name))
             if member_path:
                 result.append(member_path)
-                result.extend(_collect_local_paths(member_path, visited))
+                result.extend(collect_local_paths(member_path, visited))
 
     return result
 
