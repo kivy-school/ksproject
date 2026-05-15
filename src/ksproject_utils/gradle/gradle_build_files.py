@@ -362,7 +362,7 @@ tasks.named("preBuild") {{
         shutil.copy2(icon_src, mipmap_dir / "ic_launcher.png")
 
     # -------------------------------------------------------------------------
-    # MainActivity.java — extends SDLActivity (SDL2 AAR provides the class)
+    # MainActivity.java — extends PythonActivity (SDL2 AAR provides the class)
     # -------------------------------------------------------------------------
 
     @staticmethod
@@ -388,10 +388,9 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import org.libsdl.app.SDLActivity;
 import org.kivy.android.PythonActivity;
 
-public class MainActivity extends SDLActivity {{
+public class MainActivity extends PythonActivity {{
     private static final String TAG = "ksproject";
     public static MainActivity mActivity;
     @Override
@@ -451,7 +450,8 @@ public class MainActivity extends SDLActivity {{
         setEnv("PYTHONNOUSERSITE", "1");
         setEnv("PYTHONUNBUFFERED", "1");
         setEnv("P4A_BOOTSTRAP", "SDL2");
-        setEnv("APP_ACTIVITY", "{package_name}");
+        setEnv("APP_ACTIVITY", "{package_name}.MainActivity");
+        SDLActivity.nativeSetenv("PYTHONOPTIMIZE", "2");
         super.onCreate(savedInstanceState);
     }}
 
@@ -574,14 +574,70 @@ public class Hardware {{
         content = f"""\
 package org.kivy.android;
 
-import android.app.Activity;
-import {package_name}.MainActivity;
+import org.libsdl.app.SDLActivity;
+import android.content.pm.PackageManager;
+import android.util.Log;
+import android.content.Context;
+import android.view.inputmethod.InputMethodManager;
 
-public class PythonActivity {{
+public class PythonActivity extends SDLActivity {{
     public static Activity mActivity;
+
+    public static final String TAG = "PythonActivity";
 
     public static Activity getActivity() {{
         return mActivity;
+    }}
+    /**
+     * Used by android.permissions module to register a call back after requesting runtime
+     * permissions
+     */
+    public interface PermissionsCallback {{
+        void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults);
+    }}
+
+    private PermissionsCallback permissionCallback;
+    private boolean havePermissionsCallback = false;
+
+    public void addPermissionsCallback(PermissionsCallback callback) {{
+        permissionCallback = callback;
+        havePermissionsCallback = true;
+        Log.v(TAG, "addPermissionsCallback(): Added callback for onRequestPermissionsResult");
+    }}
+
+    @Override
+    public void onRequestPermissionsResult(
+            int requestCode, String[] permissions, int[] grantResults) {{
+        Log.v(TAG, "onRequestPermissionsResult()");
+        if (havePermissionsCallback) {{
+            Log.v(TAG, "onRequestPermissionsResult passed to callback");
+            permissionCallback.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        }}
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+    }}
+
+    /** Used by android.permissions module to check a permission */
+    public boolean checkCurrentPermission(String permission) {{
+        return checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED;
+    }}
+
+    /** Used by android.permissions module to request runtime permissions */
+    public void requestPermissionsWithRequestCode(String[] permissions, int requestCode) {{
+        requestPermissions(permissions, requestCode);
+    }}
+
+    public void requestPermissions(String[] permissions) {{
+        requestPermissionsWithRequestCode(permissions, 1);
+    }}
+
+    public static void changeKeyboard(int inputType) {{
+        if (SDLActivity.keyboardInputType != inputType) {{
+            SDLActivity.keyboardInputType = inputType;
+            InputMethodManager imm =
+                    (InputMethodManager)
+                            getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+            imm.restartInput(mTextEdit);
+        }}
     }}
 }}
 """
