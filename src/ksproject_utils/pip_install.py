@@ -19,19 +19,6 @@ class PipInstaller:
     @staticmethod
     def install(uv_src: str, platform: Platform, site_packages: str) -> None:
         project_dir = Path(uv_src).resolve()
-        wheel_dir = project_dir.parent / ".ksproject_wheels"
-        wheel_dir.mkdir(exist_ok=True)
-
-        # Pre-build all local path/workspace deps as real wheels so that
-        # uv pip install --no-sources never writes editable .pth references
-        # into the Android site-packages.
-        for local_path in _collect_local_paths(project_dir):
-            try:
-                subprocess.check_call(
-                    [UV, "build", "--wheel", str(local_path), "--out-dir", str(wheel_dir)]
-                )
-            except subprocess.CalledProcessError as e:
-                raise PipInstallError(f"Failed to build wheel for '{local_path}': {e}")
 
         try:
             subprocess.check_call([
@@ -39,16 +26,13 @@ class PipInstaller:
                 "--python-platform", platform.pip_platform,
                 "--index-strategy", "unsafe-best-match",
                 "--no-editable",
-                "--no-sources",
-                "--find-links", str(wheel_dir),
                 "--target", site_packages,
             ])
         except subprocess.CalledProcessError as e:
             raise PipInstallError(f"Failed to install '{uv_src}': {e}")
 
-        # Copy .java / .libs from local dep source trees into site_packages.
-        # uv_build won't include dot-directories in wheels, so ksproject
-        # handles it here — the same way Gradle consumes them.
+        # Copy .java / .libs / .kotlin from local dep source trees into site_packages.
+        # These dot-directories are not included in wheels, so ksproject collects them.
         sp = Path(site_packages)
         for local_path in _collect_local_paths(project_dir):
             for dot_dir in (".java", ".libs", ".kotlin"):
