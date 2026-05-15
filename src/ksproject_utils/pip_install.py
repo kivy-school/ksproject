@@ -25,7 +25,6 @@ class PipInstaller:
                 UV, "pip", "install", uv_src,
                 "--python-platform", platform.pip_platform,
                 "--index-strategy", "unsafe-best-match",
-                "--no-editable",
                 "--target", site_packages,
             ])
         except subprocess.CalledProcessError as e:
