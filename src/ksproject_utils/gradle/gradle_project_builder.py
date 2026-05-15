@@ -109,7 +109,7 @@ class GradleProjectBuilder:
             target_sdk=(self.android.api if self.android and self.android.api else 35),
             python_version=PY_VERSION,
             ndk_version=toolchain.ndk_version,
-            nkd_path=toolchain.ndk_path,
+            ndk_path=toolchain.ndk_path,
             aar=aar,
             gradle_dependencies=(self.android.gradle_dependencies if self.android else []),
         )
