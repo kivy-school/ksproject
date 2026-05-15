@@ -451,6 +451,7 @@ public class MainActivity extends SDLActivity {{
         setEnv("PYTHONNOUSERSITE", "1");
         setEnv("PYTHONUNBUFFERED", "1");
         setEnv("P4A_BOOTSTRAP", "SDL2");
+        setEnv("APP_ACTIVITY", "{package_name}")
         super.onCreate(savedInstanceState);
     }}
 
