@@ -56,6 +56,9 @@ class ApplePlatform(Platform):
 
     sdk_platform = "apple"
 
+    # XcodeGen/xcodebuild slice name; matches the per-slice subdir used by
+    # the post-build install script (``site_packages/<slice>``).
+    slice: str
 
     def __init__(self, root: str):
         self.root = root
@@ -63,19 +66,29 @@ class ApplePlatform(Platform):
 
     @property
     def site_packages(self) -> str:
-        return f"{self.project_path}/site-packages/{self.pip_platform}"
+        return f"{self.project_path}/site_packages/{self.slice}"
 
 
 class IOSArm64Platform(ApplePlatform):
 
     pip_platform = "arm64-apple-ios"
     pip_arch = "arm64"
+    slice = "iphoneos"
 
 class IOSSim_X86_64Platform(ApplePlatform):
     pip_platform = "x86_64-apple-ios-simulator"
     pip_arch = "x86_64"
+    slice = "iphonesimulator"
 
 class IOSSim_Arm64Platform(ApplePlatform):
 
     pip_platform = "arm64-apple-ios-simulator"
     pip_arch = "arm64"
+    slice = "iphonesimulator"
+
+
+class MacOSPlatform(ApplePlatform):
+
+    pip_platform = "macosx_11_0_arm64"
+    pip_arch = "arm64"
+    slice = "macos"
