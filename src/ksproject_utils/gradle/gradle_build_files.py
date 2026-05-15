@@ -333,13 +333,13 @@ tasks.named("preBuild") {{
         android:allowBackup="true"
         android:supportsRtl="true"
         android:hardwareAccelerated="true"
-        android:theme="@android:style/Theme.NoTitleBar.Fullscreen">{meta_lines}
+        android:theme="@android:style/Theme.DeviceDefault.NoActionBar">{meta_lines}
 
         <activity
             android:name=".MainActivity"
             android:label="{app_name}"
             android:configChanges="orientation|screenSize|keyboardHidden"
-            android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
