@@ -24,7 +24,7 @@ automatically on first build into `.kivyschool/` inside your project.
 ```bash
 uv init --package hello-world --python 3.13
 cd hello-world
-uv add git+https://github.com/kivy-school/ksproject --branch gradle_support --dev
+uv add git+https://github.com/kivy-school/ksproject --dev
 uv run ksproject init
 ```
 
