@@ -756,6 +756,22 @@ int main(int argc, char *argv[]) {{
 
     PyRun_SimpleString(REDIRECT_STDIO);
 
+    PyObject* check_kivy = PyImport_ImportModule("kivy");
+    if (check_kivy) {{
+        LOGI("Kivy detected: initializing environment.");
+        Py_DECREF(check_kivy);
+        setenv("KIVY_NO_FILELOG", "1", 1);
+        setenv("KIVY_NO_CONFIG", "1", 1);
+        setenv("KIVY_BUILD", "android", 1);
+
+        if (app_path) {{
+            setenv("KIVY_HOME", app_path, 1);
+        }}
+    }} else {{
+        PyErr_Clear(); 
+        LOGI("Kivy not found: proceeding with standard Python.");
+    }}
+    
     /* Run `python -m <entrypoint>` via runpy. The entrypoint env var is the
      * importable package or module name, not a filesystem path. */
     PyObject *runpy = PyImport_ImportModule("runpy");
