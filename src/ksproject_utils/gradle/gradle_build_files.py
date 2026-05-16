@@ -393,7 +393,7 @@ import org.kivy.android.PythonActivity;
 
 public class MainActivity extends PythonActivity {{
     private static final String TAG = "ksproject";
-    public static MainActivity mActivity;
+
     @Override
     protected String[] getLibraries() {{
         return new String[] {{
@@ -406,7 +406,6 @@ public class MainActivity extends PythonActivity {{
     @Override
     protected void onCreate(Bundle savedInstanceState) {{
         mActivity = this;
-        PythonActivity.mActivity = this;
         File appDir = new File(getFilesDir(), "app");
         if (!appDir.exists()) {{
             appDir.mkdirs();
@@ -583,11 +582,11 @@ import android.content.Context;
 import android.view.inputmethod.InputMethodManager;
 
 public class PythonActivity extends SDLActivity {{
-    public static Activity mActivity;
+    public static PythonActivity mActivity;
 
     public static final String TAG = "PythonActivity";
 
-    public static Activity getActivity() {{
+    public static PythonActivity getActivity() {{
         return mActivity;
     }}
 
