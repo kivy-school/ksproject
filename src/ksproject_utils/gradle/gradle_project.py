@@ -111,7 +111,12 @@ class GradleProject:
         env["JAVA_HOME"] = self.toolchain.java_path
         if sys.platform == "linux" and "JAVA_TOOL_OPTIONS" not in env:
             env["JAVA_TOOL_OPTIONS"] = "-XX:TieredStopAtLevel=1 -Xshare:off"
-        gradlew = self.gradle_dir / "gradlew"
+        if sys.platform == "win32":
+            gradlew = self.gradle_dir / "gradlew.bat"
+            use_shell = True
+        else:
+            gradlew = self.gradle_dir / "gradlew"
+            use_shell = False
         if not gradlew.exists():
             raise GradleProjectError(
                 f"Gradle project not generated yet: {gradlew} missing. "
@@ -121,6 +126,7 @@ class GradleProject:
             [str(gradlew), task],
             cwd=self.gradle_dir,
             env=env,
+            shell=use_shell,
         )
         if result.returncode != 0:
             raise GradleProjectError(

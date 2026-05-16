@@ -40,7 +40,7 @@ plugins {
     id("com.android.library") version "8.9.1" apply false
 }
 """
-        (dir / "build.gradle.kts").write_text(content)
+        (dir / "build.gradle.kts").write_text(content, encoding = "utf-8")
 
     @staticmethod
     def write_settings_gradle(dir: Path, app_name: str) -> None:
@@ -64,7 +64,7 @@ dependencyResolutionManagement {{
 rootProject.name = "{app_name}"
 include(":app")
 """
-        (dir / "settings.gradle.kts").write_text(content)
+        (dir / "settings.gradle.kts").write_text(content, encoding = "utf-8")
 
     @staticmethod
     def write_gradle_properties(dir: Path) -> None:
@@ -74,11 +74,12 @@ include(":app")
             "android.useAndroidX=true\n"
             "android.nonTransitiveRClass=true\n"
         )
-        (dir / "gradle.properties").write_text(content)
+        (dir / "gradle.properties").write_text(content, encoding = "utf-8")
 
     @staticmethod
     def write_local_properties(dir: Path, sdk_path: str) -> None:
-        (dir / "local.properties").write_text(f"sdk.dir={sdk_path}\n")
+        sdk_path = str(sdk_path).replace("\\", "/")
+        (dir / "local.properties").write_text(f"sdk.dir={sdk_path}\n", encoding="utf-8")
 
     # -------------------------------------------------------------------------
     # Gradle wrapper
@@ -98,7 +99,7 @@ include(":app")
             "zipStoreBase=GRADLE_USER_HOME\n"
             "zipStorePath=wrapper/dists\n"
         )
-        (wrapper_dir / "gradle-wrapper.properties").write_text(properties)
+        (wrapper_dir / "gradle-wrapper.properties").write_text(properties, encoding="utf-8")
 
         jar_path = wrapper_dir / "gradle-wrapper.jar"
         gradlew_path = dir / "gradlew"
@@ -142,7 +143,8 @@ include(":app")
                 ndk_path=ndk_path,
                 aar=aar,
                 gradle_dependencies=gradle_dependencies or [],
-            )
+            ),
+            encoding="utf-8"
         )
         (app_dir / "libs").mkdir(parents=True, exist_ok=True)
 
@@ -174,6 +176,7 @@ include(":app")
             f'    implementation("{dep}")\n'
             for dep in (gradle_dependencies or [])
         )
+        ndk_path = str(ndk_path).replace("\\", "/") if ndk_path else ndk_path
         return f"""\
 plugins {{
     id("{plugin_id}")
@@ -350,7 +353,7 @@ tasks.named("preBuild") {{
     </application>
 </manifest>
 """
-        (main_dir / "AndroidManifest.xml").write_text(content)
+        (main_dir / "AndroidManifest.xml").write_text(content, encoding = "utf-8")
 
     # -------------------------------------------------------------------------
     # Icon
@@ -443,7 +446,7 @@ public class MainActivity extends PythonActivity {{
         setEnv("ANDROID_APP_PATH", appPath);
         setEnv("ANDROID_ARGUMENT", appPath);
         setEnv("ANDROID_UNPACK", appPath);
-        setEnv("ANDROID_ENTRYPOINT", "{python_module}");
+        setEnv("ANDROID_ENTRYPOINT", "{str(python_module).replace("-", "").replace(".", "_").replace(" ", "_")}");
         setEnv("ANDROID_NATIVE_LIB_DIR",
                getApplicationInfo().nativeLibraryDir);
         setEnv("PYTHONHOME", appPath);
@@ -551,7 +554,7 @@ public class MainActivity extends PythonActivity {{
 }}
 """
         dest = java_dir / "MainActivity.java"
-        dest.write_text(content)
+        dest.write_text(content, encoding = "utf-8")
 
     # -------------------------------------------------------------------------
     # Hardware.java — org.renpy.android.Hardware shim for Kivy SDL2 metrics
@@ -579,7 +582,7 @@ public class Hardware {{
     }}
 }}
 """
-        (java_dir / "Hardware.java").write_text(content)
+        (java_dir / "Hardware.java").write_text(content, encoding = "utf-8")
 
     # -------------------------------------------------------------------------
     # PythonActivity.java — org.kivy.android.PythonActivity shim
@@ -657,7 +660,7 @@ public class PythonActivity extends SDLActivity {{
     }}
 }}
 """
-        (java_dir / "PythonActivity.java").write_text(content)
+        (java_dir / "PythonActivity.java").write_text(content, encoding = "utf-8")
 
     # -------------------------------------------------------------------------
     # Native bootstrap — libmain.so (provides SDL_main → CPython)
@@ -825,7 +828,7 @@ int main(int argc, char *argv[]) {{
     return ret;
 }}
 """
-        (cpp_dir / "main.c").write_text(content)
+        (cpp_dir / "main.c").write_text(content, encoding = "utf-8")
 
     @staticmethod
     def write_cmake_lists(cpp_dir: Path) -> None:
@@ -859,4 +862,4 @@ target_include_directories(main PRIVATE
     "${PYTHON_INCLUDE_DIR}")
 target_link_libraries(main SDL2 python3 log android)
 """
-        (cpp_dir / "CMakeLists.txt").write_text(content)
+        (cpp_dir / "CMakeLists.txt").write_text(content, encoding = "utf-8")
