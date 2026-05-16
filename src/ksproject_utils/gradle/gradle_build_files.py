@@ -478,22 +478,33 @@ public class MainActivity extends PythonActivity {{
     private static void unpackAsset(AssetManager am, String src, File destRoot)
             throws IOException {{
         String[] entries = am.list(src);
+        File outFile = new File(destRoot, src);
+
         if (entries == null || entries.length == 0) {{
-            File outFile = new File(destRoot, src);
+            // It's a file - Unpack it
             File parent = outFile.getParentFile();
-            if (parent != null) parent.mkdirs();
-            try (InputStream in = am.open(src);
-                 OutputStream out = new FileOutputStream(outFile)) {{
-                byte[] buf = new byte[8192];
-                int n;
-                while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+            if (parent != null && !parent.exists()) {{
+                parent.mkdirs();
             }}
-            return;
-        }}
-        File dir = new File(destRoot, src);
-        dir.mkdirs();
-        for (String child : entries) {{
-            unpackAsset(am, src + "/" + child, destRoot);
+
+            // Using Buffered streams and a larger 16KB buffer for faster I/O
+            try (InputStream in = new java.io.BufferedInputStream(am.open(src));
+                 OutputStream out = new java.io.BufferedOutputStream(new FileOutputStream(outFile))) {{
+                byte[] buf = new byte[16384]; 
+                int n;
+                while ((n = in.read(buf)) > 0) {{
+                    out.write(buf, 0, n);
+                }}
+            }}
+        }} else {{
+            // It's a directory - Recurse
+            if (!outFile.exists()) {{
+                outFile.mkdirs();
+            }}
+            for (String child : entries) {{
+                // Template will process the string concatenation here
+                unpackAsset(am, src + "/" + child, destRoot);
+            }}
         }}
     }}
 
@@ -510,20 +521,29 @@ public class MainActivity extends PythonActivity {{
     ) throws IOException {{
         String[] entries = am.list(current);
         if (entries == null || entries.length == 0) {{
+            // It's a file - calculate relative path and unpack it
             String rel = current.length() > srcRoot.length()
                 ? current.substring(srcRoot.length() + 1)
                 : "";
             File outFile = new File(destRoot, rel);
+            
             File parent = outFile.getParentFile();
-            if (parent != null) parent.mkdirs();
-            try (InputStream in = am.open(current);
-                 OutputStream out = new FileOutputStream(outFile)) {{
-                byte[] buf = new byte[8192];
+            if (parent != null && !parent.exists()) {{
+                parent.mkdirs();
+            }}
+
+            try (InputStream in = new java.io.BufferedInputStream(am.open(current));
+                 OutputStream out = new java.io.BufferedOutputStream(new FileOutputStream(outFile))) {{
+                byte[] buf = new byte[16384];
                 int n;
-                while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+                while ((n = in.read(buf)) > 0) {{
+                    out.write(buf, 0, n);
+                }}
             }}
             return;
         }}
+
+        // It's a directory - loop through children and recurse
         for (String child : entries) {{
             unpackAssetTreeRec(am, srcRoot, current + "/" + child, destRoot);
         }}
@@ -711,6 +731,15 @@ int main(int argc, char *argv[]) {{
         LOGE("missing ANDROID_APP_PATH / ANDROID_ENTRYPOINT");
         return 1;
     }}
+
+    /* Env vars untill we patch Kivy platform check*/
+    setenv("KIVY_NO_FILELOG", "1", 1);
+    setenv("KIVY_NO_CONFIG", "1", 1);
+    setenv("KIVY_BUILD", "android", 1);
+    if (app_path) {{
+        setenv("KIVY_HOME", app_path, 1);
+    }}
+
     if (chdir(app_path) != 0) {{
         LOGE("chdir(%s) failed", app_path);
     }}
@@ -754,14 +783,6 @@ int main(int argc, char *argv[]) {{
     LOGI("Python initialized");
 
     PyRun_SimpleString(REDIRECT_STDIO);
-
-    /* Env vars untill we patch Kivy platform check*/
-    setenv("KIVY_NO_FILELOG", "1", 1);
-    setenv("KIVY_NO_CONFIG", "1", 1);
-    setenv("KIVY_BUILD", "android", 1);
-    if (app_path) {{
-        setenv("KIVY_HOME", app_path, 1);
-    }}
     
     /* Run `python -m <entrypoint>` via runpy. The entrypoint env var is the
      * importable package or module name, not a filesystem path. */
