@@ -290,5 +290,3 @@ def _copy_pure_python(src: Path, dst: Path) -> None:
             _copy_pure_python(child, dst / child.name)
         elif child.suffix not in {".so", ".pyc"}:
             shutil.copy2(child, dst / child.name)
-
-

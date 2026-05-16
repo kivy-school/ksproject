@@ -23,7 +23,9 @@ from ..pyproject_toml import KivySchoolData
 _CMDLINE_TOOLS_URLS = {
     "darwin": "https://dl.google.com/android/repository/commandlinetools-mac-11076708_latest.zip",
     "linux": "https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip",
+    "win32": "https://dl.google.com/android/repository/commandlinetools-windows-11076708_latest.zip",
 }
+
 SDKMAN_INSTALL_URL = "https://get.sdkman.io"
 DEFAULT_SDK_VERSION = "35"
 DEFAULT_NDK_VERSION = "27.3.13750724"
@@ -209,6 +211,9 @@ def _restore_cmdline_tools_exec_bits(sdk_root: Path) -> None:
     Google's cmdline-tools zip. Any file starting with a shebang is a shell
     wrapper intended to be run directly.
     """
+    if sys.platform == "win32":
+        return
+
     bin_dir = sdk_root / "cmdline-tools" / "latest" / "bin"
     if not bin_dir.is_dir():
         return
@@ -252,11 +257,17 @@ def _run_sdkmanager(
     if sys.platform == "linux" and "JAVA_TOOL_OPTIONS" not in env:
         env["JAVA_TOOL_OPTIONS"] = "-XX:TieredStopAtLevel=1 -Xshare:off"
 
+    if sys.platform == "win32" and not sdkmanager.endswith(".bat"):
+        sdkmanager += ".bat"
+
+    use_shell = sys.platform == "win32"
+
     result = subprocess.run(
         [sdkmanager, *args],
         env=env,
         input=stdin_input,
         text=True,
+        shell=use_shell
     )
     if result.returncode != 0:
         raise AndroidToolchainError(
@@ -310,7 +321,9 @@ def _ensure_emulator(sdk_path: str, sdk_version: str, java_path: str) -> None:
 
 def _java_major_version(java_home: str) -> int | None:
     """Return the major Java version number for the JDK at *java_home*, or None."""
-    java_bin = Path(java_home) / "bin" / "java"
+    exe_name = "java.exe" if sys.platform == "win32" else "java"
+    java_bin = Path(java_home) / "bin" / exe_name
+    
     if not java_bin.exists():
         return None
     try:
@@ -374,14 +387,17 @@ def _detect_system_java_home() -> str | None:
         out = result.stdout.strip()
         return out or None
 
-    # Linux: resolve JAVA_HOME from the javac symlink chain
+    # Linux/Windows: resolve JAVA_HOME from the javac symlink/path
+    cmd = "where" if sys.platform == "win32" else "which"
     try:
         result = subprocess.run(
-            ["which", "javac"], capture_output=True, text=True
+            [cmd, "javac"], capture_output=True, text=True
         )
         if result.returncode != 0:
             return None
-        javac = Path(result.stdout.strip()).resolve()
+        first_line = result.stdout.strip().splitlines()[0]
+        javac = Path(first_line).resolve()
+
         # <java_home>/bin/javac → go up two levels
         java_home = javac.parent.parent
         return str(java_home) if java_home.exists() else None
