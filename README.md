@@ -171,10 +171,10 @@ app_name = "Hello World"
 [tool.kivy-school.android]
 package_name = "org.example.hello_world"
 archs = ["arm64-v8a", "x86_64"]
-api = 35
+api = 36
 min_api = 24
 ndk = "27.3.13750724"
-ndk_api = 24
+ndk_api = 26
 
 # Assets — paths relative to the project root
 # icon = "assets/icon.png"
@@ -198,6 +198,8 @@ ndk_api = 24
 # java_path = "/path/to/jdk"
 
 # Declare services as (assuming you have all your services in `services` folder in root dir containing pyproject.toml)
+# Every sub-dir with top-level dir must have an __init__.py so it is considered as a python module and packaged with the app.
+
 #services = [
 #    { name = "MyService1", entrypoint = "services.myservice1", foreground = true, foreground_service_type = "location|dataSync" },
 #    { name = "MyService2", entrypoint = "services.myservice2", foreground = true, foreground_service_type = "location|dataSync" },

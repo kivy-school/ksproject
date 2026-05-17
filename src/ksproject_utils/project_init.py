@@ -52,6 +52,7 @@ class ProjectInit:
 
         self._write_app_sources()
         self._ensure_wheelhouse()
+        self._ensure_base_dirs()
         print(f"[ksproject] initialized at {self.project_path}")
 
     # ------------------------------------------------------------------
@@ -266,3 +267,9 @@ if __name__ == "__main__":
 
     def _ensure_wheelhouse(self) -> None:
         (self.project_path / "wheelhouse").mkdir(exist_ok=True)
+
+    def _ensure_base_dirs(self) -> None:
+        (self.project_path / ".java").mkdir(exist_ok=True)
+        services_dir = self.project_path / "services"
+        services_dir.mkdir(exist_ok=True)
+        (services_dir / "__init__.py").touch()
