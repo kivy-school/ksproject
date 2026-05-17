@@ -316,15 +316,32 @@ tasks.named("preBuild") {{
         app_name: str,
         permissions: list[str] | None = None,
         meta_data: dict[str, str] | None = None,
+        services: list["KivySchoolData.ServiceData"] | None = None,
     ) -> None:
+        
         perm_lines = "\n".join(
             f'    <uses-permission android:name="android.permission.{p}" />'
             for p in (permissions or ["INTERNET"])
         )
+        
         meta_lines = "".join(
             f'\n        <meta-data android:name="{k}" android:value="{v}" />'
             for k, v in (meta_data or {}).items()
         )
+
+        service_lines = ""
+        if services:
+            for svc in services:
+                fg_type = (
+                    f'\n            android:foregroundServiceType="{svc.foreground_service_type}"'
+                    if svc.foreground_service_type else ""
+                )
+                service_lines += f"""
+        <service
+            android:name=".{svc.name}"
+            android:exported="false"{fg_type}>
+        </service>"""
+
         content = f"""\
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
@@ -338,7 +355,7 @@ tasks.named("preBuild") {{
         android:supportsRtl="true"
         android:hardwareAccelerated="true"
         android:theme="@android:style/Theme.DeviceDefault.NoActionBar">{meta_lines}
-
+{service_lines}
         <activity
             android:name=".MainActivity"
             android:label="{app_name}"
@@ -353,7 +370,7 @@ tasks.named("preBuild") {{
     </application>
 </manifest>
 """
-        (main_dir / "AndroidManifest.xml").write_text(content, encoding = "utf-8")
+        (main_dir / "AndroidManifest.xml").write_text(content, encoding="utf-8")
 
     # -------------------------------------------------------------------------
     # Icon
@@ -662,6 +679,160 @@ public class PythonActivity extends SDLActivity {{
 """
         (java_dir / "PythonActivity.java").write_text(content, encoding = "utf-8")
 
+    @staticmethod
+    def write_kivy_python_service(main_dir: Path) -> None:
+        """Base PythonService that loads native libs and starts a C thread."""
+        java_dir = main_dir / "java" / "org" / "kivy" / "android"
+        java_dir.mkdir(parents=True, exist_ok=True)
+        content = """\
+package org.kivy.android;
+
+import android.app.Service;
+import android.content.Intent;
+import android.os.IBinder;
+import android.util.Log;
+
+public class PythonService extends Service {
+    private static final String TAG = "PythonService";
+    private Thread pythonThread = null;
+    public static PythonService mService = null;
+
+    static {
+        System.loadLibrary("python3");
+        System.loadLibrary("service_main");
+    }
+
+    // Native method implemented in service_main.c
+    public native int nativeStart(String appPath, String entrypoint, String pythonVersion);
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        mService = this;
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        mService = null;
+        Log.i(TAG, "PythonService destroyed");
+    }
+
+    @Override
+    public IBinder onBind(Intent intent) {
+        return null;
+    }
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        if (pythonThread != null && pythonThread.isAlive()) {
+            Log.w(TAG, "Python service thread is already running.");
+            return START_STICKY;
+        }
+
+        final String appPath = intent.getStringExtra("androidPrivate");
+        final String entrypoint = intent.getStringExtra("androidEntrypoint");
+        final String pythonVersion = intent.getStringExtra("pythonVersion");
+
+        pythonThread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                Log.i(TAG, "Starting Python Service thread");
+                nativeStart(appPath, entrypoint, pythonVersion);
+                Log.i(TAG, "Python Service thread terminated");
+                stopSelf();
+            }
+        });
+        
+        pythonThread.start();
+        return START_STICKY;
+    }
+}
+"""
+        (java_dir / "PythonService.java").write_text(content, encoding="utf-8")
+
+    @staticmethod
+    def write_custom_service(
+        main_dir: Path,
+        package_name: str,
+        service_name: str,
+        python_version: str,
+        entrypoint: str,
+        foreground: bool, # NEW ARGUMENT
+    ) -> None:
+        java_dir = main_dir / "java" / Path(*package_name.split("."))
+        java_dir.mkdir(parents=True, exist_ok=True)
+
+        foreground_imports = ""
+        foreground_logic = ""
+        
+        if foreground:
+            foreground_imports = """
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.os.Build;
+import android.content.Context;
+"""
+            foreground_logic = f"""
+        // Android requires foreground services to show a persistent notification
+        String channelId = "{package_name}.{service_name}";
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {{
+            NotificationChannel channel = new NotificationChannel(
+                channelId,
+                "{service_name} Background Task",
+                NotificationManager.IMPORTANCE_LOW
+            );
+            NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+            if (manager != null) {{
+                manager.createNotificationChannel(channel);
+            }}
+        }}
+
+        Notification notification;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {{
+            notification = new Notification.Builder(this, channelId)
+                .setContentTitle("{service_name} is running")
+                .setContentText("Python background task active")
+                .setSmallIcon(android.R.drawable.stat_notify_sync)
+                .build();
+        }} else {{
+            notification = new Notification.Builder(this)
+                .setContentTitle("{service_name} is running")
+                .setContentText("Python background task active")
+                .setSmallIcon(android.R.drawable.stat_notify_sync)
+                .build();
+        }}
+
+        startForeground(1, notification);
+"""
+
+        content = f"""\
+package {package_name};
+
+import android.content.Intent;
+import org.kivy.android.PythonService;
+import java.io.File;{foreground_imports}
+
+public class {service_name} extends PythonService {{
+    
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {{
+        if (intent == null) {{
+            intent = new Intent();
+        }}
+        {foreground_logic}
+        File appDir = new File(getFilesDir(), "app");
+        intent.putExtra("androidPrivate", appDir.getAbsolutePath());
+        intent.putExtra("androidEntrypoint", "{entrypoint}");
+        intent.putExtra("pythonVersion", "{python_version}");
+        
+        return super.onStartCommand(intent, flags, startId);
+    }}
+}}
+"""
+        (java_dir / f"{service_name}.java").write_text(content, encoding="utf-8")
+
     # -------------------------------------------------------------------------
     # Native bootstrap — libmain.so (provides SDL_main → CPython)
     # -------------------------------------------------------------------------
@@ -831,6 +1002,134 @@ int main(int argc, char *argv[]) {{
         (cpp_dir / "main.c").write_text(content, encoding = "utf-8")
 
     @staticmethod
+    def write_service_main_c(cpp_dir: Path) -> None:
+        cpp_dir.mkdir(parents=True, exist_ok=True)
+        content = """\
+#define PY_SSIZE_T_CLEAN
+#include <jni.h>
+#include <Python.h>
+#include <android/log.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+#define LOGI(...) __android_log_print(ANDROID_LOG_INFO,  "ksproject-service", __VA_ARGS__)
+#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "ksproject-service", __VA_ARGS__)
+
+// Include the same AndroidEmbed implementation as main.c
+static PyObject *androidembed_log(PyObject *self, PyObject *args) {
+    const char *s;
+    if (!PyArg_ParseTuple(args, "s", &s)) return NULL;
+    __android_log_write(ANDROID_LOG_INFO, "python-service", s);
+    Py_RETURN_NONE;
+}
+
+static PyMethodDef AndroidEmbedMethods[] = {
+    {"log", androidembed_log, METH_VARARGS, "log to android logcat"},
+    {NULL, NULL, 0, NULL}
+};
+
+static struct PyModuleDef androidembed_mod = {
+    PyModuleDef_HEAD_INIT, "androidembed", NULL, -1, AndroidEmbedMethods
+};
+
+PyMODINIT_FUNC PyInit_androidembed(void) {
+    return PyModule_Create(&androidembed_mod);
+}
+
+static const char *REDIRECT_STDIO =
+    "import sys, androidembed\\n"
+    "class _LogFile:\\n"
+    "    def __init__(self): self._buf = ''\\n"
+    "    def write(self, s):\\n"
+    "        self._buf += s\\n"
+    "        while chr(10) in self._buf:\\n"
+    "            i = self._buf.index(chr(10))\\n"
+    "            androidembed.log(self._buf[:i])\\n"
+    "            self._buf = self._buf[i+1:]\\n"
+    "    def flush(self):\\n"
+    "        if self._buf:\\n"
+    "            androidembed.log(self._buf); self._buf = ''\\n"
+    "sys.stdout = sys.stderr = _LogFile()\\n";
+
+JNIEXPORT jint JNICALL
+Java_org_kivy_android_PythonService_nativeStart(
+    JNIEnv *env, jobject thiz, jstring j_appPath, jstring j_entrypoint, jstring j_pyVersion) {
+    
+    const char *app_path = (*env)->GetStringUTFChars(env, j_appPath, NULL);
+    const char *entrypoint = (*env)->GetStringUTFChars(env, j_entrypoint, NULL);
+    const char *py_version = (*env)->GetStringUTFChars(env, j_pyVersion, NULL);
+
+    LOGI("Service starting. App Path: %s, Entry: %s", app_path, entrypoint);
+
+    if (chdir(app_path) != 0) {
+        LOGE("chdir(%s) failed", app_path);
+    }
+
+    setenv("ANDROID_APP_PATH", app_path, 1);
+    setenv("ANDROID_ENTRYPOINT", entrypoint, 1);
+    setenv("PYTHONHOME", app_path, 1);
+
+    PyImport_AppendInittab("androidembed", PyInit_androidembed);
+
+    PyConfig config;
+    PyConfig_InitIsolatedConfig(&config);
+    config.parse_argv = 0;
+    config.install_signal_handlers = 0;
+    config.write_bytecode = 0;
+    config.use_environment = 1;
+
+    // Build paths
+    wchar_t w_stdlib[1024], w_dynload[1024], w_site[1024], w_app[1024];
+    swprintf(w_stdlib,  1024, L"%s/python%s", app_path, py_version);
+    swprintf(w_dynload, 1024, L"%s/python%s/lib-dynload", app_path, py_version);
+    swprintf(w_site,    1024, L"%s/site-packages", app_path);
+    swprintf(w_app,     1024, L"%s", app_path);
+    
+    config.module_search_paths_set = 1;
+    PyWideStringList_Append(&config.module_search_paths, w_stdlib);
+    PyWideStringList_Append(&config.module_search_paths, w_dynload);
+    PyWideStringList_Append(&config.module_search_paths, w_site);
+    PyWideStringList_Append(&config.module_search_paths, w_app);
+
+    PyStatus status = Py_InitializeFromConfig(&config);
+    PyConfig_Clear(&config);
+    if (PyStatus_Exception(status)) {
+        LOGE("Service Py_Initialize failed");
+        return 1;
+    }
+
+    PyRun_SimpleString(REDIRECT_STDIO);
+
+    PyObject *runpy = PyImport_ImportModule("runpy");
+    PyObject *func = PyObject_GetAttrString(runpy, "run_module");
+    PyObject *args_tuple = PyTuple_Pack(1, PyUnicode_FromString(entrypoint));
+    PyObject *kwargs = Py_BuildValue("{s:s, s:i}", "run_name", "__main__", "alter_sys", 1);
+    
+    PyObject *result = PyObject_Call(func, args_tuple, kwargs);
+    
+    int ret = 0;
+    if (!result) {
+        LOGE("python service entrypoint raised an exception");
+        PyErr_Print();
+        ret = 1;
+    } else {
+        Py_DECREF(result);
+    }
+
+    Py_FinalizeEx();
+
+    (*env)->ReleaseStringUTFChars(env, j_appPath, app_path);
+    (*env)->ReleaseStringUTFChars(env, j_entrypoint, entrypoint);
+    (*env)->ReleaseStringUTFChars(env, j_pyVersion, py_version);
+
+    LOGI("Service python thread exit");
+    return ret;
+}
+"""
+        (cpp_dir / "service_main.c").write_text(content, encoding="utf-8")
+
+    @staticmethod
     def write_cmake_lists(cpp_dir: Path) -> None:
         cpp_dir.mkdir(parents=True, exist_ok=True)
         content = """\
@@ -849,17 +1148,19 @@ set(PYTHON_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/python_include/${ANDROID_ABI
 set(JNI_LIBS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../jniLibs/${ANDROID_ABI}")
 
 add_library(SDL2 SHARED IMPORTED)
-set_target_properties(SDL2 PROPERTIES
-    IMPORTED_LOCATION "${JNI_LIBS_DIR}/libSDL2.so")
+set_target_properties(SDL2 PROPERTIES IMPORTED_LOCATION "${JNI_LIBS_DIR}/libSDL2.so")
 
 add_library(python3 SHARED IMPORTED)
-set_target_properties(python3 PROPERTIES
-    IMPORTED_LOCATION "${JNI_LIBS_DIR}/libpython3.so")
+set_target_properties(python3 PROPERTIES IMPORTED_LOCATION "${JNI_LIBS_DIR}/libpython3.so")
 
+# Primary UI Bootstrap
 add_library(main SHARED main.c)
-target_include_directories(main PRIVATE
-    "${SDL2_INCLUDE_DIR}"
-    "${PYTHON_INCLUDE_DIR}")
+target_include_directories(main PRIVATE "${SDL2_INCLUDE_DIR}" "${PYTHON_INCLUDE_DIR}")
 target_link_libraries(main SDL2 python3 log android)
+
+# Background Service Bootstrap
+add_library(service_main SHARED service_main.c)
+target_include_directories(service_main PRIVATE "${PYTHON_INCLUDE_DIR}")
+target_link_libraries(service_main python3 log android)
 """
-        (cpp_dir / "CMakeLists.txt").write_text(content, encoding = "utf-8")
+        (cpp_dir / "CMakeLists.txt").write_text(content, encoding="utf-8")
