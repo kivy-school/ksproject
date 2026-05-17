@@ -196,6 +196,35 @@ ndk_api = 24
 # sdk_path  = "/path/to/android-sdk"
 # ndk_path  = "/path/to/android-sdk/ndk/27.3.13750724"
 # java_path = "/path/to/jdk"
+
+# Declare services as (assuming you have all your services in `services` folder in root dir containing pyproject.toml)
+#services = [
+#    { name = "MyService1", entrypoint = "services.myservice1", foreground = true, foreground_service_type = "location|dataSync" },
+#    { name = "MyService2", entrypoint = "services.myservice2", foreground = true, foreground_service_type = "location|dataSync" },
+#    { name = "MyService3", entrypoint = "services.myservice3", foreground = true, foreground_service_type = "dataSync" },
+#]
+
+# OR
+
+
+# [[tool.kivy-school.android.services]]
+# name = "MyService1"
+# entrypoint = "services.myservice1"
+# foreground = true
+# foreground_service_type = "location|dataSync"
+# 
+# [[tool.kivy-school.android.services]]
+# name = "MyService2"
+# entrypoint = "services.myservice2"
+# foreground = true
+# foreground_service_type = "location|dataSync"
+# 
+# [[tool.kivy-school.android.services]]
+# name = "MyService3"
+# entrypoint = "services.myservice3"
+# foreground = true
+# foreground_service_type = "dataSync"
+
 ```
 
 ---
