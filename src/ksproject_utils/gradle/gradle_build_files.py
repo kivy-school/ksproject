@@ -127,6 +127,7 @@ include(":app")
         python_version: str = "3.13",
         ndk_version: str | None = None,
         aar: bool = False,
+        gradle_dependencies: list[str] | None = None,
     ) -> None:
         (app_dir / "build.gradle.kts").write_text(
             GradleBuildFiles._app_build_gradle_content(
@@ -138,6 +139,7 @@ include(":app")
                 python_version=python_version,
                 ndk_version=ndk_version,
                 aar=aar,
+                gradle_dependencies=gradle_dependencies or [],
             )
         )
         (app_dir / "libs").mkdir(parents=True, exist_ok=True)
@@ -152,6 +154,7 @@ include(":app")
         python_version: str,
         ndk_version: str | None = None,
         aar: bool = False,
+        gradle_dependencies: list[str] | None = None,
     ) -> str:
         abi_filters = ", ".join(f'"{a.value}"' for a in archs)
         arch_list_kts = ", ".join(f'"{a.value}"' for a in archs)
@@ -163,6 +166,10 @@ include(":app")
             else f'        applicationId = "{package_name}"\n'
                  f"        versionCode = 1\n"
                  f'        versionName = "1.0"\n'
+        )
+        extra_deps = "".join(
+            f'    implementation("{dep}")\n'
+            for dep in (gradle_dependencies or [])
         )
         return f"""\
 plugins {{
@@ -220,7 +227,7 @@ android {{
 
 dependencies {{
     implementation(fileTree("libs") {{ include("*.aar", "*.jar") }})
-}}
+{extra_deps}}}
 
 {GradleBuildFiles._site_packages_tasks(arch_list_kts, python_version)}
 """
@@ -299,12 +306,22 @@ tasks.named("preBuild") {{
         main_dir: Path,
         package_name: str,
         app_name: str,
+        permissions: list[str] | None = None,
+        meta_data: dict[str, str] | None = None,
     ) -> None:
+        perm_lines = "\n".join(
+            f'    <uses-permission android:name="android.permission.{p}" />'
+            for p in (permissions or ["INTERNET"])
+        )
+        meta_lines = "".join(
+            f'\n        <meta-data android:name="{k}" android:value="{v}" />'
+            for k, v in (meta_data or {}).items()
+        )
         content = f"""\
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <uses-permission android:name="android.permission.INTERNET" />
+{perm_lines}
 
     <application
         android:label="{app_name}"
@@ -312,7 +329,7 @@ tasks.named("preBuild") {{
         android:allowBackup="true"
         android:supportsRtl="true"
         android:hardwareAccelerated="true"
-        android:theme="@android:style/Theme.NoTitleBar.Fullscreen">
+        android:theme="@android:style/Theme.NoTitleBar.Fullscreen">{meta_lines}
 
         <activity
             android:name=".MainActivity"

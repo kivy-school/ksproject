@@ -110,6 +110,7 @@ class GradleProjectBuilder:
             python_version=PY_VERSION,
             ndk_version=toolchain.ndk_version,
             aar=aar,
+            gradle_dependencies=(self.android.gradle_dependencies if self.android else []),
         )
 
         main_dir = app_dir / "src" / "main"
@@ -118,6 +119,8 @@ class GradleProjectBuilder:
             main_dir,
             package_name=self.package_name,
             app_name=self.app_name,
+            permissions=(self.android.permissions if self.android else []),
+            meta_data=(self.android.meta_data if self.android else {}),
         )
         res_dir = main_dir / "res"
         GradleBuildFiles.write_icon(res_dir, self._resolve_asset("icon"))

@@ -38,6 +38,9 @@ class KivySchoolData:
         java_path: Path | None
         icon: str | None
         presplash: str | None
+        permissions: list[str]
+        meta_data: dict[str, str]
+        gradle_dependencies: list[str]
 
         def __init__(self, data: dict):
             self.package_name = data["package_name"]
@@ -54,6 +57,9 @@ class KivySchoolData:
             self.java_path = Path(data["java_path"]) if data.get("java_path") else None
             self.icon = data.get("icon")
             self.presplash = data.get("presplash")
+            self.permissions = data.get("permissions", [])
+            self.meta_data = data.get("meta_data", {})
+            self.gradle_dependencies = data.get("gradle_dependencies", [])
 
         class Arch(Enum):
             ARM64_V8A = "arm64-v8a"
