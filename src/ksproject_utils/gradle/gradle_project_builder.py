@@ -143,8 +143,8 @@ class GradleProjectBuilder:
                     entrypoint=svc.entrypoint,
                     foreground=svc.foreground,
                     start_type=getattr(svc, "start_type", "START_NOT_STICKY"),
-                    notification_title=getattr(svc, "notification_title", ""),
-                    notification_text=getattr(svc, "notification_text", ""),
+                    notification_title=getattr(svc, "notification_title", None),
+                    notification_text=getattr(svc, "notification_text", None),
                     notification_icon=getattr(svc, "notification_icon", "stat_notify_sync"),
                 )
 

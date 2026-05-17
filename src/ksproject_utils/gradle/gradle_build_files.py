@@ -898,8 +898,8 @@ public class PythonService extends Service implements Runnable {
         entrypoint: str,
         foreground: bool,
         start_type: str = "START_NOT_STICKY",
-        notification_title: str = "",
-        notification_text: str = "",
+        notification_title: str | None = "",
+        notification_text: str | None = "",
         notification_icon: str = "stat_notify_sync",
     ) -> None:
         java_dir = main_dir / "java" / Path(*package_name.split("."))
@@ -907,7 +907,7 @@ public class PythonService extends Service implements Runnable {
 
         foreground_imports = ""
         foreground_logic = ""
-        
+
         start_type_constant = start_type.upper()
         is_sticky_bool_str = "true" if start_type_constant == "START_STICKY" else "false"
 
