@@ -683,72 +683,211 @@ public class PythonActivity extends SDLActivity {{
 
     @staticmethod
     def write_kivy_python_service(main_dir: Path) -> None:
-        """Base PythonService that loads native libs and starts a C thread."""
+        """Base PythonService matching p4a architecture with critical SDL/Pyjnius hooks."""
         java_dir = main_dir / "java" / "org" / "kivy" / "android"
         java_dir.mkdir(parents=True, exist_ok=True)
         content = """\
 package org.kivy.android;
 
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.app.Service;
+import android.content.Context;
 import android.content.Intent;
+import android.graphics.Color;
+import android.os.Build;
+import android.os.Bundle;
 import android.os.IBinder;
+import android.os.Process;
 import android.util.Log;
+import java.io.File;
+import java.lang.reflect.Method;
+import java.lang.reflect.InvocationTargetException;
+import org.libsdl.app.SDL;
 
-public class PythonService extends Service {
-    private static final String TAG = "PythonService";
+public class PythonService extends Service implements Runnable {
+
     private Thread pythonThread = null;
+
+    private String androidPrivate;
+    private String androidArgument;
+    private String pythonName;
+    private String pythonHome;
+    private String pythonPath;
+    private String serviceEntrypoint;
+    private String pythonServiceArgument;
+
     public static PythonService mService = null;
+    private Intent startIntent = null;
+    private boolean autoRestartService = false;
 
     static {
+        System.loadLibrary("SDL2");
         System.loadLibrary("python3");
         System.loadLibrary("service_main");
     }
 
-    // Native method implemented in service_main.c
-    public native int nativeStart(String appPath, String entrypoint, String pythonVersion);
+    public void setAutoRestartService(boolean restart) {
+        autoRestartService = restart;
+    }
+
+    public int startType() {
+        return START_NOT_STICKY;
+    }
+
+    @Override
+    public IBinder onBind(Intent arg0) {
+        return null;
+    }
 
     @Override
     public void onCreate() {
         super.onCreate();
-        mService = this;
+        SDL.setContext(this);
+    }
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        if (pythonThread != null) {
+            Log.v("python service", "service exists, do not start again");
+            return startType();
+        }
+        if (intent == null) {
+            Context context = getApplicationContext();
+            intent = getThisDefaultIntent(context, "");
+        }
+
+        startIntent = intent;
+        Bundle extras = intent.getExtras();
+        androidPrivate = extras.getString("androidPrivate");
+        androidArgument = extras.getString("androidArgument");
+        serviceEntrypoint = extras.getString("serviceEntrypoint");
+        pythonName = extras.getString("pythonName");
+        pythonHome = extras.getString("pythonHome");
+        pythonPath = extras.getString("pythonPath");
+        boolean serviceStartAsForeground = (extras.getString("serviceStartAsForeground").equals("true"));
+        pythonServiceArgument = extras.getString("pythonServiceArgument");
+        
+        pythonThread = new Thread(this);
+        pythonThread.start();
+
+        if (serviceStartAsForeground) {
+            doStartForeground(extras);
+        }
+
+        return startType();
+    }
+
+    protected int getServiceId() {
+        return 1;
+    }
+
+    protected Intent getThisDefaultIntent(Context ctx, String pythonServiceArgument) {
+        return null;
+    }
+
+    protected void doStartForeground(Bundle extras) {
+        String serviceTitle = extras.getString("serviceTitle");
+        String smallIconName = extras.getString("smallIconName");
+        String contentTitle = extras.getString("contentTitle");
+        String contentText = extras.getString("contentText");
+        Notification notification;
+        Context context = getApplicationContext();
+        Intent contextIntent = new Intent(context, PythonActivity.class);
+        PendingIntent pIntent = PendingIntent.getActivity(
+                context, 0, contextIntent,
+                PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+
+        int smallIconId = context.getApplicationInfo().icon;
+        if (smallIconName != null && !smallIconName.equals("")) {
+            int resId = getResources().getIdentifier(smallIconName, "mipmap", getPackageName());
+            if (resId == 0) {
+                resId = getResources().getIdentifier(smallIconName, "drawable", getPackageName());
+            }
+            if (resId != 0) {
+                smallIconId = resId;
+            }
+        }
+
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            notification = new Notification(smallIconId, serviceTitle, System.currentTimeMillis());
+            try {
+                Method func = notification.getClass().getMethod(
+                        "setLatestEventInfo", Context.class, CharSequence.class, CharSequence.class, PendingIntent.class);
+                func.invoke(notification, context, contentTitle, contentText, pIntent);
+            } catch (Exception e) {
+                Log.e("python service", "Notification legacy setup failed", e);
+            }
+        } else {
+            String NOTIFICATION_CHANNEL_ID = "org.kivy.p4a" + getServiceId();
+            String channelName = "Background Service" + getServiceId();
+            NotificationChannel chan = new NotificationChannel(
+                    NOTIFICATION_CHANNEL_ID, channelName, NotificationManager.IMPORTANCE_NONE);
+
+            chan.setLightColor(Color.BLUE);
+            chan.setLockscreenVisibility(Notification.VISIBILITY_PRIVATE);
+            NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+            manager.createNotificationChannel(chan);
+
+            Notification.Builder builder = new Notification.Builder(context, NOTIFICATION_CHANNEL_ID);
+            builder.setContentTitle(contentTitle);
+            builder.setContentText(contentText);
+            builder.setContentIntent(pIntent);
+            builder.setSmallIcon(smallIconId);
+            notification = builder.build();
+        }
+        startForeground(getServiceId(), notification);
     }
 
     @Override
     public void onDestroy() {
         super.onDestroy();
-        mService = null;
-        Log.i(TAG, "PythonService destroyed");
-    }
-
-    @Override
-    public IBinder onBind(Intent intent) {
-        return null;
-    }
-
-    @Override
-    public int onStartCommand(Intent intent, int flags, int startId) {
-        if (pythonThread != null && pythonThread.isAlive()) {
-            Log.w(TAG, "Python service thread is already running.");
-            return START_STICKY;
+        pythonThread = null;
+        if (autoRestartService && startIntent != null) {
+            Log.v("python service", "service restart requested");
+            startService(startIntent);
         }
-
-        final String appPath = intent.getStringExtra("androidPrivate");
-        final String entrypoint = intent.getStringExtra("androidEntrypoint");
-        final String pythonVersion = intent.getStringExtra("pythonVersion");
-
-        pythonThread = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                Log.i(TAG, "Starting Python Service thread");
-                nativeStart(appPath, entrypoint, pythonVersion);
-                Log.i(TAG, "Python Service thread terminated");
-                stopSelf();
-            }
-        });
-        
-        pythonThread.start();
-        return START_STICKY;
+        Process.killProcess(Process.myPid());
     }
+
+    @Override
+    public void onTaskRemoved(Intent rootIntent) {
+        super.onTaskRemoved(rootIntent);
+        if (startType() != START_STICKY) {
+            stopSelf();
+        }
+    }
+
+    @Override
+    public void run() {
+        String app_root = getFilesDir().getAbsolutePath() + "/app";
+        File app_root_file = new File(app_root);
+        PythonUtil.loadLibraries(app_root_file, new File(getApplicationInfo().nativeLibraryDir));
+
+        SDL.setupJNI();
+        
+        this.mService = this;
+        nativeStart(
+                androidPrivate,
+                androidArgument,
+                serviceEntrypoint,
+                pythonName,
+                pythonHome,
+                pythonPath,
+                pythonServiceArgument);
+        stopSelf();
+    }
+
+    public static native void nativeStart(
+            String androidPrivate,
+            String androidArgument,
+            String serviceEntrypoint,
+            String pythonName,
+            String pythonHome,
+            String pythonPath,
+            String pythonServiceArgument);
 }
 """
         (java_dir / "PythonService.java").write_text(content, encoding="utf-8")
@@ -760,7 +899,11 @@ public class PythonService extends Service {
         service_name: str,
         python_version: str,
         entrypoint: str,
-        foreground: bool, # NEW ARGUMENT
+        foreground: bool,
+        start_type: str = "START_NOT_STICKY",
+        notification_title: str = "",
+        notification_text: str = "",
+        notification_icon: str = "stat_notify_sync",
     ) -> None:
         java_dir = main_dir / "java" / Path(*package_name.split("."))
         java_dir.mkdir(parents=True, exist_ok=True)
@@ -768,6 +911,12 @@ public class PythonService extends Service {
         foreground_imports = ""
         foreground_logic = ""
         
+        start_type_constant = start_type.upper()
+        is_sticky_bool_str = "true" if start_type_constant == "START_STICKY" else "false"
+
+        title = notification_title or f"{service_name} is running"
+        text = notification_text or "Background task active"
+
         if foreground:
             foreground_imports = """
 import android.app.Notification;
@@ -777,12 +926,11 @@ import android.os.Build;
 import android.content.Context;
 """
             foreground_logic = f"""
-        // Android requires foreground services to show a persistent notification
         String channelId = "{package_name}.{service_name}";
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {{
             NotificationChannel channel = new NotificationChannel(
                 channelId,
-                "{service_name} Background Task",
+                "{service_name} Channel",
                 NotificationManager.IMPORTANCE_LOW
             );
             NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
@@ -791,18 +939,23 @@ import android.content.Context;
             }}
         }}
 
+        int iconId = getResources().getIdentifier("{notification_icon}", "drawable", "android");
+        if (iconId == 0) {{
+            iconId = android.R.drawable.stat_notify_sync;
+        }}
+
         Notification notification;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {{
             notification = new Notification.Builder(this, channelId)
-                .setContentTitle("{service_name} is running")
-                .setContentText("Python background task active")
-                .setSmallIcon(android.R.drawable.stat_notify_sync)
+                .setContentTitle("{title}")
+                .setContentText("{text}")
+                .setSmallIcon(iconId)
                 .build();
         }} else {{
             notification = new Notification.Builder(this)
-                .setContentTitle("{service_name} is running")
-                .setContentText("Python background task active")
-                .setSmallIcon(android.R.drawable.stat_notify_sync)
+                .setContentTitle("{title}")
+                .setContentText("{text}")
+                .setSmallIcon(iconId)
                 .build();
         }}
 
@@ -812,6 +965,7 @@ import android.content.Context;
         content = f"""\
 package {package_name};
 
+import android.content.Context;
 import android.content.Intent;
 import org.kivy.android.PythonService;
 import java.io.File;{foreground_imports}
@@ -819,15 +973,34 @@ import java.io.File;{foreground_imports}
 public class {service_name} extends PythonService {{
     
     @Override
+    public int startType() {{
+        return {start_type_constant};
+    }}
+
+    @Override
+    protected Intent getThisDefaultIntent(Context ctx, String pythonServiceArgument) {{
+        Intent intent = new Intent(ctx, {service_name}.class);
+        File appDir = new File(ctx.getFilesDir(), "app");
+        
+        intent.putExtra("androidPrivate", appDir.getAbsolutePath());
+        intent.putExtra("androidEntrypoint", "{entrypoint}");
+        intent.putExtra("pythonVersion", "{python_version}");
+        intent.putExtra("serviceStartAsForeground", "{'true' if foreground else 'false'}");
+        return intent;
+    }}
+    
+    @Override
     public int onStartCommand(Intent intent, int flags, int startId) {{
         if (intent == null) {{
-            intent = new Intent();
+            intent = getThisDefaultIntent(getApplicationContext(), "");
         }}
         {foreground_logic}
         File appDir = new File(getFilesDir(), "app");
         intent.putExtra("androidPrivate", appDir.getAbsolutePath());
         intent.putExtra("androidEntrypoint", "{entrypoint}");
         intent.putExtra("pythonVersion", "{python_version}");
+        
+        setAutoRestartService({is_sticky_bool_str});
         
         return super.onStartCommand(intent, flags, startId);
     }}
