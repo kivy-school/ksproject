@@ -13,7 +13,7 @@ def render_main_swift(platform: str) -> str:
     """
     if platform == "iOS":
         imports = "import KivyLauncher\nimport Kivy_iOS_Module"
-        modules = '".ios"'
+        modules = ".ios"
     elif platform == "macOS":
         imports = "import KivyLauncher"
         modules = ""

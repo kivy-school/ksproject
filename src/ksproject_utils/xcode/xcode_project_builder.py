@@ -14,7 +14,7 @@ from .main_files import render_main_swift
 from .plist_templates import STDLIB_PLIST_XML
 from .project_spec import ProjectSpec
 from .project_target import ProjectTarget
-from .python_apple import copy_python_xcframework, copy_sdl2_frameworks
+from .python_apple import copy_python_xcframework, copy_site_frameworks, fetch_kivy_sdl2_xcframeworks
 from .static_templates import (
     APP_ICON_CONTENTS,
     APP_MAIN_PY_TEMPLATE,
@@ -124,14 +124,22 @@ class XcodeProjectBuilder:
             macos_main.write_text(render_main_swift("macOS"))
 
     def _write_app(self) -> None:
-        main_py = self.project_dir / "app" / "main.py"
-        if not main_py.exists():
-            main_py.write_text(APP_MAIN_PY_TEMPLATE.format(module_name=self.module_name))
+        app_dir = self.project_dir / "app"
+        old = app_dir / "main.py"
+        if old.exists():
+            old.unlink()
+        entry = app_dir / "__main__.py"
+        if not entry.exists():
+            entry.write_text(APP_MAIN_PY_TEMPLATE.format(module_name=self.module_name))
 
     def _install_frameworks(self, platforms: list[str]) -> None:
         copy_python_xcframework(self.project_dir / "Support", platforms)
         if "iOS" in platforms:
-            copy_sdl2_frameworks(self.project_dir / "Support")
+            fetch_kivy_sdl2_xcframeworks(self.project_dir / "Support")  # TEMPORARY: remove once kivy2x ships .frameworks/
+            copy_site_frameworks(
+                self.project_dir / "Support",
+                self.project_dir / "site_packages",
+            )
 
     # ------------------------------------------------------------------
     # Spec + xcodegen

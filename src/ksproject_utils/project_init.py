@@ -102,6 +102,12 @@ find-links = ["./wheelhouse"]
 [tool.kivy-school]
 app_name = "{self.app_name}"
 
+[tool.kivy-school.ios]
+bundle_id = "org.example.{self.module_name}"
+
+[tool.kivy-school.macos]
+bundle_id = "org.example.{self.module_name}"
+
 [tool.kivy-school.android]
 archs = ["arm64-v8a", "x86_64"]
 package_name = "org.example.{self.module_name}"

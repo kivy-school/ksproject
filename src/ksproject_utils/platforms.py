@@ -89,6 +89,6 @@ class IOSSim_Arm64Platform(ApplePlatform):
 
 class MacOSPlatform(ApplePlatform):
 
-    pip_platform = "macosx_11_0_arm64"
+    pip_platform = "aarch64-apple-darwin"
     pip_arch = "arm64"
     slice = "macos"

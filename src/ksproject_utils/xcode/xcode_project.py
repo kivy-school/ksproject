@@ -5,10 +5,15 @@ Mirrors ``gradle_project.GradleProject`` for the Apple side.
 from __future__ import annotations
 
 import json
+import platform
+import plistlib
 import subprocess
 from pathlib import Path
 
+from ..pip_install import PipInstaller
+from ..platforms import IOSArm64Platform, IOSSim_Arm64Platform, IOSSim_X86_64Platform, MacOSPlatform
 from ..pyproject_toml import PyProjectToml
+from .python_apple import copy_site_frameworks
 from .xcode_project_builder import XcodeProjectBuilder
 
 
@@ -57,6 +62,41 @@ class XcodeProject:
     def generate(self, platforms: list[str] | None = None) -> Path:
         return self.builder.generate(platforms=platforms)
 
+    def install_site_packages(
+        self, platforms: list[str], simulator: bool = False
+    ) -> None:
+        """Pip-install the project into per-platform site_packages dirs.
+
+        After installing, move any ``.frameworks/`` dropped by the kivy wheel
+        into ``Support/`` and clean them out of every site_packages slice.
+        """
+        platform_classes = []
+        if "iOS" in platforms:
+            if simulator:
+                arch = platform.machine()  # 'arm64' on Apple Silicon, 'x86_64' on Intel
+                if arch == "arm64":
+                    platform_classes.append(IOSSim_Arm64Platform)
+                else:
+                    platform_classes.append(IOSSim_X86_64Platform)
+            else:
+                platform_classes.append(IOSArm64Platform)
+        if "macOS" in platforms:
+            platform_classes += [MacOSPlatform]
+
+        for cls in platform_classes:
+            plat = cls(str(self.project_path))
+            Path(plat.site_packages).mkdir(parents=True, exist_ok=True)
+            PipInstaller.install(
+                uv_src=str(self.project_path),
+                platform=plat,
+                site_packages=plat.site_packages,
+            )
+
+        copy_site_frameworks(
+            self.xcode_dir / "Support",
+            self.xcode_dir / "site_packages",
+        )
+
     # ------------------------------------------------------------------
     # Build via xcodebuild
     # ------------------------------------------------------------------
@@ -94,16 +134,22 @@ class XcodeProject:
                 f"xcodebuild exited with code {result.returncode}"
             )
         # Locate the .app inside derivedData.
-        products = derived / "Build" / "Products"
+        return self._find_app()
+
+    def _find_app(self) -> Path:
+        products = self.xcode_dir / "build" / "Build" / "Products"
         candidates = sorted(products.rglob(f"{self.app_name}.app"))
         if not candidates:
             raise XcodeProjectError(
-                f"xcodebuild succeeded but no {self.app_name}.app found under {products}"
+                f"No {self.app_name}.app found under {products}. "
+                "Run `ksproject ios build` first."
             )
         return candidates[-1]
 
     def ios_build(self, variant: str = "debug", simulator: bool = False) -> Path:
-        self.generate(platforms=["iOS", "macOS"])
+        if not self.xcodeproj.exists():
+            self.generate(platforms=["iOS", "macOS"])
+        self.install_site_packages(platforms=["iOS"], simulator=simulator)
         dest = (
             "generic/platform=iOS Simulator"
             if simulator
@@ -112,7 +158,9 @@ class XcodeProject:
         return self._xcodebuild(dest, variant)
 
     def macos_build(self, variant: str = "debug") -> Path:
-        self.generate(platforms=["iOS", "macOS"])
+        if not self.xcodeproj.exists():
+            self.generate(platforms=["iOS", "macOS"])
+        self.install_site_packages(platforms=["iOS", "macOS"])
         return self._xcodebuild("generic/platform=macOS", variant)
 
     # ------------------------------------------------------------------
@@ -149,10 +197,13 @@ class XcodeProject:
         return out
 
     def _list_physical_devices(self) -> list[dict]:
-        result = subprocess.run(
-            ["xcrun", "devicectl", "list", "devices", "--json-output", "-"],
-            capture_output=True, text=True,
-        )
+        try:
+            result = subprocess.run(
+                ["xcrun", "devicectl", "list", "devices", "--json-output", "-"],
+                capture_output=True, text=True, timeout=10,
+            )
+        except subprocess.TimeoutExpired:
+            return []
         if result.returncode != 0:
             return []
         try:
@@ -176,19 +227,14 @@ class XcodeProject:
     # ------------------------------------------------------------------
 
     def _bundle_id(self) -> str:
-        ios = self.pyproject.tool.kivy_school.ios if self.pyproject.tool.kivy_school else None
-        macos = self.pyproject.tool.kivy_school.macos if self.pyproject.tool.kivy_school else None
-        if ios is not None:
-            return ios.bundle_id
-        if macos is not None:
-            return macos.bundle_id
-        raise XcodeProjectError("No [tool.kivy-school.ios] or [tool.kivy-school.macos] bundle_id set")
+        info_plist = self._find_app() / "Info.plist"
+        with open(info_plist, "rb") as f:
+            return plistlib.load(f)["CFBundleIdentifier"]
 
     def ios_run(
         self,
         uuid: str | None = None,
         name: str | None = None,
-        variant: str = "debug",
     ) -> None:
         if (uuid is None) == (name is None):
             raise XcodeProjectError("ios run requires exactly one of --uuid or --name")
@@ -200,15 +246,22 @@ class XcodeProject:
             target = self._find_device_by_uuid(uuid)
             kind = target["kind"] if target else "simulator"
 
+        app = self._find_app()
+        print(f"App: {app}")
         if kind == "simulator":
-            subprocess.run(["xcrun", "simctl", "boot", uuid], check=False)
-            app = self.ios_build(variant=variant, simulator=True)
-            subprocess.run(["xcrun", "simctl", "install", uuid, str(app)], check=True)
+            print(f"Booting simulator {uuid}...")
             subprocess.run(
-                ["xcrun", "simctl", "launch", uuid, self._bundle_id()], check=True
+                ["xcrun", "simctl", "boot", uuid],
+                check=False, capture_output=True,
+            )
+            print(f"Installing {app.name} (this may take ~30-60s)...")
+            subprocess.run(["xcrun", "simctl", "install", uuid, str(app)], check=True)
+            print("Launching...")
+            subprocess.run(
+                ["xcrun", "simctl", "launch", "--console-pty", uuid, self._bundle_id()],
+                check=True,
             )
         else:
-            app = self.ios_build(variant=variant, simulator=False)
             subprocess.run(
                 ["xcrun", "devicectl", "device", "install", "app",
                  "--device", uuid, str(app)],
@@ -220,8 +273,8 @@ class XcodeProject:
                 check=True,
             )
 
-    def macos_run(self, variant: str = "debug") -> None:
-        app = self.macos_build(variant=variant)
+    def macos_run(self) -> None:
+        app = self._find_app()
         subprocess.run(["open", "-W", str(app)], check=False)
 
     # ------------------------------------------------------------------
@@ -229,7 +282,10 @@ class XcodeProject:
     # ------------------------------------------------------------------
 
     def _find_device_by_uuid(self, uuid: str) -> dict | None:
-        for d in self.devices():
+        for d in self._list_simulators():
+            if d["uuid"] == uuid:
+                return d
+        for d in self._list_physical_devices():
             if d["uuid"] == uuid:
                 return d
         return None

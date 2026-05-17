@@ -217,7 +217,6 @@ class ProjectTarget:
                 "destinationFilters": ["macOS"],
             },
             {"path": "Sources/Shared", "group": "Sources", "type": "group"},
-            {"path": "Sources", "group": self.name, "type": "group"},
             {
                 "path": "Resources/Launch Screen.storyboard",
                 "group": "Resources",
@@ -242,6 +241,8 @@ class ProjectTarget:
             {"framework": "Support/SDL2_image.xcframework", "platformFilter": "iOS"},
             {"framework": "Support/SDL2_mixer.xcframework", "platformFilter": "iOS"},
             {"framework": "Support/SDL2_ttf.xcframework", "platformFilter": "iOS"},
+            # {"framework": "Support/libEGL.xcframework", "platformFilter": "iOS"},
+            # {"framework": "Support/libGLESv2.xcframework", "platformFilter": "iOS"},
         ]
 
     # ----- info / entitlements -----
