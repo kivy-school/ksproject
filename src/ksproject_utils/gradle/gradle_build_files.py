@@ -702,6 +702,8 @@ import android.os.Bundle;
 import android.os.IBinder;
 import android.os.Process;
 import android.util.Log;
+import android.system.Os;
+import android.system.ErrnoException;
 import java.io.File;
 import java.lang.reflect.Method;
 import java.lang.reflect.InvocationTargetException;
@@ -712,12 +714,9 @@ public class PythonService extends Service implements Runnable {
     private Thread pythonThread = null;
 
     private String androidPrivate;
-    private String androidArgument;
-    private String pythonName;
-    private String pythonHome;
-    private String pythonPath;
     private String serviceEntrypoint;
-    private String pythonServiceArgument;
+    private String pythonVersion;
+    private String pythonName;
 
     public static PythonService mService = null;
     private Intent startIntent = null;
@@ -761,20 +760,23 @@ public class PythonService extends Service implements Runnable {
 
         startIntent = intent;
         Bundle extras = intent.getExtras();
-        androidPrivate = extras.getString("androidPrivate");
-        androidArgument = extras.getString("androidArgument");
-        serviceEntrypoint = extras.getString("serviceEntrypoint");
-        pythonName = extras.getString("pythonName");
-        pythonHome = extras.getString("pythonHome");
-        pythonPath = extras.getString("pythonPath");
-        boolean serviceStartAsForeground = (extras.getString("serviceStartAsForeground").equals("true"));
-        pythonServiceArgument = extras.getString("pythonServiceArgument");
-        
-        pythonThread = new Thread(this);
-        pythonThread.start();
+        if (extras != null) {
+            androidPrivate = extras.getString("androidPrivate");
+            serviceEntrypoint = extras.getString("serviceEntrypoint");
+            pythonVersion = extras.getString("pythonVersion");
+            pythonName = extras.getString("pythonName");
+            
+            boolean serviceStartAsForeground = false;
+            if (extras.containsKey("serviceStartAsForeground")) {
+                serviceStartAsForeground = extras.getString("serviceStartAsForeground").equals("true");
+            }
 
-        if (serviceStartAsForeground) {
-            doStartForeground(extras);
+            pythonThread = new Thread(this);
+            pythonThread.start();
+
+            if (serviceStartAsForeground) {
+                doStartForeground(extras);
+            }
         }
 
         return startType();
@@ -862,32 +864,27 @@ public class PythonService extends Service implements Runnable {
 
     @Override
     public void run() {
-        System.loadLibrary("SDL2");
-        System.loadLibrary("python3");
-        System.loadLibrary("service_main");
 
         SDL.setupJNI();
-        
+
+        try {
+            Os.setenv("ANDROID_NATIVE_LIB_DIR", getApplicationInfo().nativeLibraryDir, true);
+        } catch (ErrnoException e) {
+            Log.e("python service", "setenv ANDROID_NATIVE_LIB_DIR failed", e);
+        }
+
         this.mService = this;
         nativeStart(
                 androidPrivate,
-                androidArgument,
                 serviceEntrypoint,
-                pythonName,
-                pythonHome,
-                pythonPath,
-                pythonServiceArgument);
+                pythonVersion);
         stopSelf();
     }
 
     public static native void nativeStart(
-            String androidPrivate,
-            String androidArgument,
-            String serviceEntrypoint,
-            String pythonName,
-            String pythonHome,
-            String pythonPath,
-            String pythonServiceArgument);
+            String appPath,
+            String entrypoint,
+            String pyVersion);
 }
 """
         (java_dir / "PythonService.java").write_text(content, encoding="utf-8")
@@ -981,25 +978,20 @@ public class {service_name} extends PythonService {{
     protected Intent getThisDefaultIntent(Context ctx, String pythonServiceArgument) {{
         Intent intent = new Intent(ctx, {service_name}.class);
         File appDir = new File(ctx.getFilesDir(), "app");
-        
         intent.putExtra("androidPrivate", appDir.getAbsolutePath());
-        intent.putExtra("androidEntrypoint", "{entrypoint}");
+        intent.putExtra("serviceEntrypoint", "{entrypoint}");
         intent.putExtra("pythonVersion", "{python_version}");
+        intent.putExtra("pythonName", "{service_name.lower()}");
         intent.putExtra("serviceStartAsForeground", "{'true' if foreground else 'false'}");
         return intent;
     }}
-    
+
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {{
-        if (intent == null) {{
+        if (intent == null || intent.getExtras() == null || !intent.hasExtra("pythonName")) {{
             intent = getThisDefaultIntent(getApplicationContext(), "");
         }}
         {foreground_logic}
-        File appDir = new File(getFilesDir(), "app");
-        intent.putExtra("androidPrivate", appDir.getAbsolutePath());
-        intent.putExtra("androidEntrypoint", "{entrypoint}");
-        intent.putExtra("pythonVersion", "{python_version}");
-        
         setAutoRestartService({is_sticky_bool_str});
         
         return super.onStartCommand(intent, flags, startId);
@@ -1282,6 +1274,13 @@ Java_org_kivy_android_PythonService_nativeStart(
     PyWideStringList_Append(&config.module_search_paths, w_dynload);
     PyWideStringList_Append(&config.module_search_paths, w_site);
     PyWideStringList_Append(&config.module_search_paths, w_app);
+
+    const char *native_lib_dir = getenv("ANDROID_NATIVE_LIB_DIR");
+    if (native_lib_dir) {
+        wchar_t w_native[1024];
+        swprintf(w_native, 1024, L"%s", native_lib_dir);
+        PyWideStringList_Append(&config.module_search_paths, w_native);
+    }
 
     PyStatus status = Py_InitializeFromConfig(&config);
     PyConfig_Clear(&config);
