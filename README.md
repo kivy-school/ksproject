@@ -201,9 +201,9 @@ ndk_api = 26
 # Every sub-dir with top-level dir must have an __init__.py so it is considered as a python module and packaged with the app.
 
 #services = [
-#    { name = "MyService1", entrypoint = "myapp.services.myservice1", foreground = true, foreground_service_type = "location|dataSync" },
-#    { name = "MyService2", entrypoint = "myapp.services.myservice2", foreground = true, foreground_service_type = "location|dataSync" },
-#    { name = "MyService3", entrypoint = "myapp.services.myservice3", foreground = true, foreground_service_type = "dataSync" },
+#    { name = "MyService1", start_type = "START_NOT_STICKY", entrypoint = "myapp.services.myservice1", foreground = true, foreground_service_type = "location|dataSync", notification_title = "Myservice1 Running", notification_text = "Service is managing background vibration patterns.", notification_icon = "stat_notify_sync" },
+#    { name = "MyService2", start_type = "START_STICKY", entrypoint = "myapp.services.myservice2", foreground = true, foreground_service_type = "location|dataSync", notification_title = "Myservice2 Running", notification_text = "Service is managing background vibration patterns.", notification_icon = "stat_notify_sync" },
+#    { name = "MyService3", start_type = "START_STICKY", entrypoint = "myapp.services.myservice3", foreground = true, foreground_service_type = "dataSync", notification_title = "Myservice3 Running", notification_text = "Service is managing background vibration patterns.", notification_icon = "stat_notify_sync" },
 #]
 
 # OR
@@ -211,21 +211,34 @@ ndk_api = 26
 
 # [[tool.kivy-school.android.services]]
 # name = "MyService1"
+# start_type = "START_NOT_STICKY"
 # entrypoint = "myapp.services.myservice1"
 # foreground = true
 # foreground_service_type = "location|dataSync"
+# notification_title = "Myservice1 Running"
+# notification_text = "Service is managing background vibration patterns."
+# notification_icon = "stat_notify_sync"
 # 
 # [[tool.kivy-school.android.services]]
 # name = "MyService2"
+# start_type = "START_STICKY"
 # entrypoint = "myapp.services.myservice2"
 # foreground = true
 # foreground_service_type = "location|dataSync"
-# 
+# notification_title = "Myservice2 Running"
+# notification_text = "Service is managing background vibration patterns."
+# notification_icon = "stat_notify_sync"
+
+# # 
 # [[tool.kivy-school.android.services]]
 # name = "MyService3"
+# start_type = "START_STICKY"
 # entrypoint = "myapp.services.myservice3"
 # foreground = true
 # foreground_service_type = "dataSync"
+# notification_title = "Myservice3 Running"
+# notification_text = "Service is managing background vibration patterns."
+# notification_icon = "stat_notify_sync"
 
 ```
 
