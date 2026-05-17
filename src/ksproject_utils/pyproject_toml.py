@@ -8,20 +8,57 @@ class KivySchoolData:
 
     app_name: str | None
     ios: "KivySchoolData.IosData | None"
+    macos: "KivySchoolData.MacosData | None"
     android: "KivySchoolData.AndroidData | None"
 
     def __init__(self, data: dict):
         self.app_name = data.get("app_name")
         self.ios = KivySchoolData.IosData(data["ios"]) if "ios" in data else None
+        self.macos = (
+            KivySchoolData.MacosData(data["macos"]) if "macos" in data else None
+        )
         self.android = (
             KivySchoolData.AndroidData(data["android"]) if "android" in data else None
         )
 
     class IosData:
         bundle_id: str
+        info_plist: dict
+        entitlements: dict
+        permissions: list[str]
+        frameworks: list[str]
 
         def __init__(self, data: dict):
             self.bundle_id = data["bundle_id"]
+            self.info_plist = data.get("info_plist", {})
+            self.entitlements = data.get("entitlements", {})
+            self.permissions = data.get("permissions", [])
+            self.frameworks = data.get("frameworks", [])
+
+    class MacosData:
+        bundle_id: str
+        info_plist: dict
+        entitlements: dict
+
+        def __init__(self, data: dict):
+            self.bundle_id = data["bundle_id"]
+            self.info_plist = data.get("info_plist", {})
+            self.entitlements = data.get("entitlements", {})
+
+    class ServiceData:
+        name: str
+        entrypoint: str
+        foreground: bool
+        foreground_service_type: str | None
+
+        def __init__(self, data: dict):
+            self.name = data["name"]
+            # Enforce module syntax if they accidentally leave ".py" or "/"
+            raw_entry = data.get("entrypoint", "service_main")
+            self.entrypoint = raw_entry.replace("/", ".").replace(".py", "")
+            
+            self.foreground = data.get("foreground", False)
+            self.foreground_service_type = data.get("foreground_service_type")
 
     class ServiceData:
         name: str

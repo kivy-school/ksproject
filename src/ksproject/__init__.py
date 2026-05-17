@@ -5,13 +5,17 @@ import argparse
 import sys
 from pathlib import Path
 
-from ksproject_utils.gradle.gradle_project import GradleProject
 from ksproject_utils.project_init import ProjectInit
+
+from ksproject.apple_commands import AppleCommands
+from ksproject.gradle_commands import GradleCommands
 
 
 class KSProjectCLI:
 
     def __init__(self) -> None:
+        self._gradle = GradleCommands()
+        self._apple = AppleCommands()
         self.parser = self._build_parser()
 
     # ------------------------------------------------------------------
@@ -32,38 +36,8 @@ class KSProjectCLI:
         p_init.add_argument("--name", help="App name (default: directory name)")
         p_init.set_defaults(func=self.init)
 
-        android = sub.add_parser("android", help="Android / Gradle commands")
-        asub = android.add_subparsers(dest="command", required=True)
-
-        p_build = asub.add_parser("build", help="Build an APK")
-        p_build.add_argument(
-            "variant",
-            nargs="?",
-            default="debug",
-            choices=["debug", "release"],
-        )
-        p_build.add_argument(
-            "--aar",
-            action="store_true",
-            help="Build an AAR library instead of an APK",
-        )
-        p_build.set_defaults(func=self.android_build)
-
-        p_devices = asub.add_parser("devices", help="List devices and AVDs")
-        p_devices.set_defaults(func=self.android_devices)
-
-        p_run = asub.add_parser("run", help="Build, install, and launch")
-        target = p_run.add_mutually_exclusive_group(required=True)
-        target.add_argument(
-            "--uuid", help="adb serial of a device or running emulator"
-        )
-        target.add_argument("--name", help="AVD name to boot")
-        p_run.add_argument(
-            "--variant",
-            default="debug",
-            choices=["debug", "release"],
-        )
-        p_run.set_defaults(func=self.android_run)
+        self._gradle.register(sub)
+        self._apple.register(sub)
 
         return parser
 
@@ -73,34 +47,6 @@ class KSProjectCLI:
 
     def init(self, args: argparse.Namespace) -> int:
         ProjectInit(Path(args.path), app_name=args.name).run()
-        return 0
-
-    def android_build(self, args: argparse.Namespace) -> int:
-        project = GradleProject(Path.cwd())
-        output = project.build(args.variant, aar=args.aar)
-        label = "AAR" if args.aar else "APK"
-        print(f"{label}: {output}")
-        return 0
-
-    def android_devices(self, args: argparse.Namespace) -> int:
-        project = GradleProject(Path.cwd())
-        items = project.devices()
-        if not items:
-            print("(no devices or AVDs found)")
-            return 0
-        for it in items:
-            if it.get("kind") == "device":
-                print(
-                    f"device  serial={it['serial']:<20} state={it['state']:<12}"
-                    f" model={it.get('model', '')}"
-                )
-            else:
-                print(f"avd     name={it['name']}")
-        return 0
-
-    def android_run(self, args: argparse.Namespace) -> int:
-        project = GradleProject(Path.cwd())
-        project.run(uuid=args.uuid, name=args.name, variant=args.variant)
         return 0
 
     # ------------------------------------------------------------------
@@ -114,3 +60,4 @@ class KSProjectCLI:
 
 def main() -> None:
     sys.exit(KSProjectCLI().run())
+
