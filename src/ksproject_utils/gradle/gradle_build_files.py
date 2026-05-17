@@ -941,22 +941,28 @@ import android.content.Context;
             iconId = android.R.drawable.stat_notify_sync;
         }}
 
+        // Prioritize dynamic Intent titles (if launched from Python), otherwise use our Python defaults
+        String finalTitle = intent.hasExtra("serviceTitle") ? intent.getStringExtra("serviceTitle") : "{title}";
+        String finalText = intent.hasExtra("serviceDescription") ? intent.getStringExtra("serviceDescription") : "{text}";
+
         Notification notification;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {{
             notification = new Notification.Builder(this, channelId)
-                .setContentTitle("{title}")
-                .setContentText("{text}")
+                .setContentTitle(finalTitle)
+                .setContentText(finalText)
                 .setSmallIcon(iconId)
                 .build();
         }} else {{
             notification = new Notification.Builder(this)
-                .setContentTitle("{title}")
-                .setContentText("{text}")
+                .setContentTitle(finalTitle)
+                .setContentText(finalText)
                 .setSmallIcon(iconId)
                 .build();
         }}
 
         startForeground(1, notification);
+
+        intent.putExtra("serviceStartAsForeground", "false");
 """
 
         content = f"""\
@@ -982,7 +988,12 @@ public class {service_name} extends PythonService {{
         intent.putExtra("serviceEntrypoint", "{entrypoint}");
         intent.putExtra("pythonVersion", "{python_version}");
         intent.putExtra("pythonName", "{service_name.lower()}");
+        
+        // Set fallback titles for when the system auto-restarts the service
+        intent.putExtra("serviceTitle", "{title}");
+        intent.putExtra("serviceDescription", "{text}");
         intent.putExtra("serviceStartAsForeground", "{'true' if foreground else 'false'}");
+        
         return intent;
     }}
 
@@ -990,6 +1001,14 @@ public class {service_name} extends PythonService {{
     public int onStartCommand(Intent intent, int flags, int startId) {{
         if (intent == null || intent.getExtras() == null || !intent.hasExtra("pythonName")) {{
             intent = getThisDefaultIntent(getApplicationContext(), "");
+        }} else {{
+            // Ensure title and description are present even if launched normally via Python without them
+            if (!intent.hasExtra("serviceTitle")) {{
+                intent.putExtra("serviceTitle", "{title}");
+            }}
+            if (!intent.hasExtra("serviceDescription")) {{
+                intent.putExtra("serviceDescription", "{text}");
+            }}
         }}
         {foreground_logic}
         setAutoRestartService({is_sticky_bool_str});

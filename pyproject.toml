@@ -1,7 +1,7 @@
 [project]
 name = "ksproject"
 version = "0.0.1"
-description = "Add your description here"
+description = "Compile python apps for Android and iOS."
 readme = "README.md"
 authors = [
     { name = "kivyschool" }

@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 import signal
 import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -11,13 +12,20 @@ from .adb import ADB, ADBError
 from .android_toolchain import host_emulator_abi
 
 
+def _is_alive(pid: int) -> bool:
+    """Check if a process is alive using os.kill(pid, 0). 
+    This works on both POSIX and Windows (Python 3.2+).
+    """
+    try:
+        os.kill(pid, 0)
+        return True
+    except OSError:
+        return False
+
+
 def _read_lock_pid(serial: str) -> int | None:
     """Given an adb serial like 'emulator-5554', return the qemu PID from
     ~/.android/avd/.adb_lock-5554 (emulator writes its PID there)."""
-    # The emulator writes its PID to ~/.android/avd/emu-last-serial-<port> or
-    # embedded in hardware-qemu.ini.lock; the most reliable cross-version path
-    # is the tmp lock file at /tmp/android-<user>/adb-<serial>-<port>/pid but
-    # that varies. Easiest: scan all AVD lock files for a live pid.
     avd_dir = Path.home() / ".android" / "avd"
     if not avd_dir.is_dir():
         return None
@@ -26,11 +34,8 @@ def _read_lock_pid(serial: str) -> int | None:
             pid = int(lock.read_text().strip())
         except (OSError, ValueError):
             continue
-        try:
-            os.kill(pid, 0)
+        if _is_alive(pid):
             return pid  # first live pid — good enough for liveness check
-        except OSError:
-            continue
     return None
 
 
@@ -47,9 +52,13 @@ class AndroidEmulator:
     def __init__(self, sdk_path: str, sdk_version: str = "35"):
         self.sdk_path = sdk_path
         self.sdk_version = sdk_version
-        self.binary = str(Path(sdk_path) / "emulator" / "emulator")
+        
+        exe_suffix = ".exe" if sys.platform == "win32" else ""
+        bat_suffix = ".bat" if sys.platform == "win32" else ""
+
+        self.binary = str(Path(sdk_path) / "emulator" / f"emulator{exe_suffix}")
         self.avdmanager = str(
-            Path(sdk_path) / "cmdline-tools" / "latest" / "bin" / "avdmanager"
+            Path(sdk_path) / "cmdline-tools" / "latest" / "bin" / f"avdmanager{bat_suffix}"
         )
 
     def list_avds(self) -> list[str]:
@@ -113,12 +122,22 @@ class AndroidEmulator:
 
     def boot(self, name: str) -> subprocess.Popen:
         """Spawn `emulator -avd <name>` detached and return the Popen handle."""
+        kwargs = {}
+        if sys.platform == "win32":
+            # DETACHED_PROCESS = 0x00000008, CREATE_NEW_PROCESS_GROUP = 0x00000200
+            # We use getattr to prevent linting errors on Unix environments
+            detached = getattr(subprocess, "DETACHED_PROCESS", 0x00000008)
+            new_group = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200)
+            kwargs["creationflags"] = detached | new_group
+        else:
+            kwargs["start_new_session"] = True
+
         return subprocess.Popen(
             [self.binary, "-avd", name, "-no-snapshot-load"],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             stdin=subprocess.DEVNULL,
-            start_new_session=True,
+            **kwargs
         )
 
     def boot_and_wait(
@@ -168,13 +187,7 @@ class AndroidEmulator:
 
     @staticmethod
     def _cleanup_stale_lock(name: str) -> None:
-        """Kill any qemu process holding the AVD's hardware-qemu.ini.lock.
-
-        The emulator writes its PID to `~/.android/avd/<name>.avd/
-        hardware-qemu.ini.lock`. If a previous run hung mid-boot and never
-        registered with adb, that PID is still alive and any new `emulator
-        -avd <name>` invocation fails with "Running multiple emulators ...".
-        """
+        """Kill any qemu process holding the AVD's hardware-qemu.ini.lock."""
         avd_dir = Path.home() / ".android" / "avd" / f"{name}.avd"
         lock = avd_dir / "hardware-qemu.ini.lock"
         try:
@@ -185,9 +198,8 @@ class AndroidEmulator:
             pid = int(pid_text)
         except ValueError:
             return
-        try:
-            os.kill(pid, 0)  # probe
-        except OSError:
+            
+        if not _is_alive(pid):
             # Stale PID — process is gone, but the lockfile remains. Remove
             # it so the emulator doesn't refuse to start.
             try:
@@ -195,21 +207,24 @@ class AndroidEmulator:
             except OSError:
                 pass
             return
+            
         # Live process still owns the lock — kill it.
-        for sig in (signal.SIGTERM, signal.SIGKILL):
+        # Windows doesn't have SIGKILL; SIGTERM forcefully terminates processes.
+        sigs = [signal.SIGTERM] if sys.platform == "win32" else [signal.SIGTERM, signal.SIGKILL]
+        
+        for sig in sigs:
             try:
                 os.kill(pid, sig)
             except OSError:
                 break
             for _ in range(20):
                 time.sleep(0.1)
-                try:
-                    os.kill(pid, 0)
-                except OSError:
+                if not _is_alive(pid):
                     break
             else:
                 continue
             break
+            
         try:
             lock.unlink()
         except OSError:
@@ -247,13 +262,10 @@ class AndroidEmulator:
         avd_pid = _read_lock_pid(serial)
         while True:
             # If the qemu process for this serial is gone, give up.
-            if avd_pid is not None:
-                try:
-                    os.kill(avd_pid, 0)
-                except OSError:
-                    raise AndroidEmulatorError(
-                        f"Emulator process {avd_pid} for {serial} died while waiting for it to come online"
-                    )
+            if avd_pid is not None and not _is_alive(avd_pid):
+                raise AndroidEmulatorError(
+                    f"Emulator process {avd_pid} for {serial} died while waiting for it to come online"
+                )
             for d in adb.devices():
                 if d["serial"] == serial and d["state"] == "device":
                     return
