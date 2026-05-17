@@ -122,6 +122,7 @@ class GradleProjectBuilder:
             app_name=self.app_name,
             permissions=(self.android.permissions if self.android else []),
             meta_data=(self.android.meta_data if self.android else {}),
+            services=(self.android.services if self.android else []),
         )
         res_dir = main_dir / "res"
         GradleBuildFiles.write_icon(res_dir, self._resolve_asset("icon"))
@@ -130,12 +131,31 @@ class GradleProjectBuilder:
         )
         GradleBuildFiles.write_renpy_hardware(main_dir, self.package_name)
         GradleBuildFiles.write_kivy_python_activity(main_dir, self.package_name)
+        
+        if self.android and self.android.services:
+            GradleBuildFiles.write_kivy_python_service(main_dir)
+            for svc in self.android.services:
+                GradleBuildFiles.write_custom_service(
+                    main_dir=main_dir,
+                    package_name=self.package_name,
+                    service_name=svc.name,
+                    python_version=PY_VERSION,
+                    entrypoint=svc.entrypoint,
+                    foreground=svc.foreground,
+                    start_type=getattr(svc, "start_type", "START_NOT_STICKY"),
+                    notification_title=getattr(svc, "notification_title", None),
+                    notification_text=getattr(svc, "notification_text", None),
+                    notification_icon=getattr(svc, "notification_icon", "stat_notify_sync"),
+                )
+
         _install_sdl2_java(main_dir, self.working_dir)
         _install_sdl2_headers(main_dir, self.working_dir)
 
         # Native bootstrap (libmain.so) — provides SDL_main → CPython
         cpp_dir = main_dir / "cpp"
         GradleBuildFiles.write_main_c(cpp_dir, PY_VERSION)
+        if self.android and self.android.services:
+            GradleBuildFiles.write_service_main_c(cpp_dir)
         GradleBuildFiles.write_cmake_lists(cpp_dir)
 
         # Generate the wrapper now that the app module exists on disk
