@@ -33,7 +33,8 @@ class PipInstaller:
         # Copy .java / .libs / .kotlin from local dep source trees into site_packages.
         # These dot-directories are not included in wheels, so ksproject collects them.
         sp = Path(site_packages)
-        for local_path in collect_local_paths(project_dir):
+        all_paths = [project_dir] + collect_local_paths(project_dir)
+        for local_path in all_paths:
             for dot_dir in (".java", ".libs", ".kotlin"):
                 src = local_path / dot_dir
                 if src.is_dir():
