@@ -998,6 +998,7 @@ int main(int argc, char *argv[]) {{
 
     Py_FinalizeEx();
     LOGI("python exit %d", ret);
+    exit(ret);
     return ret;
 }}
 """
@@ -1070,7 +1071,22 @@ Java_org_kivy_android_PythonService_nativeStart(
 
     setenv("ANDROID_APP_PATH", app_path, 1);
     setenv("ANDROID_ENTRYPOINT", entrypoint, 1);
+    setenv("ANDROID_ARGUMENT", app_path, 1);
+    setenv("ANDROID_PRIVATE", app_path, 1);
+    setenv("ANDROID_UNPACK", app_path, 1);
+
     setenv("PYTHONHOME", app_path, 1);
+    setenv("PYTHONNOUSERSITE", "1", 1);
+    setenv("PYTHONUNBUFFERED", "1", 1);
+    setenv("PYTHONOPTIMIZE", "2", 1);
+
+    // just to make sure no abnormalities
+    setenv("KIVY_NO_FILELOG", "1", 1);
+    setenv("KIVY_NO_CONFIG", "1", 1);
+    setenv("KIVY_BUILD", "android", 1);
+    if (app_path) {
+        setenv("KIVY_HOME", app_path, 1);
+    }
 
     PyImport_AppendInittab("androidembed", PyInit_androidembed);
 

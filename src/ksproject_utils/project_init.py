@@ -141,8 +141,11 @@ class KivyIntroApp(App):
         Builder.load_file(os.path.join(self.directory, "app.kv"))
         return IntroScreen()
 
-if __name__ == "__main__":
+def main() -> None:
     KivyIntroApp().run()
+        
+if __name__ == "__main__":
+    main()
 """
 
         app_kv_content = """<IntroScreen>:
@@ -238,14 +241,11 @@ if __name__ == "__main__":
                     radius: [25] # Perfect pill-shaped button
 """
 
-        init_py_content = """from .app import KivyIntroApp
-
-def main(*args) -> None:
-    app = KivyIntroApp()
-    app.run()
+        init_py_content = """
+print("App initialized!!")
 """
 
-        main_py_content = """from . import main
+        main_py_content = """from .app import main
 
 if __name__ == "__main__":
     main()
