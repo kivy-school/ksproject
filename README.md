@@ -197,13 +197,13 @@ ndk_api = 26
 # ndk_path  = "/path/to/android-sdk/ndk/27.3.13750724"
 # java_path = "/path/to/jdk"
 
-# Declare services as (assuming you have all your services in `services` folder in root dir containing pyproject.toml)
+# Declare services as (assuming you have all your services in `services` folder in src/project_name dir containing __main__.py)
 # Every sub-dir with top-level dir must have an __init__.py so it is considered as a python module and packaged with the app.
 
 #services = [
-#    { name = "MyService1", entrypoint = "services.myservice1", foreground = true, foreground_service_type = "location|dataSync" },
-#    { name = "MyService2", entrypoint = "services.myservice2", foreground = true, foreground_service_type = "location|dataSync" },
-#    { name = "MyService3", entrypoint = "services.myservice3", foreground = true, foreground_service_type = "dataSync" },
+#    { name = "MyService1", entrypoint = "myapp.services.myservice1", foreground = true, foreground_service_type = "location|dataSync" },
+#    { name = "MyService2", entrypoint = "myapp.services.myservice2", foreground = true, foreground_service_type = "location|dataSync" },
+#    { name = "MyService3", entrypoint = "myapp.services.myservice3", foreground = true, foreground_service_type = "dataSync" },
 #]
 
 # OR
@@ -211,19 +211,19 @@ ndk_api = 26
 
 # [[tool.kivy-school.android.services]]
 # name = "MyService1"
-# entrypoint = "services.myservice1"
+# entrypoint = "myapp.services.myservice1"
 # foreground = true
 # foreground_service_type = "location|dataSync"
 # 
 # [[tool.kivy-school.android.services]]
 # name = "MyService2"
-# entrypoint = "services.myservice2"
+# entrypoint = "myapp.services.myservice2"
 # foreground = true
 # foreground_service_type = "location|dataSync"
 # 
 # [[tool.kivy-school.android.services]]
 # name = "MyService3"
-# entrypoint = "services.myservice3"
+# entrypoint = "myapp.services.myservice3"
 # foreground = true
 # foreground_service_type = "dataSync"
 

@@ -270,6 +270,6 @@ if __name__ == "__main__":
 
     def _ensure_base_dirs(self) -> None:
         (self.project_path / ".java").mkdir(exist_ok=True)
-        services_dir = self.project_path / "services"
+        services_dir = self.project_path / "src" / self.module_name / "services"
         services_dir.mkdir(exist_ok=True)
         (services_dir / "__init__.py").touch()
