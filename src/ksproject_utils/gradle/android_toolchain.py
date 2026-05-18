@@ -27,9 +27,28 @@ _CMDLINE_TOOLS_URLS = {
 }
 
 SDKMAN_INSTALL_URL = "https://get.sdkman.io"
-DEFAULT_SDK_VERSION = "35"
-DEFAULT_NDK_VERSION = "27.3.13750724"
+DEFAULT_SDK_VERSION = "36"
+DEFAULT_NDK_VERSION = "28.0.12916984"
 DEFAULT_CMAKE_VERSION = "3.22.1"
+
+_NDK_VERSION_MAP = {
+    "25a": "25.0.8775105",
+    "25b": "25.1.8937393",
+    "25c": "25.2.9519653",
+    "26a": "26.0.10792818",
+    "26b": "26.1.10909125",
+    "26c": "26.2.11381408",
+    "26d": "26.3.11579264",
+    "27a": "27.0.12077973",
+    "27b": "27.1.12297006",
+    "27c": "27.2.12479018",
+    "27d": "27.3.13750724",
+    "28a": "28.0.12433566",
+    "28b": "28.0.12687989",
+    "28c": "28.0.12916984",
+    "29" : "29.0.14206865",
+    "30" : "30.0.14608247"
+}
 
 # sdkmanager (Android cmdline-tools) is known to crash (SIGSEGV) on Java >= 22.
 # Pin sdkman installs to this LTS identifier and reject newer detections.
@@ -72,7 +91,13 @@ class AndroidToolchain:
             )
 
         sdk_version = (android.sdk if android else None) or DEFAULT_SDK_VERSION
-        ndk_version = (android.ndk if android else None) or DEFAULT_NDK_VERSION
+
+        ndk_user = android.ndk if android else None
+        if ndk_user:
+            ndk_clean = ndk_user.lower().lstrip("r")
+            ndk_version = _NDK_VERSION_MAP.get(ndk_clean, DEFAULT_NDK_VERSION)
+        else:
+            ndk_version = DEFAULT_NDK_VERSION
 
         # Java first — sdkmanager needs it
         java_path = _resolve_java(android)
