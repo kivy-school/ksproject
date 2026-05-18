@@ -263,11 +263,10 @@ if __name__ == "__main__":
         # --- Target Write Loop ---
         for name, content in files.items():
             target = app_src / name
-            if not self._already_kivyschool():
-                target.write_text(content, encoding="utf-8")
+            target.write_text(content, encoding="utf-8")
 
         tmpl_path = (self.project_path / "AndroidManifest.tmpl.xml")
-        if (not self._already_kivyschool()) or (not tmpl_path.exists()):
+        if not tmpl_path.exists():
             default_manifest_template = """\
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
