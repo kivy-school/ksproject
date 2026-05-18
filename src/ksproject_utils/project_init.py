@@ -103,12 +103,6 @@ find-links = ["./wheelhouse"]
 [tool.kivy-school]
 app_name = "{self.app_name}"
 
-[tool.kivy-school.ios]
-bundle_id = "org.example.{self.module_name}"
-
-[tool.kivy-school.macos]
-bundle_id = "org.example.{self.module_name}"
-
 [tool.kivy-school.android]
 archs = ["arm64-v8a"]
 package_name = "org.example.{self.module_name}"
@@ -147,11 +141,9 @@ class KivyIntroApp(App):
         Builder.load_file(os.path.join(self.directory, "app.kv"))
         return IntroScreen()
 
-def main() -> None:
-    KivyIntroApp().run()
-        
 if __name__ == "__main__":
-    main()
+    KivyIntroApp().run()
+
 """
 
         app_kv_content = """<IntroScreen>:
@@ -247,11 +239,14 @@ if __name__ == "__main__":
                     radius: [25] # Perfect pill-shaped button
 """
 
-        init_py_content = """
-print("App initialized!!")
+        init_py_content = f"""print("App initialized!!")
+def main():
+    from .app import KivyIntroApp
+    app = KivyIntroApp()
+    app.run()
 """
 
-        main_py_content = """from .app import main
+        main_py_content = """from . import main
 
 if __name__ == "__main__":
     main()
