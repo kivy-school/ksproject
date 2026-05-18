@@ -109,10 +109,10 @@ package_name = "org.example.{self.module_name}"
 api = 36
 min_api = 24
 sdk = "36"
-ndk = "27.3.13750724" # check source.properties inside ndk-dir
+ndk = "28c"
 ndk_api = 24
 # sdk_path = "/path/to/android-sdk"
-# ndk_path = "/path/to/android-sdk/ndk/27.3.13750724"
+# ndk_path = "/path/to/android-ndk"
 # java_path = "/path/to/jdk"
 """
 
