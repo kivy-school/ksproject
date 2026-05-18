@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 import platform
 import re
+import shutil
 import subprocess
 import sys
 import urllib.request
@@ -95,7 +96,7 @@ class AndroidToolchain:
         ndk_user = android.ndk if android else None
         if ndk_user:
             ndk_clean = ndk_user.lower().lstrip("r")
-            ndk_version = _NDK_VERSION_MAP.get(ndk_clean, DEFAULT_NDK_VERSION)
+            ndk_version = _NDK_VERSION_MAP.get(ndk_clean, ndk_user)
         else:
             ndk_version = DEFAULT_NDK_VERSION
 
@@ -119,6 +120,47 @@ class AndroidToolchain:
 # SDK
 # ---------------------------------------------------------------------------
 
+def _ensure_cmdline_tools(sdk_root: Path) -> Path:
+    """Ensures cmdline-tools exist, finding existing Android Studio installs or downloading."""
+    sdk_root.mkdir(parents=True, exist_ok=True)
+    cmdline_tools_dir = sdk_root / "cmdline-tools"
+    sdk_exe = "sdkmanager.bat" if sys.platform == "win32" else "sdkmanager"
+    
+    # 1. Check standard 'latest' path
+    default_sdkmanager = cmdline_tools_dir / "latest" / "bin" / sdk_exe
+    if default_sdkmanager.exists():
+        return default_sdkmanager
+
+    # 2. Hunt for Android Studio's versioned folders (e.g., cmdline-tools/11.0/bin/sdkmanager)
+    if cmdline_tools_dir.exists():
+        for child in cmdline_tools_dir.iterdir():
+            if child.is_dir():
+                candidate = child / "bin" / sdk_exe
+                if candidate.exists():
+                    return candidate
+
+    # 3. If missing, download it
+    print("[ksproject] Downloading Android cmdline-tools...")
+    cmdline_tools_zip = sdk_root / "commandlinetools.zip"
+    url = _CMDLINE_TOOLS_URLS[sys.platform]
+    urllib.request.urlretrieve(url, cmdline_tools_zip)
+
+    cmdline_tools_dir.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(cmdline_tools_zip) as zf:
+        zf.extractall(cmdline_tools_dir)
+
+    # sdkmanager requires the directory to be named "latest"
+    unpacked = cmdline_tools_dir / "cmdline-tools"
+    if unpacked.exists():
+        if default_sdkmanager.parent.parent.exists():
+            shutil.rmtree(default_sdkmanager.parent.parent)
+        unpacked.rename(default_sdkmanager.parent.parent)
+    cmdline_tools_zip.unlink(missing_ok=True)
+
+    _restore_cmdline_tools_exec_bits(sdk_root)
+    return default_sdkmanager
+
+
 def _resolve_sdk(
     android: KivySchoolData.AndroidData | None,
     sdk_version: str,
@@ -137,10 +179,13 @@ def _resolve_sdk(
     platforms_dir = managed / "platforms" / f"android-{sdk_version}"
     if not platforms_dir.exists():
         _install_sdk(managed, sdk_version, ndk_version, java_path)
+    
     _restore_cmdline_tools_exec_bits(managed)
+    
     # CMake is required by AGP's externalNativeBuild but wasn't always
     # installed in older runs. Top it up if missing.
-    if not (managed / "cmake" / DEFAULT_CMAKE_VERSION / "bin" / "cmake").exists():
+    cmake_exe = "cmake.exe" if sys.platform == "win32" else "cmake"
+    if not (managed / "cmake" / DEFAULT_CMAKE_VERSION / "bin" / cmake_exe).exists():
         _sdkmanager_install(
             managed, java_path, [f"cmake;{DEFAULT_CMAKE_VERSION}"]
         )
@@ -176,28 +221,7 @@ def _resolve_ndk(
 def _install_sdk(
     sdk_root: Path, sdk_version: str, ndk_version: str, java_path: str
 ) -> None:
-    sdk_root.mkdir(parents=True, exist_ok=True)
-
-    cmdline_tools_zip = sdk_root / "commandlinetools.zip"
-    cmdline_tools_dir = sdk_root / "cmdline-tools"
-    sdkmanager = cmdline_tools_dir / "latest" / "bin" / "sdkmanager"
-
-    if not sdkmanager.exists():
-        print("[ksproject] Downloading Android cmdline-tools...")
-        url = _CMDLINE_TOOLS_URLS[sys.platform]
-        urllib.request.urlretrieve(url, cmdline_tools_zip)
-
-        cmdline_tools_dir.mkdir(parents=True, exist_ok=True)
-        with zipfile.ZipFile(cmdline_tools_zip) as zf:
-            zf.extractall(cmdline_tools_dir)
-
-        # sdkmanager requires the directory to be named "latest"
-        unpacked = cmdline_tools_dir / "cmdline-tools"
-        if unpacked.exists():
-            unpacked.rename(cmdline_tools_dir / "latest")
-        cmdline_tools_zip.unlink(missing_ok=True)
-
-        _restore_cmdline_tools_exec_bits(sdk_root)
+    sdkmanager = _ensure_cmdline_tools(sdk_root)
 
     env = os.environ.copy()
     env["ANDROID_HOME"] = str(sdk_root)
@@ -255,11 +279,8 @@ def _restore_cmdline_tools_exec_bits(sdk_root: Path) -> None:
 def _sdkmanager_install(
     sdk_root: Path, java_path: str, packages: list[str]
 ) -> None:
-    sdkmanager = sdk_root / "cmdline-tools" / "latest" / "bin" / "sdkmanager"
-    if not sdkmanager.exists():
-        raise AndroidToolchainError(
-            f"sdkmanager not found at {sdkmanager}; reinstall the SDK"
-        )
+    sdkmanager = _ensure_cmdline_tools(sdk_root)
+    
     env = os.environ.copy()
     env["ANDROID_HOME"] = str(sdk_root)
     env["JAVA_HOME"] = java_path
@@ -307,7 +328,10 @@ def _ensure_emulator(sdk_path: str, sdk_version: str, java_path: str) -> None:
     pick up the new packages on next invocation.
     """
     sdk_root = Path(sdk_path)
-    emulator_bin = sdk_root / "emulator" / "emulator"
+    
+    emu_exe = "emulator.exe" if sys.platform == "win32" else "emulator"
+    emulator_bin = sdk_root / "emulator" / emu_exe
+    
     abi = host_emulator_abi()
     sysimg_dir = (
         sdk_root / "system-images" / f"android-{sdk_version}" / "google_apis" / abi
@@ -315,8 +339,9 @@ def _ensure_emulator(sdk_path: str, sdk_version: str, java_path: str) -> None:
     if emulator_bin.exists() and sysimg_dir.exists():
         return
 
-    sdkmanager = sdk_root / "cmdline-tools" / "latest" / "bin" / "sdkmanager"
-    if not sdkmanager.exists():
+    try:
+        sdkmanager = _ensure_cmdline_tools(sdk_root)
+    except Exception:
         # No SDK manager — skip silently; callers needing the emulator will
         # surface a clearer error.
         return
