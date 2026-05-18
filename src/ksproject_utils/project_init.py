@@ -103,22 +103,16 @@ find-links = ["./wheelhouse"]
 [tool.kivy-school]
 app_name = "{self.app_name}"
 
-[tool.kivy-school.ios]
-bundle_id = "org.example.{self.module_name}"
-
-[tool.kivy-school.macos]
-bundle_id = "org.example.{self.module_name}"
-
 [tool.kivy-school.android]
 archs = ["arm64-v8a"]
 package_name = "org.example.{self.module_name}"
 api = 36
 min_api = 24
 sdk = "36"
-ndk = "27.3.13750724" # check source.properties inside ndk-dir
+ndk = "28c"
 ndk_api = 24
 # sdk_path = "/path/to/android-sdk"
-# ndk_path = "/path/to/android-sdk/ndk/27.3.13750724"
+# ndk_path = "/path/to/android-ndk"
 # java_path = "/path/to/jdk"
 """
 
@@ -147,11 +141,9 @@ class KivyIntroApp(App):
         Builder.load_file(os.path.join(self.directory, "app.kv"))
         return IntroScreen()
 
-def main() -> None:
-    KivyIntroApp().run()
-        
 if __name__ == "__main__":
-    main()
+    KivyIntroApp().run()
+
 """
 
         app_kv_content = """<IntroScreen>:
@@ -247,11 +239,14 @@ if __name__ == "__main__":
                     radius: [25] # Perfect pill-shaped button
 """
 
-        init_py_content = """
-print("App initialized!!")
+        init_py_content = f"""print("App initialized!!")
+def main():
+    from .app import KivyIntroApp
+    app = KivyIntroApp()
+    app.run()
 """
 
-        main_py_content = """from .app import main
+        main_py_content = """from . import main
 
 if __name__ == "__main__":
     main()
@@ -268,8 +263,40 @@ if __name__ == "__main__":
         # --- Target Write Loop ---
         for name, content in files.items():
             target = app_src / name
-            if (not self._already_kivyschool()) or (not target.exists()):
+            if not self._already_kivyschool():
                 target.write_text(content, encoding="utf-8")
+
+        tmpl_path = (self.project_path / "AndroidManifest.tmpl.xml")
+        if (not self._already_kivyschool()) or (not tmpl_path.exists()):
+            default_manifest_template = """\
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+{{ permissions }}
+
+    <application
+        android:label="{{ app_name }}"
+        android:icon="@mipmap/ic_launcher"
+        android:allowBackup="true"
+        android:supportsRtl="true"
+        android:hardwareAccelerated="true"
+        android:theme="@android:style/Theme.DeviceDefault.NoActionBar">{{ meta_data }}
+{{ services }}
+        <activity
+            android:name=".MainActivity"
+            android:label="{{ app_name }}"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>
+"""
+            tmpl_path.write_text(default_manifest_template, encoding="utf-8")
 
     def _ensure_wheelhouse(self) -> None:
         (self.project_path / "wheelhouse").mkdir(exist_ok=True)

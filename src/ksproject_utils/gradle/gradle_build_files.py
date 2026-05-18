@@ -314,6 +314,7 @@ tasks.named("preBuild") {{
     def write_android_manifest(
         main_dir: Path,
         package_name: str,
+        project_dir: Path,
         app_name: str,
         permissions: list[str] | None = None,
         meta_data: dict[str, str] | None = None,
@@ -344,23 +345,27 @@ tasks.named("preBuild") {{
             android:process=":{svc.name.lower()}"{fg_type}>
         </service>"""
 
-        content = f"""\
+        template_path = project_dir / "AndroidManifest.tmpl.xml"
+        
+        if not template_path.exists():
+            print("AndroidManifest.tmpl.xml not found... Continuing with default template...")
+            default_template = """\
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-{perm_lines}
+{{ permissions }}
 
     <application
-        android:label="{app_name}"
+        android:label="{{ app_name }}"
         android:icon="@mipmap/ic_launcher"
         android:allowBackup="true"
         android:supportsRtl="true"
         android:hardwareAccelerated="true"
-        android:theme="@android:style/Theme.DeviceDefault.NoActionBar">{meta_lines}
-{service_lines}
+        android:theme="@android:style/Theme.DeviceDefault.NoActionBar">{{ meta_data }}
+{{ services }}
         <activity
             android:name=".MainActivity"
-            android:label="{app_name}"
+            android:label="{{ app_name }}"
             android:configChanges="orientation|screenSize|keyboardHidden"
             android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
             android:exported="true">
@@ -372,7 +377,16 @@ tasks.named("preBuild") {{
     </application>
 </manifest>
 """
-        (main_dir / "AndroidManifest.xml").write_text(content, encoding="utf-8")
+            template_path.write_text(default_template, encoding="utf-8")
+
+        template_content = template_path.read_text(encoding="utf-8")
+        
+        manifest_content = template_content.replace("{{ app_name }}", app_name)
+        manifest_content = manifest_content.replace("{{ permissions }}", perm_lines)
+        manifest_content = manifest_content.replace("{{ meta_data }}", meta_lines)
+        manifest_content = manifest_content.replace("{{ services }}", service_lines)
+        
+        (main_dir / "AndroidManifest.xml").write_text(manifest_content, encoding="utf-8")
 
     # -------------------------------------------------------------------------
     # Icon
