@@ -119,6 +119,7 @@ class GradleProjectBuilder:
         GradleBuildFiles.write_android_manifest(
             main_dir,
             package_name=self.package_name,
+            project_dir=self.working_dir,
             app_name=self.app_name,
             permissions=(self.android.permissions if self.android else []),
             meta_data=(self.android.meta_data if self.android else {}),

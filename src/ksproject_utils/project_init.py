@@ -266,6 +266,38 @@ if __name__ == "__main__":
             if (not self._already_kivyschool()) or (not target.exists()):
                 target.write_text(content, encoding="utf-8")
 
+        tmpl_path = (self.project_path / "AndroidManifest.tmpl.xml")
+        if (not self._already_kivyschool()) or (not tmpl_path.exists()):
+            default_manifest_template = """\
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+{{ permissions }}
+
+    <application
+        android:label="{{ app_name }}"
+        android:icon="@mipmap/ic_launcher"
+        android:allowBackup="true"
+        android:supportsRtl="true"
+        android:hardwareAccelerated="true"
+        android:theme="@android:style/Theme.DeviceDefault.NoActionBar">{{ meta_data }}
+{{ services }}
+        <activity
+            android:name=".MainActivity"
+            android:label="{{ app_name }}"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>
+"""
+            tmpl_path.write_text(default_manifest_template, encoding="utf-8")
+
     def _ensure_wheelhouse(self) -> None:
         (self.project_path / "wheelhouse").mkdir(exist_ok=True)
 
