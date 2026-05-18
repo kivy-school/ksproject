@@ -348,6 +348,7 @@ tasks.named("preBuild") {{
         template_path = project_dir / "AndroidManifest.tmpl.xml"
         
         if not template_path.exists():
+            print("AndroidManifest.tmpl.xml not found... Continuing with default template...")
             default_template = """\
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
