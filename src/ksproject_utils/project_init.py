@@ -263,8 +263,7 @@ if __name__ == "__main__":
         # --- Target Write Loop ---
         for name, content in files.items():
             target = app_src / name
-            if not target.exists():
-                target.write_text(content, encoding="utf-8")
+            target.write_text(content, encoding="utf-8")
 
         tmpl_path = (self.project_path / "AndroidManifest.tmpl.xml")
         if not tmpl_path.exists():
