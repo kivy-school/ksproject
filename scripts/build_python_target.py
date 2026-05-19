@@ -173,9 +173,21 @@ def build_wheel(
 
     # (src_path, arcname_inside_wheel)
     entries: list[tuple[Path, str]] = []
-    entries.append(
-        (libpy_stage, f"libpython/prefix/{abi}/lib/libpython{py_minor}.so")
-    )
+    lib_python_files = [(stage / item, f"libpython/prefix/{abi}/lib/") for item in [
+        "libpython.so",
+        "libcrypto.so",
+        "libcrypto_python.so",
+        "libsqlite3.so",
+        "libsqlite3_python.so",
+        "libssl.so",
+        "libssl_python.so",
+    ]]
+    for entry in lib_python_files:
+        entries.append(entry)
+    # entries.append(
+    #     (libpy_stage, f"libpython/prefix/{abi}/lib/libpython{py_minor}.so")
+    # )
+    
     for so in sorted(dynload_stage.glob("*.so")):
         entries.append(
             (
