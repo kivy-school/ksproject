@@ -13,7 +13,8 @@ import toml
 
 from .tools import get_uv
 
-from .app_py import app_py_content, app_kv_content
+from .templates.base_app import app_kv, app_py
+
 from .pyproject_init import PyProjectInitKeys
 
 from .gradle.project_init import GradleProjectInit
@@ -113,8 +114,8 @@ if __name__ == "__main__":
 
         # --- File Assignment Map ---
         files = {
-            "app.py": app_py_content(),
-            "app.kv": app_kv_content(),
+            "app.py": app_py,
+            "app.kv": app_kv,
             #"__init__.py": init_py_content,
             "__main__.py": main_py_content,
         }

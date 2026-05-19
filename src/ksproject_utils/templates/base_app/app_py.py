@@ -1,3 +1,4 @@
+app_py = """\
 import os
 from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
@@ -20,3 +21,4 @@ class KivyIntroApp(App):
 def main():
     app = KivyIntroApp()
     app.run()
+"""

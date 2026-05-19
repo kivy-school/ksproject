@@ -1,3 +1,4 @@
+app_kv = """\
 <IntroScreen>:
     orientation: 'vertical'
     padding: dp(24)
@@ -89,3 +90,4 @@
                     pos: self.pos
                     size: self.size
                     radius: [25] # Perfect pill-shaped button
+"""
