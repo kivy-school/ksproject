@@ -182,11 +182,24 @@ class GradleProjectBuilder:
             jni_abi = main_dir / "jniLibs" / arch.value
             jni_abi.mkdir(parents=True, exist_ok=True)
 
-            src_lib = prefix / f"lib/libpython{PY_VERSION}.so"
+            # libpython gets renamed to libpython3.so (matches the SONAME the
+            # native bootstrap dlopen()s). All other lib*.so siblings in
+            # prefix/lib/ (libcrypto, libssl, libsqlite3 and their _python
+            # shims) are shipped verbatim — Android's nativeLibraryDir only
+            # exposes files matching lib*.so, and CPython extensions like
+            # _ssl/_hashlib/_sqlite3 dlopen these at runtime.
+            lib_src_dir = prefix / "lib"
+            src_lib = lib_src_dir / f"libpython{PY_VERSION}.so"
             if src_lib.exists():
                 dst_lib = jni_abi / "libpython3.so"
                 if not dst_lib.exists():
                     shutil.copy2(src_lib, dst_lib)
+            for so_file in lib_src_dir.glob("lib*.so"):
+                if so_file.name == f"libpython{PY_VERSION}.so":
+                    continue
+                dst = jni_abi / so_file.name
+                if not dst.exists():
+                    shutil.copy2(so_file, dst)
 
             # Extension modules go into assets/lib-dynload/<abi> so they can be
             # unpacked to a writable filesystem path at runtime (AGP 8 keeps
