@@ -56,22 +56,7 @@ class KivySchoolData:
             # Enforce module syntax if they accidentally leave ".py" or "/"
             raw_entry = data.get("entrypoint", "service_main")
             self.entrypoint = raw_entry.replace("/", ".").replace(".py", "")
-            
-            self.foreground = data.get("foreground", False)
-            self.foreground_service_type = data.get("foreground_service_type")
 
-    class ServiceData:
-        name: str
-        entrypoint: str
-        foreground: bool
-        foreground_service_type: str | None
-
-        def __init__(self, data: dict):
-            self.name = data["name"]
-            # Enforce module syntax if they accidentally leave ".py" or "/"
-            raw_entry = data.get("entrypoint", "service_main")
-            self.entrypoint = raw_entry.replace("/", ".").replace(".py", "")
-            
             self.foreground = data.get("foreground", False)
             self.foreground_service_type = data.get("foreground_service_type")
 
@@ -113,7 +98,7 @@ class KivySchoolData:
             self.permissions = data.get("permissions", [])
             self.meta_data = data.get("meta_data", {})
             self.gradle_dependencies = data.get("gradle_dependencies", [])
-            
+
             # Parse the list of services
             self.services = [
                 KivySchoolData.ServiceData(s) for s in data.get("services", [])

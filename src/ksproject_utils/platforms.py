@@ -1,8 +1,5 @@
-
-
-
 class Platform:
-    
+
     sdk_platform: str
 
     pip_platform: str
@@ -13,10 +10,6 @@ class Platform:
     project_path: str
 
     site_packages: str
-
-
-    
-
 
 
 class AndroidPlatform(Platform):
@@ -50,8 +43,6 @@ class AndroidX86_64Platform(AndroidPlatform):
     abi = "x86_64"
 
 
-
-
 class ApplePlatform(Platform):
 
     sdk_platform = "apple"
@@ -75,10 +66,12 @@ class IOSArm64Platform(ApplePlatform):
     pip_arch = "arm64"
     slice = "iphoneos"
 
+
 class IOSSim_X86_64Platform(ApplePlatform):
     pip_platform = "x86_64-apple-ios-simulator"
     pip_arch = "x86_64"
     slice = "iphonesimulator"
+
 
 class IOSSim_Arm64Platform(ApplePlatform):
 
