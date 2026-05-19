@@ -62,7 +62,7 @@ class ProjectInit:
 
         self._write_app_sources()
         self._ensure_wheelhouse()
-        self._ensure_base_dirs()
+        #self._ensure_base_dirs()
         print(f"[ksproject] initialized at {self.project_path}")
 
     # ------------------------------------------------------------------
