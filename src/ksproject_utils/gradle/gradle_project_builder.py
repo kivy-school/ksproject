@@ -137,8 +137,8 @@ class GradleProjectBuilder:
         GradleBuildFiles.write_renpy_hardware(main_dir, self.package_name)
         GradleBuildFiles.write_kivy_python_activity(main_dir, self.package_name)
 
+        GradleBuildFiles.write_kivy_python_service(main_dir)
         if self.android and self.android.services:
-            GradleBuildFiles.write_kivy_python_service(main_dir)
             for svc in self.android.services:
                 GradleBuildFiles.write_custom_service(
                     main_dir=main_dir,
