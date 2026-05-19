@@ -25,15 +25,22 @@ from ..pyproject_toml import KivySchoolData
 _CMDLINE_TOOLS_URLS = {
     "darwin": "https://dl.google.com/android/repository/commandlinetools-mac-11076708_latest.zip",
     "linux": "https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip",
-    "win32": "https://dl.google.com/android/repository/commandlinetools-windows-11076708_latest.zip",
+    "win32": "https://dl.google.com/android/repository/commandlinetools-win-11076708_latest.zip",
 }
 
 SDKMAN_INSTALL_URL = "https://get.sdkman.io"
 DEFAULT_SDK_VERSION = "36"
-DEFAULT_NDK_VERSION = "28.0.12916984"
+DEFAULT_NDK_VERSION = "28.2.13676358"
 DEFAULT_CMAKE_VERSION = "3.22.1"
 
 _NDK_VERSION_MAP = {
+    "25": "25.2.9519653",   # r25c
+    "26": "26.3.11579264",  # r26d
+    "27": "27.3.13750724",  # r27d (LTS)
+    "28": "28.2.13676358",  # r28c
+    "29": "29.0.14206865",  # r29 stable
+    "30": "30.0.14608247",  # r30 beta
+    # --- Explicit Revisions ---
     "25a": "25.0.8775105",
     "25b": "25.1.8937393",
     "25c": "25.2.9519653",
@@ -45,11 +52,9 @@ _NDK_VERSION_MAP = {
     "27b": "27.1.12297006",
     "27c": "27.2.12479018",
     "27d": "27.3.13750724",
-    "28a": "28.0.12433566",
-    "28b": "28.0.12687989",
-    "28c": "28.0.12916984",
-    "29": "29.0.14206865",
-    "30": "30.0.14608247",
+    "28a": "28.0.12916984",
+    "28b": "28.1.13356709",
+    "28c": "28.2.13676358",
 }
 
 # sdkmanager (Android cmdline-tools) is known to crash (SIGSEGV) on Java >= 22.
@@ -128,15 +133,19 @@ def _ensure_cmdline_tools(sdk_root: Path) -> Path:
     cmdline_tools_dir = sdk_root / "cmdline-tools"
     sdk_exe = "sdkmanager.bat" if sys.platform == "win32" else "sdkmanager"
 
-    # 1. Check standard 'latest' path
     default_sdkmanager = cmdline_tools_dir / "latest" / "bin" / sdk_exe
     if default_sdkmanager.exists():
         return default_sdkmanager
 
-    # 2. Hunt for Android Studio's versioned folders (e.g., cmdline-tools/11.0/bin/sdkmanager)
     if cmdline_tools_dir.exists():
+        # Check if it's directly inside cmdline-tools/bin
+        direct_candidate = cmdline_tools_dir / "bin" / sdk_exe
+        if direct_candidate.exists():
+            return direct_candidate
+            
+        # Check inside subfolders (like latest/, 11.0/, cmdline-tools/, etc.)
         for child in cmdline_tools_dir.iterdir():
-            if child.is_dir():
+            if child.is_dir() and child.name != "bin":
                 candidate = child / "bin" / sdk_exe
                 if candidate.exists():
                     return candidate
@@ -304,6 +313,9 @@ def _run_sdkmanager(
 
     use_shell = sys.platform == "win32"
 
+    if "ANDROID_HOME" in env:
+        args = [f"--sdk_root={env['ANDROID_HOME']}"] + args
+
     result = subprocess.run(
         [sdkmanager, *args], env=env, input=stdin_input, text=True, shell=use_shell
     )
@@ -312,30 +324,33 @@ def _run_sdkmanager(
             f"sdkmanager '{' '.join(args)}' exited with code {result.returncode}"
         )
 
-
 def _ensure_emulator(sdk_path: str, sdk_version: str, java_path: str) -> None:
-    """Install the emulator + a host-arch system image if missing.
-
-    Allows users who installed the SDK earlier (without emulator support) to
-    pick up the new packages on next invocation.
-    """
+    """Install the emulator + a host-arch system image if missing."""
     sdk_root = Path(sdk_path)
 
     emu_exe = "emulator.exe" if sys.platform == "win32" else "emulator"
     emulator_bin = sdk_root / "emulator" / emu_exe
 
     abi = host_emulator_abi()
-    sysimg_dir = (
-        sdk_root / "system-images" / f"android-{sdk_version}" / "google_apis" / abi
-    )
-    if emulator_bin.exists() and sysimg_dir.exists():
+    system_images_root = sdk_root / "system-images"
+    
+    # 1. Fuzzy match the API folder (e.g., allow "android-36.1" when looking for "36")
+    sysimg_exists = False
+    if system_images_root.exists():
+        for api_dir in system_images_root.iterdir():
+            if api_dir.is_dir() and api_dir.name.startswith(f"android-{sdk_version}"):
+                # 2. Check if *any* system image variant for this ABI exists inside
+                for tag_dir in api_dir.iterdir():
+                    if tag_dir.is_dir() and (tag_dir / abi).exists():
+                        sysimg_exists = True
+                        break
+
+    if emulator_bin.exists() and sysimg_exists:
         return
 
     try:
         sdkmanager = _ensure_cmdline_tools(sdk_root)
     except Exception:
-        # No SDK manager — skip silently; callers needing the emulator will
-        # surface a clearer error.
         return
 
     env = os.environ.copy()
@@ -343,18 +358,24 @@ def _ensure_emulator(sdk_path: str, sdk_version: str, java_path: str) -> None:
     env["JAVA_HOME"] = java_path
 
     print(f"[ksproject] Installing Android emulator + system image ({abi})...")
-    if not emulator_bin.exists():
-        _run_sdkmanager(str(sdkmanager), ["--install", "emulator"], env=env)
-    if not sysimg_dir.exists():
-        _run_sdkmanager(
-            str(sdkmanager),
-            [
-                "--install",
-                f"system-images;android-{sdk_version};google_apis;{abi}",
-            ],
-            env=env,
-            stdin_input="y\n",
-        )
+    
+    # 3. Safely attempt download without crashing the build if it fails
+    try:
+        if not emulator_bin.exists():
+            _run_sdkmanager(str(sdkmanager), ["--install", "emulator"], env=env)
+        if not sysimg_exists:
+            _run_sdkmanager(
+                str(sdkmanager),
+                [
+                    "--install",
+                    f"system-images;android-{sdk_version};google_apis;{abi}",
+                ],
+                env=env,
+                stdin_input="y\n",
+            )
+    except Exception as e:
+        print(f"[ksproject] Warning: Emulator setup failed ({e})")
+        print("[ksproject] Skipping emulator setup to continue build...")
 
 
 # ---------------------------------------------------------------------------
