@@ -2,6 +2,7 @@
 
 Swift-specific tasks (SwiftPM build / copy / Swift activity) are intentionally
 omitted — generated projects are pure AGP."""
+
 from __future__ import annotations
 
 import shutil
@@ -40,7 +41,7 @@ plugins {
     id("com.android.library") version "8.9.1" apply false
 }
 """
-        (dir / "build.gradle.kts").write_text(content, encoding = "utf-8")
+        (dir / "build.gradle.kts").write_text(content, encoding="utf-8")
 
     @staticmethod
     def write_settings_gradle(dir: Path, app_name: str) -> None:
@@ -64,7 +65,7 @@ dependencyResolutionManagement {{
 rootProject.name = "{app_name}"
 include(":app")
 """
-        (dir / "settings.gradle.kts").write_text(content, encoding = "utf-8")
+        (dir / "settings.gradle.kts").write_text(content, encoding="utf-8")
 
     @staticmethod
     def write_gradle_properties(dir: Path) -> None:
@@ -75,7 +76,7 @@ include(":app")
             "android.useAndroidX=true\n"
             "android.nonTransitiveRClass=true\n"
         )
-        (dir / "gradle.properties").write_text(content, encoding = "utf-8")
+        (dir / "gradle.properties").write_text(content, encoding="utf-8")
 
     @staticmethod
     def write_local_properties(dir: Path, sdk_path: str) -> None:
@@ -100,7 +101,9 @@ include(":app")
             "zipStoreBase=GRADLE_USER_HOME\n"
             "zipStorePath=wrapper/dists\n"
         )
-        (wrapper_dir / "gradle-wrapper.properties").write_text(properties, encoding="utf-8")
+        (wrapper_dir / "gradle-wrapper.properties").write_text(
+            properties, encoding="utf-8"
+        )
 
         jar_path = wrapper_dir / "gradle-wrapper.jar"
         gradlew_path = dir / "gradlew"
@@ -145,7 +148,7 @@ include(":app")
                 aar=aar,
                 gradle_dependencies=gradle_dependencies or [],
             ),
-            encoding="utf-8"
+            encoding="utf-8",
         )
         (app_dir / "libs").mkdir(parents=True, exist_ok=True)
 
@@ -170,12 +173,11 @@ include(":app")
             ""
             if aar
             else f'        applicationId = "{package_name}"\n'
-                 f"        versionCode = 1\n"
-                 f'        versionName = "1.0"\n'
+            f"        versionCode = 1\n"
+            f'        versionName = "1.0"\n'
         )
         extra_deps = "".join(
-            f'    implementation("{dep}")\n'
-            for dep in (gradle_dependencies or [])
+            f'    implementation("{dep}")\n' for dep in (gradle_dependencies or [])
         )
         ndk_path = str(ndk_path).replace("\\", "/") if ndk_path else ndk_path
         return f"""\
@@ -320,12 +322,12 @@ tasks.named("preBuild") {{
         meta_data: dict[str, str] | None = None,
         services: list["KivySchoolData.ServiceData"] | None = None,
     ) -> None:
-        
+
         perm_lines = "\n".join(
             f'    <uses-permission android:name="android.permission.{p}" />'
             for p in (permissions or ["INTERNET"])
         )
-        
+
         meta_lines = "".join(
             f'\n        <meta-data android:name="{k}" android:value="{v}" />'
             for k, v in (meta_data or {}).items()
@@ -336,7 +338,8 @@ tasks.named("preBuild") {{
             for svc in services:
                 fg_type = (
                     f'\n            android:foregroundServiceType="{svc.foreground_service_type}"'
-                    if svc.foreground_service_type else ""
+                    if svc.foreground_service_type
+                    else ""
                 )
                 service_lines += f"""
         <service
@@ -346,9 +349,11 @@ tasks.named("preBuild") {{
         </service>"""
 
         template_path = project_dir / "AndroidManifest.tmpl.xml"
-        
+
         if not template_path.exists():
-            print("AndroidManifest.tmpl.xml not found... Continuing with default template...")
+            print(
+                "AndroidManifest.tmpl.xml not found... Continuing with default template..."
+            )
             default_template = """\
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
@@ -380,13 +385,15 @@ tasks.named("preBuild") {{
             template_path.write_text(default_template, encoding="utf-8")
 
         template_content = template_path.read_text(encoding="utf-8")
-        
+
         manifest_content = template_content.replace("{{ app_name }}", app_name)
         manifest_content = manifest_content.replace("{{ permissions }}", perm_lines)
         manifest_content = manifest_content.replace("{{ meta_data }}", meta_lines)
         manifest_content = manifest_content.replace("{{ services }}", service_lines)
-        
-        (main_dir / "AndroidManifest.xml").write_text(manifest_content, encoding="utf-8")
+
+        (main_dir / "AndroidManifest.xml").write_text(
+            manifest_content, encoding="utf-8"
+        )
 
     # -------------------------------------------------------------------------
     # Icon
@@ -587,7 +594,7 @@ public class MainActivity extends PythonActivity {{
 }}
 """
         dest = java_dir / "MainActivity.java"
-        dest.write_text(content, encoding = "utf-8")
+        dest.write_text(content, encoding="utf-8")
 
     # -------------------------------------------------------------------------
     # Hardware.java — org.renpy.android.Hardware shim for Kivy SDL2 metrics
@@ -615,7 +622,7 @@ public class Hardware {{
     }}
 }}
 """
-        (java_dir / "Hardware.java").write_text(content, encoding = "utf-8")
+        (java_dir / "Hardware.java").write_text(content, encoding="utf-8")
 
     # -------------------------------------------------------------------------
     # PythonActivity.java — org.kivy.android.PythonActivity shim
@@ -693,7 +700,7 @@ public class PythonActivity extends SDLActivity {{
     }}
 }}
 """
-        (java_dir / "PythonActivity.java").write_text(content, encoding = "utf-8")
+        (java_dir / "PythonActivity.java").write_text(content, encoding="utf-8")
 
     @staticmethod
     def write_kivy_python_service(main_dir: Path) -> None:
@@ -923,7 +930,9 @@ public class PythonService extends Service implements Runnable {
         foreground_logic = ""
 
         start_type_constant = start_type.upper()
-        is_sticky_bool_str = "true" if start_type_constant == "START_STICKY" else "false"
+        is_sticky_bool_str = (
+            "true" if start_type_constant == "START_STICKY" else "false"
+        )
 
         title = notification_title or f"{service_name} is running"
         text = notification_text or "Background task active"
@@ -1200,7 +1209,7 @@ int main(int argc, char *argv[]) {{
     return ret;
 }}
 """
-        (cpp_dir / "main.c").write_text(content, encoding = "utf-8")
+        (cpp_dir / "main.c").write_text(content, encoding="utf-8")
 
     @staticmethod
     def write_service_main_c(cpp_dir: Path) -> None:

@@ -1,4 +1,5 @@
 """CPython-for-Android build helper. Ported from PyFrameworkBackend.installAndroid."""
+
 from __future__ import annotations
 
 import os
@@ -66,7 +67,9 @@ def install_cpython_android(
     # the full cross-build prefix (+ shared pure-py stdlib), so we just extract
     # into the same path install_cpython_android() would otherwise produce.
     remaining = [
-        a for a in archs if not _try_install_prebuilt(working_dir, a, android_version, py_version)
+        a
+        for a in archs
+        if not _try_install_prebuilt(working_dir, a, android_version, py_version)
     ]
     if not remaining:
         return
@@ -146,9 +149,7 @@ def _try_install_prebuilt(
         f"libpython-{android_version}-{PREBUILT_BUILD_TAG}-py3-none-"
         f"android_{PREBUILT_API}_{arch.replace('-', '_')}.whl"
     )
-    wheel_url = (
-        PREBUILT_INDEX_URL.rstrip("/") + f"/{android_version}/" + wheel_name
-    )
+    wheel_url = PREBUILT_INDEX_URL.rstrip("/") + f"/{android_version}/" + wheel_name
 
     cache_dir = working_dir / ".kivyschool" / "prebuilt-cache"
     cache_dir.mkdir(parents=True, exist_ok=True)
@@ -182,10 +183,10 @@ def _try_install_prebuilt(
                 if name.endswith("/"):
                     continue
                 if name.startswith(arch_prefix):
-                    rel = name[len(arch_prefix):]
+                    rel = name[len(arch_prefix) :]
                     dst = prefix / rel
                 elif name.startswith(stdlib_prefix):
-                    rel = name[len(stdlib_prefix):]
+                    rel = name[len(stdlib_prefix) :]
                     dst = stdlib_dst / rel
                 else:
                     continue
@@ -210,6 +211,4 @@ def _run_android(args: list[str], cwd: Path, env: dict[str, str]) -> None:
         env=env,
     )
     if result.returncode != 0:
-        raise CPythonBuildError(
-            f"CPython Android build step failed: {' '.join(args)}"
-        )
+        raise CPythonBuildError(f"CPython Android build step failed: {' '.join(args)}")

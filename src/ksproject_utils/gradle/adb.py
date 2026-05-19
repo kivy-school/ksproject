@@ -1,4 +1,5 @@
 """Thin wrapper around the Android `adb` binary."""
+
 from __future__ import annotations
 
 import subprocess
@@ -55,13 +56,15 @@ class ADB:
                 if ":" in p:
                     k, _, v = p.partition(":")
                     extras[k] = v
-            devices.append({
-                "serial": serial,
-                "state": state,
-                "model": extras.get("model", ""),
-                "transport_id": extras.get("transport_id", ""),
-                "kind": "device",
-            })
+            devices.append(
+                {
+                    "serial": serial,
+                    "state": state,
+                    "model": extras.get("model", ""),
+                    "transport_id": extras.get("transport_id", ""),
+                    "kind": "device",
+                }
+            )
         return devices
 
     def install(self, apk: Path, serial: str, replace: bool = True) -> None:
