@@ -3,6 +3,7 @@
 Single entrypoint used by both CLI and GUI: instantiate with a project path,
 then call `build()`, `devices()`, or `run()`.
 """
+
 from __future__ import annotations
 
 import os
@@ -44,9 +45,7 @@ class GradleProject:
     def __init__(self, project_path: Path):
         project_path = Path(project_path).resolve()
         if not (project_path / "pyproject.toml").is_file():
-            raise GradleProjectError(
-                f"No pyproject.toml found at {project_path}"
-            )
+            raise GradleProjectError(f"No pyproject.toml found at {project_path}")
 
         self.project_path = project_path
         self.pyproject = PyProjectToml(str(project_path / "pyproject.toml"))
@@ -62,9 +61,7 @@ class GradleProject:
             )
 
         self.builder = GradleProjectBuilder(self.pyproject, project_path)
-        self.toolchain = AndroidToolchain.resolve(
-            self.builder.android, project_path
-        )
+        self.toolchain = AndroidToolchain.resolve(self.builder.android, project_path)
         self.adb = ADB(self.toolchain.sdk_path)
         sdk_version = str(
             (self.builder.android.api if self.builder.android else None) or 35
@@ -88,9 +85,7 @@ class GradleProject:
         for arch in self.builder.archs:
             cls = _ARCH_TO_PLATFORM_CLS.get(arch)
             if cls is None:
-                raise GradleProjectError(
-                    f"No AndroidPlatform mapping for arch {arch}"
-                )
+                raise GradleProjectError(f"No AndroidPlatform mapping for arch {arch}")
             platform = cls(str(self.project_path))
             Path(platform.site_packages).mkdir(parents=True, exist_ok=True)
             PipInstaller.install(
@@ -136,7 +131,10 @@ class GradleProject:
         if aar:
             output = (
                 self.gradle_dir
-                / "app" / "build" / "outputs" / "aar"
+                / "app"
+                / "build"
+                / "outputs"
+                / "aar"
                 / f"app-{variant}.aar"
             )
             if not output.exists():
@@ -144,8 +142,12 @@ class GradleProject:
         else:
             output = (
                 self.gradle_dir
-                / "app" / "build" / "outputs" / "apk"
-                / variant / f"app-{variant}.apk"
+                / "app"
+                / "build"
+                / "outputs"
+                / "apk"
+                / variant
+                / f"app-{variant}.apk"
             )
             if not output.exists():
                 raise GradleProjectError(f"Expected APK not found at {output}")
@@ -178,9 +180,7 @@ class GradleProject:
         variant: str = "debug",
     ) -> None:
         if (uuid is None) == (name is None):
-            raise GradleProjectError(
-                "run requires exactly one of uuid or name"
-            )
+            raise GradleProjectError("run requires exactly one of uuid or name")
 
         if uuid is not None:
             serial = uuid

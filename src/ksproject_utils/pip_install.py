@@ -21,12 +21,20 @@ class PipInstaller:
         project_dir = Path(uv_src).resolve()
 
         try:
-            subprocess.check_call([
-                UV, "pip", "install", uv_src,
-                "--python-platform", platform.pip_platform,
-                "--index-strategy", "unsafe-best-match",
-                "--target", site_packages,
-            ])
+            subprocess.check_call(
+                [
+                    UV,
+                    "pip",
+                    "install",
+                    uv_src,
+                    "--python-platform",
+                    platform.pip_platform,
+                    "--index-strategy",
+                    "unsafe-best-match",
+                    "--target",
+                    site_packages,
+                ]
+            )
         except subprocess.CalledProcessError as e:
             raise PipInstallError(f"Failed to install '{uv_src}': {e}")
 
@@ -41,7 +49,9 @@ class PipInstaller:
                     shutil.copytree(src, sp / dot_dir, dirs_exist_ok=True)
 
 
-def collect_local_paths(project_dir: Path, visited: set[Path] | None = None) -> list[Path]:
+def collect_local_paths(
+    project_dir: Path, visited: set[Path] | None = None
+) -> list[Path]:
     """Recursively collect all local path and workspace dependency directories."""
     if visited is None:
         visited = set()

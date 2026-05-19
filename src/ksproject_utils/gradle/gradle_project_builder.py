@@ -1,4 +1,5 @@
 """Orchestrates Gradle project generation. Ported from GradleProjectBuilder.swift."""
+
 from __future__ import annotations
 
 import shutil
@@ -39,7 +40,8 @@ class GradleProjectBuilder:
             else f"org.kivyschool.{pyproject.project.name}"
         )
         self.archs: list[Arch] = (
-            self.android.archs if self.android and self.android.archs
+            self.android.archs
+            if self.android and self.android.archs
             else [Arch.ARM64_V8A, Arch.X86_64]
         )
 
@@ -76,9 +78,7 @@ class GradleProjectBuilder:
             candidate = templates / f"{name}.{ext}"
             if candidate.exists():
                 return candidate
-        raise FileNotFoundError(
-            f"No template found for '{name}' in {templates}"
-        )
+        raise FileNotFoundError(f"No template found for '{name}' in {templates}")
 
     # ------------------------------------------------------------------
     # Generation
@@ -105,13 +105,17 @@ class GradleProjectBuilder:
             package_name=self.package_name,
             archs=self.archs,
             compile_sdk=(self.android.api if self.android and self.android.api else 35),
-            min_sdk=(self.android.min_api if self.android and self.android.min_api else 24),
+            min_sdk=(
+                self.android.min_api if self.android and self.android.min_api else 24
+            ),
             target_sdk=(self.android.api if self.android and self.android.api else 35),
             python_version=PY_VERSION,
             ndk_version=toolchain.ndk_version,
             ndk_path=toolchain.ndk_path,
             aar=aar,
-            gradle_dependencies=(self.android.gradle_dependencies if self.android else []),
+            gradle_dependencies=(
+                self.android.gradle_dependencies if self.android else []
+            ),
         )
 
         main_dir = app_dir / "src" / "main"
@@ -132,9 +136,9 @@ class GradleProjectBuilder:
         )
         GradleBuildFiles.write_renpy_hardware(main_dir, self.package_name)
         GradleBuildFiles.write_kivy_python_activity(main_dir, self.package_name)
-        
+
+        GradleBuildFiles.write_kivy_python_service(main_dir)
         if self.android and self.android.services:
-            GradleBuildFiles.write_kivy_python_service(main_dir)
             for svc in self.android.services:
                 GradleBuildFiles.write_custom_service(
                     main_dir=main_dir,
@@ -146,7 +150,9 @@ class GradleProjectBuilder:
                     start_type=getattr(svc, "start_type", "START_NOT_STICKY"),
                     notification_title=getattr(svc, "notification_title", None),
                     notification_text=getattr(svc, "notification_text", None),
-                    notification_icon=getattr(svc, "notification_icon", "stat_notify_sync"),
+                    notification_icon=getattr(
+                        svc, "notification_icon", "stat_notify_sync"
+                    ),
                 )
 
         _install_sdl2_java(main_dir, self.working_dir)
@@ -155,8 +161,7 @@ class GradleProjectBuilder:
         # Native bootstrap (libmain.so) — provides SDL_main → CPython
         cpp_dir = main_dir / "cpp"
         GradleBuildFiles.write_main_c(cpp_dir, PY_VERSION)
-        if self.android and self.android.services:
-            GradleBuildFiles.write_service_main_c(cpp_dir)
+        GradleBuildFiles.write_service_main_c(cpp_dir)
         GradleBuildFiles.write_cmake_lists(cpp_dir)
 
         # Generate the wrapper now that the app module exists on disk
@@ -189,9 +194,7 @@ class GradleProjectBuilder:
             # lib*.so are exposed via nativeLibraryDir).
             lib_dynload = prefix / f"lib/python{PY_VERSION}/lib-dynload"
             if lib_dynload.exists():
-                dynload_dst = (
-                    main_dir / "assets" / "lib-dynload" / arch.value
-                )
+                dynload_dst = main_dir / "assets" / "lib-dynload" / arch.value
                 dynload_dst.mkdir(parents=True, exist_ok=True)
                 for so_file in lib_dynload.iterdir():
                     if so_file.suffix == ".so":
@@ -226,7 +229,9 @@ class GradleProjectBuilder:
 
 
 _SDL2_VERSION = "2.30.11"
-_SDL2_JAVA_PREFIX = f"SDL2-{_SDL2_VERSION}/android-project/app/src/main/java/org/libsdl/app/"
+_SDL2_JAVA_PREFIX = (
+    f"SDL2-{_SDL2_VERSION}/android-project/app/src/main/java/org/libsdl/app/"
+)
 _SDL2_INCLUDE_PREFIX = f"SDL2-{_SDL2_VERSION}/include/"
 _SDL2_TARBALL_URL = (
     f"https://github.com/libsdl-org/SDL/releases/download/"
@@ -256,19 +261,17 @@ def _populate_sdl2_cache(working_dir: Path) -> None:
             for member in tar.getmembers():
                 if member.isdir():
                     continue
-                if (
-                    member.name.startswith(_SDL2_JAVA_PREFIX)
-                    and member.name.endswith(".java")
+                if member.name.startswith(_SDL2_JAVA_PREFIX) and member.name.endswith(
+                    ".java"
                 ):
-                    filename = member.name[len(_SDL2_JAVA_PREFIX):]
+                    filename = member.name[len(_SDL2_JAVA_PREFIX) :]
                     f = tar.extractfile(member)
                     if f is not None:
                         (java_cache / filename).write_bytes(f.read())
-                elif (
-                    member.name.startswith(_SDL2_INCLUDE_PREFIX)
-                    and member.name.endswith(".h")
-                ):
-                    rel = member.name[len(_SDL2_INCLUDE_PREFIX):]
+                elif member.name.startswith(
+                    _SDL2_INCLUDE_PREFIX
+                ) and member.name.endswith(".h"):
+                    rel = member.name[len(_SDL2_INCLUDE_PREFIX) :]
                     dst = include_cache / rel
                     dst.parent.mkdir(parents=True, exist_ok=True)
                     f = tar.extractfile(member)

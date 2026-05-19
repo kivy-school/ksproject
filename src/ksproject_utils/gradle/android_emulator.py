@@ -1,4 +1,5 @@
 """Thin wrapper around the Android `emulator` binary."""
+
 from __future__ import annotations
 
 import os
@@ -13,7 +14,7 @@ from .android_toolchain import host_emulator_abi
 
 
 def _is_alive(pid: int) -> bool:
-    """Check if a process is alive using os.kill(pid, 0). 
+    """Check if a process is alive using os.kill(pid, 0).
     This works on both POSIX and Windows (Python 3.2+).
     """
     try:
@@ -52,13 +53,17 @@ class AndroidEmulator:
     def __init__(self, sdk_path: str, sdk_version: str = "35"):
         self.sdk_path = sdk_path
         self.sdk_version = sdk_version
-        
+
         exe_suffix = ".exe" if sys.platform == "win32" else ""
         bat_suffix = ".bat" if sys.platform == "win32" else ""
 
         self.binary = str(Path(sdk_path) / "emulator" / f"emulator{exe_suffix}")
         self.avdmanager = str(
-            Path(sdk_path) / "cmdline-tools" / "latest" / "bin" / f"avdmanager{bat_suffix}"
+            Path(sdk_path)
+            / "cmdline-tools"
+            / "latest"
+            / "bin"
+            / f"avdmanager{bat_suffix}"
         )
 
     def list_avds(self) -> list[str]:
@@ -73,17 +78,13 @@ class AndroidEmulator:
                 f"emulator -list-avds failed: {(result.stderr or '').strip()}"
             )
         return [
-            line.strip()
-            for line in (result.stdout or "").splitlines()
-            if line.strip()
+            line.strip() for line in (result.stdout or "").splitlines() if line.strip()
         ]
 
     def ensure_default_avd(self) -> None:
         """Create a default Pixel XL AVD if none exists yet."""
         if not Path(self.binary).exists():
-            raise AndroidEmulatorError(
-                f"emulator binary not found at {self.binary}"
-            )
+            raise AndroidEmulatorError(f"emulator binary not found at {self.binary}")
         result = subprocess.run(
             [self.binary, "-list-avds"],
             capture_output=True,
@@ -93,9 +94,7 @@ class AndroidEmulator:
             return  # at least one AVD exists
 
         abi = host_emulator_abi()
-        system_image = (
-            f"system-images;android-{self.sdk_version};google_apis;{abi}"
-        )
+        system_image = f"system-images;android-{self.sdk_version};google_apis;{abi}"
         print(
             f"[ksproject] Creating default AVD '{DEFAULT_AVD_NAME}' "
             f"({DEFAULT_AVD_DEVICE}, {abi})..."
@@ -105,9 +104,12 @@ class AndroidEmulator:
                 self.avdmanager,
                 "create",
                 "avd",
-                "-n", DEFAULT_AVD_NAME,
-                "-k", system_image,
-                "-d", DEFAULT_AVD_DEVICE,
+                "-n",
+                DEFAULT_AVD_NAME,
+                "-k",
+                system_image,
+                "-d",
+                DEFAULT_AVD_DEVICE,
                 "-f",
             ],
             input="no\n",
@@ -137,7 +139,7 @@ class AndroidEmulator:
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             stdin=subprocess.DEVNULL,
-            **kwargs
+            **kwargs,
         )
 
     def boot_and_wait(
@@ -198,7 +200,7 @@ class AndroidEmulator:
             pid = int(pid_text)
         except ValueError:
             return
-            
+
         if not _is_alive(pid):
             # Stale PID — process is gone, but the lockfile remains. Remove
             # it so the emulator doesn't refuse to start.
@@ -207,11 +209,15 @@ class AndroidEmulator:
             except OSError:
                 pass
             return
-            
+
         # Live process still owns the lock — kill it.
         # Windows doesn't have SIGKILL; SIGTERM forcefully terminates processes.
-        sigs = [signal.SIGTERM] if sys.platform == "win32" else [signal.SIGTERM, signal.SIGKILL]
-        
+        sigs = (
+            [signal.SIGTERM]
+            if sys.platform == "win32"
+            else [signal.SIGTERM, signal.SIGKILL]
+        )
+
         for sig in sigs:
             try:
                 os.kill(pid, sig)
@@ -224,7 +230,7 @@ class AndroidEmulator:
             else:
                 continue
             break
-            
+
         try:
             lock.unlink()
         except OSError:

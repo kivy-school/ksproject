@@ -3,6 +3,7 @@
 Ports `PSProject/Sources/PSProject/Init.swift` + `NewToml.swift`.
 Drops Swift/iOS/macOS-specific keys; keeps android section.
 """
+
 from __future__ import annotations
 
 import subprocess
@@ -46,7 +47,9 @@ class ProjectInit:
             self._uv_init()
 
         if self._already_kivyschool():
-            print(f"[ksproject] {self.pyproject_path} already has [tool.kivy-school]; skipping toml updates")
+            print(
+                f"[ksproject] {self.pyproject_path} already has [tool.kivy-school]; skipping toml updates"
+            )
         else:
             self._append_kivyschool_config()
 
@@ -103,6 +106,12 @@ find-links = ["./wheelhouse"]
 [tool.kivy-school]
 app_name = "{self.app_name}"
 
+[tool.kivy-school.ios]
+bundle_id = "org.example.{self.module_name}"
+
+[tool.kivy-school.macos]
+bundle_id = "org.example.{self.module_name}"
+
 [tool.kivy-school.android]
 archs = ["arm64-v8a"]
 package_name = "org.example.{self.module_name}"
@@ -121,7 +130,7 @@ ndk_api = 24
         app_src.mkdir(parents=True, exist_ok=True)
 
         # --- Define File Contents ---
-        
+
         app_py_content = """import os
 from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
@@ -265,7 +274,7 @@ if __name__ == "__main__":
             target = app_src / name
             target.write_text(content, encoding="utf-8")
 
-        tmpl_path = (self.project_path / "AndroidManifest.tmpl.xml")
+        tmpl_path = self.project_path / "AndroidManifest.tmpl.xml"
         if not tmpl_path.exists():
             default_manifest_template = """\
 <?xml version="1.0" encoding="utf-8"?>
