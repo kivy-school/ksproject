@@ -700,13 +700,7 @@ public class PythonActivity extends SDLActivity {{
     }}
 
     public static void changeKeyboard(int inputType) {{
-        if (SDLActivity.keyboardInputType != inputType) {{
-            SDLActivity.keyboardInputType = inputType;
-            InputMethodManager imm =
-                    (InputMethodManager)
-                            getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
-            imm.restartInput(mTextEdit);
-        }}
+        // empty
     }}
 }}
 """
