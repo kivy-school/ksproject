@@ -7,6 +7,7 @@ Mirrors:
 Both artifacts are cached under ``~/.kivyschool/`` (one global cache shared
 across projects, matching PSProject's ``Path.ps_support``).
 """
+
 from __future__ import annotations
 
 import shutil
@@ -47,7 +48,9 @@ def python_xcframework() -> Path:
     support = _support_root()
     fw = support / "Python.xcframework"
     # We consider it "fully installed" once both iOS slice dirs exist.
-    have_ios = (fw / "ios-arm64").exists() and (fw / "ios-arm64_x86_64-simulator").exists()
+    have_ios = (fw / "ios-arm64").exists() and (
+        fw / "ios-arm64_x86_64-simulator"
+    ).exists()
     have_macos = (fw / "macos-arm64_x86_64").exists()
     if have_ios and have_macos:
         return fw
@@ -94,7 +97,11 @@ _SLICE_VERSION_MARKER = ".ksproject_slice_version"
 
 def _slice_is_current(dst: Path) -> bool:
     marker = dst / _SLICE_VERSION_MARKER
-    return dst.exists() and marker.exists() and marker.read_text().strip() == f"{PY_VERSION}-{PY_SUB_VERSION}"
+    return (
+        dst.exists()
+        and marker.exists()
+        and marker.read_text().strip() == f"{PY_VERSION}-{PY_SUB_VERSION}"
+    )
 
 
 def _mark_slice_version(dst: Path) -> None:

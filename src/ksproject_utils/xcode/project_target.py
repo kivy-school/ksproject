@@ -4,6 +4,7 @@ Ports ``PSProject/Sources/XcodeProjectBuilder/ProjectTarget/*.swift``
 (including ``BuildScripts.swift``) for the single supported "kivy" stack
 (SDL2 + KivyLauncher + PySwiftKit + CPython).
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -161,6 +162,7 @@ SIGN_PYTHON_BINARY_SCRIPT = _sign_python_binary_script(PY_SUB_VERSION)
 # --------------------------------------------------------------------------
 # Target builder
 # --------------------------------------------------------------------------
+
 
 class ProjectTarget:
     """One XcodeGen target (single multi-platform "auto" application target)."""

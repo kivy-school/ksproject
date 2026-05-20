@@ -1,4 +1,5 @@
 """iOS / macOS / Xcode CLI commands."""
+
 from __future__ import annotations
 
 import argparse
@@ -37,7 +38,9 @@ class AppleCommands:
         )
         ip_devices.set_defaults(func=self.ios_devices)
 
-        ip_run = isub.add_parser("run", help="Install and launch on a simulator or device")
+        ip_run = isub.add_parser(
+            "run", help="Install and launch on a simulator or device"
+        )
         itarget = ip_run.add_mutually_exclusive_group(required=True)
         itarget.add_argument("--uuid", help="UDID of a simulator or device")
         itarget.add_argument("--name", help="Simulator/device name")

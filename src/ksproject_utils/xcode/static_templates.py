@@ -1,4 +1,5 @@
 """Static text templates: launch screen, asset catalog, dylib template plist."""
+
 from __future__ import annotations
 
 
