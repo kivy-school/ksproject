@@ -41,12 +41,11 @@ def android_triple(arch: str) -> str:
 
 
 def android_prefix(
-    working_dir: Path, arch: str, android_version: str = ANDROID_VERSION
+    ks_root: Path, arch: str, android_version: str = ANDROID_VERSION
 ) -> Path:
     triple = android_triple(arch)
     return (
-        working_dir
-        / ".kivyschool"
+        ks_root
         / f"Python-{android_version}"
         / "cross-build"
         / triple
@@ -55,7 +54,7 @@ def android_prefix(
 
 
 def install_cpython_android(
-    working_dir: Path,
+    ks_root: Path,
     archs: list[str],
     sdk: str | None,
     ndk: str | None,
@@ -69,25 +68,24 @@ def install_cpython_android(
     remaining = [
         a
         for a in archs
-        if not _try_install_prebuilt(working_dir, a, android_version, py_version)
+        if not _try_install_prebuilt(ks_root, a, android_version, py_version)
     ]
     if not remaining:
         return
 
-    ks_dir = working_dir / ".kivyschool"
-    cpython_dir = ks_dir / f"Python-{android_version}"
+    cpython_dir = ks_root / f"Python-{android_version}"
 
     if not cpython_dir.exists():
-        ks_dir.mkdir(parents=True, exist_ok=True)
+        ks_root.mkdir(parents=True, exist_ok=True)
         print(f"Downloading CPython {android_version} source...")
         url = (
             f"https://www.python.org/ftp/python/{android_version}"
             f"/Python-{android_version}.tgz"
         )
-        tar_path = ks_dir / f"Python-{android_version}.tgz"
+        tar_path = ks_root / f"Python-{android_version}.tgz"
         urllib.request.urlretrieve(url, tar_path)
         with tarfile.open(tar_path) as tf:
-            tf.extractall(ks_dir)
+            tf.extractall(ks_root)
         tar_path.unlink(missing_ok=True)
 
     env = os.environ.copy()
@@ -120,7 +118,7 @@ def install_cpython_android(
 
 
 def _try_install_prebuilt(
-    working_dir: Path,
+    ks_root: Path,
     arch: str,
     android_version: str,
     py_version: str,
@@ -137,7 +135,7 @@ def _try_install_prebuilt(
     if os.environ.get("KIVYSCHOOL_PREBUILT_DISABLE") == "1":
         return False
 
-    prefix = android_prefix(working_dir, arch, android_version)
+    prefix = android_prefix(ks_root, arch, android_version)
     libpy = prefix / "lib" / f"libpython{py_version}.so"
     if libpy.exists():
         return True
@@ -151,7 +149,7 @@ def _try_install_prebuilt(
     )
     wheel_url = PREBUILT_INDEX_URL.rstrip("/") + f"/{android_version}/" + wheel_name
 
-    cache_dir = working_dir / ".kivyschool" / "prebuilt-cache"
+    cache_dir = ks_root / "prebuilt-cache"
     cache_dir.mkdir(parents=True, exist_ok=True)
     wheel_cache = cache_dir / wheel_name
 

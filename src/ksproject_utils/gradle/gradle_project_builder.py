@@ -44,6 +44,7 @@ class GradleProjectBuilder:
             if self.android and self.android.archs
             else [Arch.ARM64_V8A, Arch.X86_64]
         )
+        self.ks_root: Path = self.android.kivyschool_root(working_dir)
 
     @classmethod
     def create(cls, uv_dir: Path) -> "GradleProjectBuilder":
@@ -155,8 +156,8 @@ class GradleProjectBuilder:
                     ),
                 )
 
-        _install_sdl2_java(main_dir, self.working_dir)
-        _install_sdl2_headers(main_dir, self.working_dir)
+        _install_sdl2_java(main_dir, self.ks_root)
+        _install_sdl2_headers(main_dir, self.ks_root)
 
         # Native bootstrap (libmain.so) — provides SDL_main → CPython
         cpp_dir = main_dir / "cpp"
@@ -167,9 +168,9 @@ class GradleProjectBuilder:
         # Generate the wrapper now that the app module exists on disk
         GradleBuildFiles.write_gradle_wrapper(dist_dir, toolchain.java_path)
 
-        # Build CPython for Android (cached in .kivyschool/)
+        # Build CPython for Android (cached in <ks_root>/Python-<ver>/)
         install_cpython_android(
-            working_dir=self.working_dir,
+            ks_root=self.ks_root,
             archs=[a.value for a in self.archs],
             sdk=toolchain.sdk_path,
             ndk=toolchain.ndk_path,
@@ -178,7 +179,7 @@ class GradleProjectBuilder:
 
         # Copy libpython + arch-specific extension modules to jniLibs per ABI
         for arch in self.archs:
-            prefix = android_prefix(self.working_dir, arch.value)
+            prefix = android_prefix(self.ks_root, arch.value)
             jni_abi = main_dir / "jniLibs" / arch.value
             jni_abi.mkdir(parents=True, exist_ok=True)
 
@@ -222,7 +223,7 @@ class GradleProjectBuilder:
                 shutil.copytree(py_inc_src, py_inc_dst)
 
         # Copy pure Python stdlib once (no .so, no lib-dynload)
-        first_prefix = android_prefix(self.working_dir, self.archs[0].value)
+        first_prefix = android_prefix(self.ks_root, self.archs[0].value)
         stdlib_src = first_prefix / f"lib/python{PY_VERSION}"
         assets_dir = main_dir / "assets"
         assets_dir.mkdir(parents=True, exist_ok=True)
@@ -252,13 +253,13 @@ _SDL2_TARBALL_URL = (
 )
 
 
-def _sdl2_cache_root(working_dir: Path) -> Path:
-    return working_dir / ".kivyschool" / f"sdl2-{_SDL2_VERSION}"
+def _sdl2_cache_root(ks_root: Path) -> Path:
+    return ks_root / f"sdl2-{_SDL2_VERSION}"
 
 
-def _populate_sdl2_cache(working_dir: Path) -> None:
+def _populate_sdl2_cache(ks_root: Path) -> None:
     """Download SDL2 source tarball once and extract Java + include/ to cache."""
-    cache = _sdl2_cache_root(working_dir)
+    cache = _sdl2_cache_root(ks_root)
     java_cache = cache / "java"
     include_cache = cache / "include"
     if java_cache.exists() and include_cache.exists():
@@ -293,26 +294,26 @@ def _populate_sdl2_cache(working_dir: Path) -> None:
     print(f"[ksproject] SDL2 source cached at {cache}")
 
 
-def _install_sdl2_java(main_dir: Path, working_dir: Path) -> None:
+def _install_sdl2_java(main_dir: Path, ks_root: Path) -> None:
     """Copy SDL2 Java source files (SDLActivity etc) into src/main/java/org/libsdl/app/."""
     dest_dir = main_dir / "java" / "org" / "libsdl" / "app"
     if dest_dir.exists() and any(f.suffix == ".java" for f in dest_dir.iterdir()):
         return
     dest_dir.mkdir(parents=True, exist_ok=True)
-    _populate_sdl2_cache(working_dir)
-    for java_file in (_sdl2_cache_root(working_dir) / "java").iterdir():
+    _populate_sdl2_cache(ks_root)
+    for java_file in (_sdl2_cache_root(ks_root) / "java").iterdir():
         if java_file.suffix == ".java":
             shutil.copy2(java_file, dest_dir / java_file.name)
     print(f"[ksproject] SDL2 Java source installed to {dest_dir}")
 
 
-def _install_sdl2_headers(main_dir: Path, working_dir: Path) -> None:
+def _install_sdl2_headers(main_dir: Path, ks_root: Path) -> None:
     """Copy SDL2 C headers into src/main/cpp/sdl2_include/ for the NDK build."""
     dest_dir = main_dir / "cpp" / "sdl2_include"
     if dest_dir.exists() and any(dest_dir.iterdir()):
         return
-    _populate_sdl2_cache(working_dir)
-    src = _sdl2_cache_root(working_dir) / "include"
+    _populate_sdl2_cache(ks_root)
+    src = _sdl2_cache_root(ks_root) / "include"
     shutil.copytree(src, dest_dir)
     print(f"[ksproject] SDL2 headers installed to {dest_dir}")
 

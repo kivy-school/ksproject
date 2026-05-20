@@ -3,7 +3,9 @@
 Priority order for each tool:
   1. System environment variables (ANDROID_HOME, ANDROID_NDK_ROOT, JAVA_HOME)
   2. Explicit path set in [tool.kivy-school.android] (sdk_path / ndk_path / java_path)
-  3. ksproject-managed install under <project_dir>/.kivyschool/android-sdk
+  3. ksproject-managed install under either:
+        <project_dir>/.kivyschool/android-sdk  (when ``local_tools = true``)
+        ~/.kivyschool/android-sdk              (when ``local_tools = false``)
 """
 
 from __future__ import annotations
@@ -83,7 +85,12 @@ class AndroidToolchain:
     ndk_version: str = ""
 
     @staticmethod
-    def kivyschool_sdk_root(project_dir: Path) -> Path:
+    def kivyschool_sdk_root(
+        project_dir: Path,
+        android: KivySchoolData.AndroidData | None = None,
+    ) -> Path:
+        if android is not None:
+            return android.kivyschool_root(project_dir) / "android-sdk"
         return project_dir / ".kivyschool" / "android-sdk"
 
     @classmethod
@@ -186,7 +193,7 @@ def _resolve_sdk(
     if android and android.sdk_path:
         return str(android.sdk_path)
 
-    managed = AndroidToolchain.kivyschool_sdk_root(project_dir)
+    managed = AndroidToolchain.kivyschool_sdk_root(project_dir, android)
     platforms_dir = managed / "platforms" / f"android-{sdk_version}"
     if not platforms_dir.exists():
         _install_sdk(managed, sdk_version, ndk_version, java_path)
