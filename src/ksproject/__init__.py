@@ -1,4 +1,5 @@
 """ksproject CLI entrypoint."""
+
 from __future__ import annotations
 
 import argparse
@@ -60,4 +61,3 @@ class KSProjectCLI:
 
 def main() -> None:
     sys.exit(KSProjectCLI().run())
-

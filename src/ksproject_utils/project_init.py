@@ -20,7 +20,6 @@ from .pyproject_init import PyProjectInitKeys
 from .gradle.project_init import GradleProjectInit
 
 
-
 class ProjectInitError(Exception):
     pass
 
@@ -28,7 +27,7 @@ class ProjectInitError(Exception):
 class ProjectInit:
 
     EXTRA_INDEX_URLS = [
-        #"https://pypi.anaconda.org/beeware/simple",
+        # "https://pypi.anaconda.org/beeware/simple",
         "https://pypi.anaconda.org/pyswift/simple",
         "https://pypi.anaconda.org/kivyschool/simple",
     ]
@@ -62,7 +61,7 @@ class ProjectInit:
 
         self._write_app_sources()
         self._ensure_wheelhouse()
-        #self._ensure_base_dirs()
+        # self._ensure_base_dirs()
         print(f"[ksproject] initialized at {self.project_path}")
 
     # ------------------------------------------------------------------
@@ -95,8 +94,6 @@ class ProjectInit:
         block = PyProjectInitKeys(self.app_name).output()
         self.pyproject_path.write_text(f"{existing}\n{block}")
 
-    
-
     def _write_app_sources(self) -> None:
         app_src = self.project_path / "src" / self.module_name
         app_src.mkdir(parents=True, exist_ok=True)
@@ -116,7 +113,7 @@ if __name__ == "__main__":
         files = {
             "app.py": app_py,
             "app.kv": app_kv,
-            #"__init__.py": init_py_content,
+            # "__init__.py": init_py_content,
             "__main__.py": main_py_content,
         }
 
@@ -125,13 +122,7 @@ if __name__ == "__main__":
             target = app_src / name
             target.write_text(content, encoding="utf-8")
 
-        GradleProjectInit(
-            self.project_path, 
-            self.module_name
-        ).execute()
+        GradleProjectInit(self.project_path, self.module_name).execute()
 
-        
     def _ensure_wheelhouse(self) -> None:
         (self.project_path / "wheelhouse").mkdir(exist_ok=True)
-
-    

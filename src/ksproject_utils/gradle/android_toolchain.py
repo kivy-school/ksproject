@@ -34,7 +34,7 @@ DEFAULT_NDK_VERSION = "28.2.13676358"
 DEFAULT_CMAKE_VERSION = "3.22.1"
 
 _NDK_VERSION_MAP = {
-    "25": "25.2.9519653",   # r25c
+    "25": "25.2.9519653",  # r25c
     "26": "26.3.11579264",  # r26d
     "27": "27.3.13750724",  # r27d (LTS)
     "28": "28.2.13676358",  # r28c
@@ -142,7 +142,7 @@ def _ensure_cmdline_tools(sdk_root: Path) -> Path:
         direct_candidate = cmdline_tools_dir / "bin" / sdk_exe
         if direct_candidate.exists():
             return direct_candidate
-            
+
         # Check inside subfolders (like latest/, 11.0/, cmdline-tools/, etc.)
         for child in cmdline_tools_dir.iterdir():
             if child.is_dir() and child.name != "bin":
@@ -324,6 +324,7 @@ def _run_sdkmanager(
             f"sdkmanager '{' '.join(args)}' exited with code {result.returncode}"
         )
 
+
 def _ensure_emulator(sdk_path: str, sdk_version: str, java_path: str) -> None:
     """Install the emulator + a host-arch system image if missing."""
     sdk_root = Path(sdk_path)
@@ -333,7 +334,7 @@ def _ensure_emulator(sdk_path: str, sdk_version: str, java_path: str) -> None:
 
     abi = host_emulator_abi()
     system_images_root = sdk_root / "system-images"
-    
+
     # 1. Fuzzy match the API folder (e.g., allow "android-36.1" when looking for "36")
     sysimg_exists = False
     if system_images_root.exists():
@@ -358,7 +359,7 @@ def _ensure_emulator(sdk_path: str, sdk_version: str, java_path: str) -> None:
     env["JAVA_HOME"] = java_path
 
     print(f"[ksproject] Installing Android emulator + system image ({abi})...")
-    
+
     # 3. Safely attempt download without crashing the build if it fails
     try:
         if not emulator_bin.exists():

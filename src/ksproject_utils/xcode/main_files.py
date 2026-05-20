@@ -3,6 +3,7 @@
 Bakes in the KivyLauncher backend behavior from
 ``PSProject/Backends/Sources/Backends/backends/KivyLauncher.swift``.
 """
+
 from __future__ import annotations
 
 

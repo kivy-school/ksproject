@@ -18,11 +18,21 @@ find-links = ["./wheelhouse"]
 app_name = "{app_name}"
 """
 
+
 def _android_keys(module_name: str) -> str:
     return f"""\
 [tool.kivy-school.android]
-archs = ["arm64-v8a", "x86_64"]
 package_name = "org.example.{module_name}"
+archs = [
+    "arm64-v8a", 
+    # "x86_64" # Uncomment if you want to support x86_64 (emulators), but it will increase APK size
+]
+gradle_dependencies = [
+    # "com.onesignal:OneSignal:[5.6.1, 5.9.99]" # Example of adding OneSignal for push notifications; adjust version as needed
+]
+permissions = [
+    # "POST_NOTIFICATIONS", "INTERNET", "ACCESS_NETWORK_STATE", "WAKE_LOCK" # Example permissions; add as needed
+]
 api = 36
 min_api = 24
 sdk = "36"
@@ -32,6 +42,7 @@ ndk_api = 24
 # ndk_path = "/path/to/android-ndk"
 # java_path = "/path/to/jdk"
 """
+
 
 def _ios_keys(module_name: str) -> str:
     return f"""\
@@ -43,6 +54,7 @@ permissions = []
 frameworks = []
 """
 
+
 def _macos_keys(module_name: str) -> str:
     return f"""\
 [tool.kivy-school.macos]
@@ -51,13 +63,14 @@ info_plist = {{}}
 entitlements = {{}}
 """
 
+
 class PyProjectInitKeys:
 
     module_name: str
     app_name: str
 
     EXTRA_INDEX_URLS = [
-        #"https://pypi.anaconda.org/beeware/simple",
+        # "https://pypi.anaconda.org/beeware/simple",
         "https://pypi.anaconda.org/pyswift/simple",
         "https://pypi.anaconda.org/kivyschool/simple",
     ]
@@ -71,13 +84,13 @@ class PyProjectInitKeys:
 
     def android_keys(self) -> str:
         return _android_keys(self.module_name)
-    
+
     def ios_keys(self) -> str:
         return _ios_keys(self.module_name)
-    
+
     def macos_keys(self) -> str:
         return _macos_keys(self.module_name)
-    
+
     def output(self) -> str:
         return f"""\
 {self.main_keys()}

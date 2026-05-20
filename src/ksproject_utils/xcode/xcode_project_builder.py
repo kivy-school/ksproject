@@ -3,6 +3,7 @@
 Ports ``PSProject/Sources/XcodeProjectBuilder/XcodeProjectBuilder.swift`` and
 ``XcodeProjectBuilder+folders.swift``.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -14,7 +15,11 @@ from .main_files import render_main_swift
 from .plist_templates import STDLIB_PLIST_XML
 from .project_spec import ProjectSpec
 from .project_target import ProjectTarget
-from .python_apple import copy_python_xcframework, copy_site_frameworks, fetch_kivy_sdl2_xcframeworks
+from .python_apple import (
+    copy_python_xcframework,
+    copy_site_frameworks,
+    fetch_kivy_sdl2_xcframeworks,
+)
 from .static_templates import (
     APP_ICON_CONTENTS,
     APP_MAIN_PY_TEMPLATE,
@@ -135,7 +140,9 @@ class XcodeProjectBuilder:
     def _install_frameworks(self, platforms: list[str]) -> None:
         copy_python_xcframework(self.project_dir / "Support", platforms)
         if "iOS" in platforms:
-            fetch_kivy_sdl2_xcframeworks(self.project_dir / "Support")  # TEMPORARY: remove once kivy2x ships .frameworks/
+            fetch_kivy_sdl2_xcframeworks(
+                self.project_dir / "Support"
+            )  # TEMPORARY: remove once kivy2x ships .frameworks/
             copy_site_frameworks(
                 self.project_dir / "Support",
                 self.project_dir / "site_packages",

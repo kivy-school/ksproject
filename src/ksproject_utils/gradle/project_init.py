@@ -1,16 +1,14 @@
-
 from pathlib import Path
 
 
 class GradleProjectInit:
-    
+
     root: Path
     module_name: str
 
     def __init__(self, root: Path, module_name: str):
         self.root = root
         self.module_name = module_name
-
 
     # files to write
 
@@ -24,7 +22,9 @@ class GradleProjectInit:
     def _ensure_android_manifest(self) -> None:
         tmpl_path = self.root / "AndroidManifest.tmpl.xml"
         if not tmpl_path.exists():
-            tmpl_path.write_text(self.default_android_manifest_template(), encoding="utf-8")
+            tmpl_path.write_text(
+                self.default_android_manifest_template(), encoding="utf-8"
+            )
 
     def default_android_manifest_template(self) -> str:
         return """\
@@ -55,7 +55,7 @@ class GradleProjectInit:
     </application>
 </manifest>
 """
-            
+
     def _ensure_base_dirs(self) -> None:
         (self.root / ".java").mkdir(exist_ok=True)
         services_dir = self.root / "src" / self.module_name / "services"
