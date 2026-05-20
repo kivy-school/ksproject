@@ -698,6 +698,16 @@ public class PythonActivity extends SDLActivity {{
     public void requestPermissions(String[] permissions) {{
         requestPermissionsWithRequestCode(permissions, 1);
     }}
+
+    public static void changeKeyboard(int inputType) {{
+        if (SDLActivity.keyboardInputType != inputType) {{
+            SDLActivity.keyboardInputType = inputType;
+            InputMethodManager imm =
+                    (InputMethodManager)
+                            getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+            imm.restartInput(mTextEdit);
+        }}
+    }}
 }}
 """
         (java_dir / "PythonActivity.java").write_text(content, encoding="utf-8")
