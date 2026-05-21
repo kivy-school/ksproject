@@ -319,26 +319,16 @@ def main() -> int:
     py_minor = ".".join(args.version.split(".")[:2])
 
     if not args.sdk:
-        candidate = REPO_ROOT.parent / "test_app" / ".kivyschool" / "android-sdk"
-        if candidate.exists():
-            args.sdk = str(candidate)
-            print(f"Using SDK from {candidate}")
-        else:
-            raise SystemExit("--sdk / ANDROID_HOME required")
+        raise SystemExit("--sdk / ANDROID_HOME required")
     sdk_path = Path(args.sdk)
     ndk_path = Path(args.ndk) if args.ndk else find_ndk(sdk_path)
 
     args.work_dir.mkdir(parents=True, exist_ok=True)
+    ks_root = args.work_dir / ".kivyschool"
 
     if args.inspect_only:
-        for arch in ["x86_64", "arm64-v8a"]:
-            pfx = android_prefix(args.work_dir, arch, args.version)
-            lib = pfx / "lib" / f"libpython{py_minor}.so"
-            if lib.exists():
-                inspect(lib, ndk_path)
-                return 0
         for arch in archs:
-            pfx = android_prefix(REPO_ROOT.parent / "test_app", arch, args.version)
+            pfx = android_prefix(ks_root, arch, args.version)
             lib = pfx / "lib" / f"libpython{py_minor}.so"
             if lib.exists():
                 inspect(lib, ndk_path)
@@ -347,7 +337,7 @@ def main() -> int:
 
     if not args.skip_build:
         install_cpython_android(
-            working_dir=args.work_dir,
+            ks_root=ks_root,
             archs=archs,
             sdk=str(sdk_path),
             ndk=str(ndk_path),
@@ -360,7 +350,7 @@ def main() -> int:
     out_root.mkdir(parents=True, exist_ok=True)
 
     for arch in archs:
-        pfx = android_prefix(args.work_dir, arch, args.version)
+        pfx = android_prefix(ks_root, arch, args.version)
         print(f"\n[{arch}] building wheel (api={args.api})")
         build_wheel(
             out_dir=out_root,

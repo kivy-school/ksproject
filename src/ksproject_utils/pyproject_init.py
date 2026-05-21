@@ -33,11 +33,15 @@ gradle_dependencies = [
 permissions = [
     # "POST_NOTIFICATIONS", "INTERNET", "ACCESS_NETWORK_STATE", "WAKE_LOCK" # Example permissions; add as needed
 ]
+
 api = 36
 min_api = 24
 sdk = "36"
 ndk = "28c"
 ndk_api = 24
+
+local_tools = True # Set to True to use local SDK/NDK (./.kivyschool); set to False to use user-installed versions ~/.kivyschool
+
 # sdk_path = "/path/to/android-sdk"
 # ndk_path = "/path/to/android-ndk"
 # java_path = "/path/to/jdk"
