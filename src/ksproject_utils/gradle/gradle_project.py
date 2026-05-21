@@ -94,34 +94,38 @@ class GradleProject:
                 site_packages=platform.site_packages,
             )
 
-    def gradle_assemble(self, variant: str = "debug", aar: bool = False) -> Path:
-        """Run only `gradlew assemble<Variant>` and return the produced APK or AAR."""
+    def gradle_assemble(
+        self, variant: str = "debug", aar: bool = False, bundle: bool = False
+    ) -> Path:
         if variant not in ("debug", "release"):
             raise GradleProjectError(
                 f"Unknown variant {variant!r}; expected 'debug' or 'release'"
             )
 
-        task = "assembleDebug" if variant == "debug" else "assembleRelease"
+        if aar:
+            task = "assembleDebug" if variant == "debug" else "assembleRelease"
+        elif bundle:
+            task = "bundleDebug" if variant == "debug" else "bundleRelease"
+        else:
+            task = "assembleDebug" if variant == "debug" else "assembleRelease"
+
         env = os.environ.copy()
         env["JAVA_HOME"] = self.toolchain.java_path
         if sys.platform == "linux" and "JAVA_TOOL_OPTIONS" not in env:
             env["JAVA_TOOL_OPTIONS"] = "-XX:TieredStopAtLevel=1 -Xshare:off"
-        if sys.platform == "win32":
-            gradlew = self.gradle_dir / "gradlew.bat"
-            use_shell = True
-        else:
-            gradlew = self.gradle_dir / "gradlew"
-            use_shell = False
+
+        gradlew = self.gradle_dir / (
+            "gradlew.bat" if sys.platform == "win32" else "gradlew"
+        )
+        use_shell = sys.platform == "win32"
+
         if not gradlew.exists():
             raise GradleProjectError(
-                f"Gradle project not generated yet: {gradlew} missing. "
-                "Run `ksproject android build` first."
+                f"Gradle project not generated yet: {gradlew} missing."
             )
+
         result = subprocess.run(
-            [str(gradlew), task],
-            cwd=self.gradle_dir,
-            env=env,
-            shell=use_shell,
+            [str(gradlew), task], cwd=self.gradle_dir, env=env, shell=use_shell
         )
         if result.returncode != 0:
             raise GradleProjectError(
@@ -130,15 +134,18 @@ class GradleProject:
 
         if aar:
             output = (
+                self.gradle_dir / "app" / "build" / "outputs" / "aar" / f"app-{variant}.aar"
+            )
+        elif bundle:
+            output = (
                 self.gradle_dir
                 / "app"
                 / "build"
                 / "outputs"
-                / "aar"
-                / f"app-{variant}.aar"
+                / "bundle"
+                / variant
+                / f"app-{variant}.aab"
             )
-            if not output.exists():
-                raise GradleProjectError(f"Expected AAR not found at {output}")
         else:
             output = (
                 self.gradle_dir
@@ -149,18 +156,17 @@ class GradleProject:
                 / variant
                 / f"app-{variant}.apk"
             )
-            if not output.exists():
-                raise GradleProjectError(f"Expected APK not found at {output}")
+
+        if not output.exists():
+            raise GradleProjectError(f"Expected build artifact not found at {output}")
+
         return output
 
-    def build(self, variant: str = "debug", aar: bool = False) -> Path:
-        """Run full pipeline: generate → pip install → gradlew assemble<Variant>.
-
-        Returns the path to the produced APK or AAR.
-        """
+    def build(self, variant: str = "debug", aar: bool = False, bundle: bool = False) -> Path:
+        """Run full pipeline: generate → pip install → gradlew assemble/bundle."""
         self.generate(aar=aar)
         self.install_site_packages()
-        return self.gradle_assemble(variant, aar=aar)
+        return self.gradle_assemble(variant, aar=aar, bundle=bundle)
 
     # ------------------------------------------------------------------
     # Devices / run
