@@ -85,9 +85,22 @@ class GradleProjectBuilder:
     # Generation
     # ------------------------------------------------------------------
 
-    def generate(self, aar: bool = False) -> None:
+    def generate(
+        self,
+        aar: bool = False,
+        extra_gradle_dependencies: list[str] | None = None,
+        extra_permissions: list[str] | None = None,
+    ) -> None:
         dist_dir = self.working_dir / "project_dist" / "gradle"
         dist_dir.mkdir(parents=True, exist_ok=True)
+
+        # Merge gradle_dependencies and permissions from pyproject.toml with
+        # those collected from site-packages .gradle/*.json files (ksp-builder).
+        base_deps = self.android.gradle_dependencies if self.android else []
+        base_perms = self.android.permissions if self.android else []
+
+        merged_deps = _merge_unique(base_deps, extra_gradle_dependencies or [])
+        merged_perms = _merge_unique(base_perms, extra_permissions or [])
 
         # Resolve toolchain first — we need the SDK path for local.properties
         toolchain = AndroidToolchain.resolve(self.android, self.working_dir)
@@ -114,9 +127,7 @@ class GradleProjectBuilder:
             ndk_version=toolchain.ndk_version,
             ndk_path=toolchain.ndk_path,
             aar=aar,
-            gradle_dependencies=(
-                self.android.gradle_dependencies if self.android else []
-            ),
+            gradle_dependencies=merged_deps,
         )
 
         main_dir = app_dir / "src" / "main"
@@ -126,7 +137,7 @@ class GradleProjectBuilder:
             package_name=self.package_name,
             project_dir=self.working_dir,
             app_name=self.app_name,
-            permissions=(self.android.permissions if self.android else []),
+            permissions=merged_perms,
             meta_data=(self.android.meta_data if self.android else {}),
             services=(self.android.services if self.android else []),
         )
@@ -240,6 +251,11 @@ class GradleProjectBuilder:
         )
         print("")
         print(f"Build with: cd {dist_dir} && ./gradlew assembleDebug")
+
+
+def _merge_unique(base: list[str], extra: list[str]) -> list[str]:
+    """Merge two lists preserving order and removing duplicates."""
+    return list(dict.fromkeys(base + extra))
 
 
 _SDL2_VERSION = "2.30.11"

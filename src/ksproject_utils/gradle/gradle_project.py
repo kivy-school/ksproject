@@ -21,6 +21,7 @@ from ..pyproject_toml import KivySchoolData, PyProjectToml
 from .adb import ADB
 from .android_emulator import AndroidEmulator
 from .android_toolchain import AndroidToolchain
+from .collect_gradle_configs import MergedGradleConfig, collect_and_merge
 from .gradle_project_builder import GradleProjectBuilder
 
 Arch = KivySchoolData.AndroidData.Arch
@@ -76,9 +77,18 @@ class GradleProject:
     def gradle_dir(self) -> Path:
         return self.project_path / "project_dist" / "gradle"
 
-    def generate(self, aar: bool = False) -> None:
+    def generate(
+        self,
+        aar: bool = False,
+        extra_gradle_dependencies: list[str] | None = None,
+        extra_permissions: list[str] | None = None,
+    ) -> None:
         """Write Gradle files, build CPython, copy stdlib + jniLibs."""
-        self.builder.generate(aar=aar)
+        self.builder.generate(
+            aar=aar,
+            extra_gradle_dependencies=extra_gradle_dependencies or [],
+            extra_permissions=extra_permissions or [],
+        )
 
     def install_site_packages(self) -> None:
         """Install the project (and its deps) into per-arch site_packages dirs."""
@@ -163,10 +173,28 @@ class GradleProject:
         return output
 
     def build(self, variant: str = "debug", aar: bool = False, bundle: bool = False) -> Path:
-        """Run full pipeline: generate → pip install → gradlew assemble/bundle."""
-        self.generate(aar=aar)
+        """Run full pipeline: pip install → collect .gradle configs → generate → gradlew assemble/bundle."""
         self.install_site_packages()
+        merged = self._collect_site_gradle_configs()
+        self.generate(
+            aar=aar,
+            extra_gradle_dependencies=merged.gradle_dependencies,
+            extra_permissions=merged.permissions,
+        )
         return self.gradle_assemble(variant, aar=aar, bundle=bundle)
+
+    def _collect_site_gradle_configs(self) -> MergedGradleConfig:
+        """Scan all per-arch site_packages dirs for .gradle/*.json and merge."""
+        sp_dirs = []
+        for arch in self.builder.archs:
+            cls = _ARCH_TO_PLATFORM_CLS.get(arch)
+            if cls is None:
+                continue
+            platform = cls(str(self.project_path))
+            sp_dir = Path(platform.site_packages)
+            if sp_dir.is_dir():
+                sp_dirs.append(sp_dir)
+        return collect_and_merge(sp_dirs)
 
     # ------------------------------------------------------------------
     # Devices / run
