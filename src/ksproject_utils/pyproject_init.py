@@ -1,4 +1,4 @@
-from .gradle.android_toolchain import DEFAULT_SDK_VERSION
+from .gradle.android_toolchain import DEFAULT_API_VERSION
 
 
 def _main_keys(app_name: str, indexes: list[str]) -> str:
@@ -37,9 +37,9 @@ permissions = [
     # "POST_NOTIFICATIONS", "INTERNET", "ACCESS_NETWORK_STATE", "WAKE_LOCK" # Example permissions; add as needed
 ]
 
-api = {DEFAULT_SDK_VERSION}
+api = {DEFAULT_API_VERSION}
 min_api = 24
-sdk = "{DEFAULT_SDK_VERSION}"
+sdk = "{DEFAULT_API_VERSION}"
 ndk = "28c"
 ndk_api = 24
 

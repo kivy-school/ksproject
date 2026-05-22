@@ -20,7 +20,7 @@ from ..platforms import (
 from ..pyproject_toml import KivySchoolData, PyProjectToml
 from .adb import ADB
 from .android_emulator import AndroidEmulator
-from .android_toolchain import DEFAULT_SDK_VERSION, AndroidToolchain
+from .android_toolchain import DEFAULT_API_VERSION, AndroidToolchain
 from .gradle_project_builder import GradleProjectBuilder
 
 Arch = KivySchoolData.AndroidData.Arch
@@ -67,9 +67,9 @@ class GradleProject:
         # Prefer android.api, fall back to android.sdk, then the toolchain default.
         android_data = self.builder.android
         sdk_version = (
-            str(android_data.api or android_data.sdk or DEFAULT_SDK_VERSION)
+            str(android_data.api or android_data.sdk or DEFAULT_API_VERSION)
             if android_data
-            else DEFAULT_SDK_VERSION
+            else str(DEFAULT_API_VERSION)
         )
 
         # Try lightweight SDK lookup (no downloads). Falls back to full resolve
@@ -95,9 +95,9 @@ class GradleProject:
             if self.adb is None:
                 android_data = self.builder.android
                 sdk_version = (
-                    str(android_data.api or android_data.sdk or DEFAULT_SDK_VERSION)
+                    str(android_data.api or android_data.sdk or DEFAULT_API_VERSION)
                     if android_data
-                    else DEFAULT_SDK_VERSION
+                    else str(DEFAULT_API_VERSION)
                 )
                 self.adb = ADB(self._toolchain.sdk_path)
                 self.emulator = AndroidEmulator(

@@ -10,7 +10,7 @@ import time
 from pathlib import Path
 
 from .adb import ADB, ADBError
-from .android_toolchain import DEFAULT_SDK_VERSION, host_emulator_abi
+from .android_toolchain import DEFAULT_API_VERSION, host_emulator_abi
 
 
 def _is_alive(pid: int) -> bool:
@@ -50,7 +50,7 @@ class AndroidEmulatorError(Exception):
 
 class AndroidEmulator:
 
-    def __init__(self, sdk_path: str, sdk_version: str = DEFAULT_SDK_VERSION):
+    def __init__(self, sdk_path: str, sdk_version: str = str(DEFAULT_API_VERSION)):
         self.sdk_path = sdk_path
         self.sdk_version = sdk_version
 

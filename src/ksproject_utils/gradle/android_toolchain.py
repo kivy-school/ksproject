@@ -31,7 +31,7 @@ _CMDLINE_TOOLS_URLS = {
 }
 
 SDKMAN_INSTALL_URL = "https://get.sdkman.io"
-DEFAULT_SDK_VERSION = "36"
+DEFAULT_API_VERSION = 36
 DEFAULT_NDK_VERSION = "28.2.13676358"
 DEFAULT_CMAKE_VERSION = "3.22.1"
 
@@ -127,7 +127,7 @@ class AndroidToolchain:
                 f"AndroidToolchain does not support platform: {sys.platform}"
             )
 
-        sdk_version = (android.sdk if android else None) or DEFAULT_SDK_VERSION
+        sdk_version = (android.sdk if android else None) or str(DEFAULT_API_VERSION)
 
         ndk_user = android.ndk if android else None
         if ndk_user:
