@@ -94,6 +94,29 @@ class AndroidToolchain:
         return project_dir / ".kivyschool" / "android-sdk"
 
     @classmethod
+    def find_sdk_path(
+        cls,
+        android: KivySchoolData.AndroidData | None,
+        project_dir: Path,
+    ) -> str | None:
+        """Locate an existing SDK path without downloading or installing anything.
+
+        Returns None if no SDK can be found (e.g. first build hasn't run yet).
+        """
+        env = os.environ.get("ANDROID_HOME")
+        if env and Path(env).is_dir():
+            return env
+
+        if android and android.sdk_path and Path(android.sdk_path).is_dir():
+            return str(android.sdk_path)
+
+        managed = cls.kivyschool_sdk_root(project_dir, android)
+        if managed.is_dir():
+            return str(managed)
+
+        return None
+
+    @classmethod
     def resolve(
         cls,
         android: KivySchoolData.AndroidData | None,

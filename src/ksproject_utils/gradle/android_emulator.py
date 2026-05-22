@@ -10,7 +10,7 @@ import time
 from pathlib import Path
 
 from .adb import ADB, ADBError
-from .android_toolchain import host_emulator_abi
+from .android_toolchain import DEFAULT_SDK_VERSION, host_emulator_abi
 
 
 def _is_alive(pid: int) -> bool:
@@ -50,7 +50,7 @@ class AndroidEmulatorError(Exception):
 
 class AndroidEmulator:
 
-    def __init__(self, sdk_path: str, sdk_version: str = "35"):
+    def __init__(self, sdk_path: str, sdk_version: str = DEFAULT_SDK_VERSION):
         self.sdk_path = sdk_path
         self.sdk_version = sdk_version
 
@@ -134,11 +134,15 @@ class AndroidEmulator:
         else:
             kwargs["start_new_session"] = True
 
+        env = os.environ.copy()
+        env["ANDROID_SDK_ROOT"] = self.sdk_path
+
         return subprocess.Popen(
             [self.binary, "-avd", name, "-no-snapshot-load"],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             stdin=subprocess.DEVNULL,
+            env=env,
             **kwargs,
         )
 
@@ -169,10 +173,30 @@ class AndroidEmulator:
 
         while True:
             if proc.poll() is not None:
-                raise AndroidEmulatorError(
+                stderr_output = ""
+                stdout_output = ""
+                try:
+                    stdout_output = (proc.stdout.read() or b"").decode(
+                        errors="replace"
+                    )
+                except Exception:
+                    pass
+                try:
+                    stderr_output = (proc.stderr.read() or b"").decode(
+                        errors="replace"
+                    )
+                except Exception:
+                    pass
+                detail = "\n".join(
+                    filter(None, [stderr_output.strip(), stdout_output.strip()])
+                )
+                msg = (
                     f"emulator -avd {name} exited with code {proc.returncode} "
                     f"before registering with adb"
                 )
+                if detail:
+                    msg += f"\n\nEmulator output:\n{detail}"
+                raise AndroidEmulatorError(msg)
             try:
                 current = adb.devices()
             except ADBError:

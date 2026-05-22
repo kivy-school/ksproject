@@ -20,7 +20,7 @@ from ..platforms import (
 from ..pyproject_toml import KivySchoolData, PyProjectToml
 from .adb import ADB
 from .android_emulator import AndroidEmulator
-from .android_toolchain import AndroidToolchain
+from .android_toolchain import DEFAULT_SDK_VERSION, AndroidToolchain
 from .gradle_project_builder import GradleProjectBuilder
 
 Arch = KivySchoolData.AndroidData.Arch
@@ -39,7 +39,7 @@ class GradleProject:
 
     adb: ADB
     emulator: AndroidEmulator
-    toolchain: AndroidToolchain
+    _toolchain: AndroidToolchain | None
     builder: GradleProjectBuilder
 
     def __init__(self, project_path: Path):
@@ -61,12 +61,49 @@ class GradleProject:
             )
 
         self.builder = GradleProjectBuilder(self.pyproject, project_path)
-        self.toolchain = AndroidToolchain.resolve(self.builder.android, project_path)
-        self.adb = ADB(self.toolchain.sdk_path)
-        sdk_version = str(
-            (self.builder.android.api if self.builder.android else None) or 35
+        self._toolchain = None
+
+        # Determine SDK version from pyproject.toml for the emulator.
+        # Prefer android.api, fall back to android.sdk, then the toolchain default.
+        android_data = self.builder.android
+        sdk_version = (
+            str(android_data.api or android_data.sdk or DEFAULT_SDK_VERSION)
+            if android_data
+            else DEFAULT_SDK_VERSION
         )
-        self.emulator = AndroidEmulator(self.toolchain.sdk_path, sdk_version)
+
+        # Try lightweight SDK lookup (no downloads). Falls back to full resolve
+        # only when needed (via the toolchain property).
+        sdk_path = AndroidToolchain.find_sdk_path(self.builder.android, project_path)
+        if sdk_path is not None:
+            self.adb = ADB(sdk_path)
+            self.emulator = AndroidEmulator(sdk_path, sdk_version)
+        else:
+            # SDK not yet installed — adb/emulator will be set up after
+            # toolchain resolution (triggered by build).
+            self.adb = None  # type: ignore[assignment]
+            self.emulator = None  # type: ignore[assignment]
+
+    @property
+    def toolchain(self) -> AndroidToolchain:
+        """Full toolchain resolution (may download SDK/NDK/Java). Only needed for builds."""
+        if self._toolchain is None:
+            self._toolchain = AndroidToolchain.resolve(
+                self.builder.android, self.project_path
+            )
+            # Now that toolchain is resolved, ensure adb/emulator are set up.
+            if self.adb is None:
+                android_data = self.builder.android
+                sdk_version = (
+                    str(android_data.api or android_data.sdk or DEFAULT_SDK_VERSION)
+                    if android_data
+                    else DEFAULT_SDK_VERSION
+                )
+                self.adb = ADB(self._toolchain.sdk_path)
+                self.emulator = AndroidEmulator(
+                    self._toolchain.sdk_path, sdk_version
+                )
+        return self._toolchain
 
     # ------------------------------------------------------------------
     # Build pipeline
@@ -174,10 +211,33 @@ class GradleProject:
 
     def devices(self) -> list[dict]:
         """Combined list of attached adb devices and available AVDs."""
+        if self.adb is None or self.emulator is None:
+            raise GradleProjectError(
+                "No Android SDK found. Run 'ksproject android build' first to "
+                "install the toolchain, or set ANDROID_HOME / sdk_path in "
+                "[tool.kivy-school.android]."
+            )
         items: list[dict] = list(self.adb.devices())
         for name in self.emulator.list_avds():
             items.append({"name": name, "kind": "avd"})
         return items
+
+    def find_apk(self, variant: str = "debug") -> Path:
+        """Locate an existing APK for the given variant without rebuilding."""
+        apk = (
+            self.gradle_dir
+            / "app"
+            / "build"
+            / "outputs"
+            / "apk"
+            / variant
+            / f"app-{variant}.apk"
+        )
+        if not apk.exists():
+            raise GradleProjectError(
+                f"No APK found at {apk}. Run 'ksproject android build' first."
+            )
+        return apk
 
     def run(
         self,
@@ -188,6 +248,15 @@ class GradleProject:
         if (uuid is None) == (name is None):
             raise GradleProjectError("run requires exactly one of uuid or name")
 
+        if self.adb is None or self.emulator is None:
+            raise GradleProjectError(
+                "No Android SDK found. Run 'ksproject android build' first to "
+                "install the toolchain, or set ANDROID_HOME / sdk_path in "
+                "[tool.kivy-school.android]."
+            )
+
+        apk = self.find_apk(variant)
+
         if uuid is not None:
             serial = uuid
             self.adb.wait_for_device(serial)
@@ -195,6 +264,5 @@ class GradleProject:
             assert name is not None
             serial = self.emulator.boot_and_wait(name, self.adb)
 
-        apk = self.gradle_assemble(variant)
         self.adb.install(apk, serial)
         self.adb.start_app(serial, self.builder.package_name)
