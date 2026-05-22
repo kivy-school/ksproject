@@ -262,6 +262,7 @@ val copySitePackagesTasks = sitePackagesAbis.map {{ abi ->
             exclude(".libs/**")
             exclude(".java/**")
             exclude(".kotlin/**")
+            exclude(".gradle/**")
         }}
         into("src/main/assets/site-packages/$abi")
     }}
