@@ -146,6 +146,80 @@ class AndroidEmulator:
             **kwargs,
         )
 
+    def _ensure_avd_system_image(self, name: str) -> None:
+        """Ensure the system image required by the named AVD is installed.
+
+        Reads the AVD config.ini to determine the target API level and checks
+        if the corresponding system image exists in the SDK. If not, attempts
+        to install it via sdkmanager.
+        """
+        avd_ini = Path.home() / ".android" / "avd" / f"{name}.avd" / "config.ini"
+        if not avd_ini.exists():
+            return
+
+        # Parse the image.sysdir.1 to determine the API level the AVD needs
+        api_level = None
+        try:
+            for line in avd_ini.read_text().splitlines():
+                if line.startswith("image.sysdir.1"):
+                    # e.g. image.sysdir.1=system-images/android-35/google_apis/x86_64/
+                    value = line.split("=", 1)[1].strip()
+                    parts = value.split("/")
+                    for part in parts:
+                        if part.startswith("android-"):
+                            api_level = part.replace("android-", "")
+                            break
+                    break
+        except OSError:
+            return
+
+        if not api_level:
+            return
+
+        # Check if the system image exists in our SDK
+        abi = host_emulator_abi()
+        sdk_root = Path(self.sdk_path)
+        system_images_root = sdk_root / "system-images"
+
+        sysimg_exists = False
+        if system_images_root.exists():
+            for api_dir in system_images_root.iterdir():
+                if api_dir.is_dir() and api_dir.name.startswith(f"android-{api_level}"):
+                    for tag_dir in api_dir.iterdir():
+                        if tag_dir.is_dir() and (tag_dir / abi).exists():
+                            sysimg_exists = True
+                            break
+
+        if sysimg_exists:
+            return
+
+        # Try to install the missing system image
+        bat_suffix = ".bat" if sys.platform == "win32" else ""
+        sdkmanager = (
+            Path(self.sdk_path) / "cmdline-tools" / "latest" / "bin"
+            / f"sdkmanager{bat_suffix}"
+        )
+        if not sdkmanager.exists():
+            return
+
+        system_image = f"system-images;android-{api_level};google_apis;{abi}"
+        print(
+            f"[ksproject] AVD '{name}' requires android-{api_level} system image. "
+            f"Installing..."
+        )
+        try:
+            env = os.environ.copy()
+            env["ANDROID_HOME"] = str(sdk_root)
+            subprocess.run(
+                [str(sdkmanager), "--install", system_image],
+                input="y\n",
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+        except Exception as e:
+            print(f"[ksproject] Warning: Failed to install system image: {e}")
+
     def boot_and_wait(
         self,
         name: str,
@@ -163,6 +237,9 @@ class AndroidEmulator:
             self._wait_for_device(adb, already)
             self._wait_boot_completed(adb, already, proc=None)
             return already
+
+        # Ensure the system image the AVD needs is actually installed.
+        self._ensure_avd_system_image(name)
 
         # No emulator with this AVD visible in adb. Kill any stale qemu that
         # owns the AVD lock so the new launch isn't rejected.
