@@ -10,6 +10,7 @@ import urllib.request
 from pathlib import Path
 
 from ..pyproject_toml import KivySchoolData
+from .android_toolchain import DEFAULT_SDK_VERSION
 
 Arch = KivySchoolData.AndroidData.Arch
 
@@ -126,9 +127,9 @@ include(":app")
         app_dir: Path,
         package_name: str,
         archs: list[Arch],
-        compile_sdk: int = 36,
+        compile_sdk: int = int(DEFAULT_SDK_VERSION),
         min_sdk: int = 24,
-        target_sdk: int = 36,
+        target_sdk: int = int(DEFAULT_SDK_VERSION),
         python_version: str = "3.13",
         ndk_version: str | None = None,
         ndk_path: str | None | Path = None,
