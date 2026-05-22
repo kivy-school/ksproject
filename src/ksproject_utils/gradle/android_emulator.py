@@ -147,81 +147,77 @@ class AndroidEmulator:
         )
 
     def _ensure_avd_system_image(self, name: str) -> None:
-        """Ensure the system image required by the named AVD is installed.
+        """Ensure the AVD points to a system image that actually exists in the SDK.
 
-        Reads the AVD config.ini to determine the target API level and checks
-        if the corresponding system image exists in the SDK. If not, attempts
-        to install it via sdkmanager.
+        If the AVD's config.ini references a system image that isn't installed
+        (e.g. android-35), but the project's configured API level (e.g. 36) IS
+        installed, update the AVD config to use the available system image
+        instead of trying to download old versions.
         """
-        avd_ini = Path.home() / ".android" / "avd" / f"{name}.avd" / "config.ini"
+        avd_dir = Path.home() / ".android" / "avd" / f"{name}.avd"
+        avd_ini = avd_dir / "config.ini"
         if not avd_ini.exists():
             return
 
-        # Parse the image.sysdir.1 to determine the API level the AVD needs
-        api_level = None
-        try:
-            for line in avd_ini.read_text().splitlines():
-                if line.startswith("image.sysdir.1"):
-                    # e.g. image.sysdir.1=system-images/android-35/google_apis/x86_64/
-                    value = line.split("=", 1)[1].strip()
-                    parts = value.split("/")
-                    for part in parts:
-                        if part.startswith("android-"):
-                            api_level = part.replace("android-", "")
-                            break
-                    break
-        except OSError:
-            return
-
-        if not api_level:
-            return
-
-        # Check if the system image exists in our SDK
         abi = host_emulator_abi()
         sdk_root = Path(self.sdk_path)
         system_images_root = sdk_root / "system-images"
 
-        sysimg_exists = False
-        if system_images_root.exists():
-            for api_dir in system_images_root.iterdir():
-                if api_dir.is_dir() and api_dir.name.startswith(f"android-{api_level}"):
-                    for tag_dir in api_dir.iterdir():
-                        if tag_dir.is_dir() and (tag_dir / abi).exists():
-                            sysimg_exists = True
-                            break
-                if sysimg_exists:
-                    break
-
-        if sysimg_exists:
+        if not system_images_root.exists():
             return
 
-        # Try to install the missing system image
-        bat_suffix = ".bat" if sys.platform == "win32" else ""
-        sdkmanager = (
-            Path(self.sdk_path) / "cmdline-tools" / "latest" / "bin"
-            / f"sdkmanager{bat_suffix}"
-        )
-        if not sdkmanager.exists():
-            return
-
-        system_image = f"system-images;android-{api_level};google_apis;{abi}"
-        print(
-            f"[ksproject] AVD '{name}' requires android-{api_level} system image. "
-            f"Installing..."
-        )
+        # Parse the current image.sysdir.1 from config
         try:
-            env = os.environ.copy()
-            env["ANDROID_HOME"] = str(sdk_root)
-            subprocess.run(
-                [str(sdkmanager), "--install", system_image],
-                input="y\n",
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                env=env,
-            )
-        except (OSError, subprocess.SubprocessError) as e:
-            print(f"[ksproject] Warning: Failed to install system image: {e}")
+            config_text = avd_ini.read_text()
+        except OSError:
+            return
+
+        current_sysdir = None
+        for line in config_text.splitlines():
+            if line.startswith("image.sysdir.1"):
+                current_sysdir = line.split("=", 1)[1].strip()
+                break
+
+        if not current_sysdir:
+            return
+
+        # Check if the current system image path exists in our SDK
+        if (sdk_root / current_sysdir).exists():
+            return  # AVD already points to a valid system image
+
+        # Current system image is missing. Find an available one for the
+        # project's configured sdk_version.
+        target_sysdir = None
+        for api_dir in system_images_root.iterdir():
+            if api_dir.is_dir() and api_dir.name.startswith(f"android-{self.sdk_version}"):
+                for tag_dir in api_dir.iterdir():
+                    if tag_dir.is_dir() and (tag_dir / abi).exists():
+                        # Build relative path from SDK root
+                        target_sysdir = (
+                            f"system-images/{api_dir.name}/{tag_dir.name}/{abi}/"
+                        )
+                        break
+            if target_sysdir:
+                break
+
+        if not target_sysdir:
+            return
+
+        # Update the AVD config to point to the available system image
+        print(
+            f"[ksproject] Updating AVD '{name}' to use android-{self.sdk_version} "
+            f"system image (was: {current_sysdir.strip('/')})..."
+        )
+        new_lines = []
+        for line in config_text.splitlines():
+            if line.startswith("image.sysdir.1"):
+                new_lines.append(f"image.sysdir.1={target_sysdir}")
+            else:
+                new_lines.append(line)
+        try:
+            avd_ini.write_text("\n".join(new_lines) + "\n")
+        except OSError:
+            pass
 
     def boot_and_wait(
         self,
