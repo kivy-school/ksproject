@@ -31,6 +31,7 @@ _CMDLINE_TOOLS_URLS = {
 }
 
 SDKMAN_INSTALL_URL = "https://get.sdkman.io"
+DEFAULT_API_VERSION = 36
 DEFAULT_SDK_VERSION = "36"
 DEFAULT_NDK_VERSION = "28.2.13676358"
 DEFAULT_CMAKE_VERSION = "3.22.1"
@@ -92,6 +93,29 @@ class AndroidToolchain:
         if android is not None:
             return android.kivyschool_root(project_dir) / "android-sdk"
         return project_dir / ".kivyschool" / "android-sdk"
+
+    @classmethod
+    def find_sdk_path(
+        cls,
+        android: KivySchoolData.AndroidData | None,
+        project_dir: Path,
+    ) -> str | None:
+        """Locate an existing SDK path without downloading or installing anything.
+
+        Returns None if no SDK can be found (e.g. first build hasn't run yet).
+        """
+        env = os.environ.get("ANDROID_HOME")
+        if env and Path(env).is_dir():
+            return env
+
+        if android and android.sdk_path and Path(android.sdk_path).is_dir():
+            return str(android.sdk_path)
+
+        managed = cls.kivyschool_sdk_root(project_dir, android)
+        if managed.is_dir():
+            return str(managed)
+
+        return None
 
     @classmethod
     def resolve(
