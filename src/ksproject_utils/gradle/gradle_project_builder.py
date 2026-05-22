@@ -10,7 +10,7 @@ from pathlib import Path
 
 from ..pyproject_toml import KivySchoolData, PyProjectToml
 from .gradle_build_files import GradleBuildFiles
-from .android_toolchain import AndroidToolchain
+from .android_toolchain import AndroidToolchain, DEFAULT_API_VERSION
 from .cpython_android import (
     ANDROID_VERSION,
     PY_VERSION,
@@ -118,11 +118,11 @@ class GradleProjectBuilder:
             app_dir,
             package_name=self.package_name,
             archs=self.archs,
-            compile_sdk=(self.android.api if self.android and self.android.api else 35),
+            compile_sdk=(self.android.api if self.android and self.android.api else DEFAULT_API_VERSION),
             min_sdk=(
                 self.android.min_api if self.android and self.android.min_api else 24
             ),
-            target_sdk=(self.android.api if self.android and self.android.api else 35),
+            target_sdk=(self.android.api if self.android and self.android.api else DEFAULT_API_VERSION),
             python_version=PY_VERSION,
             ndk_version=toolchain.ndk_version,
             ndk_path=toolchain.ndk_path,
