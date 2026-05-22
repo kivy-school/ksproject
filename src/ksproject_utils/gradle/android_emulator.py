@@ -189,6 +189,8 @@ class AndroidEmulator:
                         if tag_dir.is_dir() and (tag_dir / abi).exists():
                             sysimg_exists = True
                             break
+                if sysimg_exists:
+                    break
 
         if sysimg_exists:
             return
@@ -213,11 +215,12 @@ class AndroidEmulator:
             subprocess.run(
                 [str(sdkmanager), "--install", system_image],
                 input="y\n",
-                capture_output=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 text=True,
                 env=env,
             )
-        except Exception as e:
+        except (OSError, subprocess.SubprocessError) as e:
             print(f"[ksproject] Warning: Failed to install system image: {e}")
 
     def boot_and_wait(
