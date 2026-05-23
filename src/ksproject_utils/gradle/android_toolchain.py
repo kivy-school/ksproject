@@ -4,8 +4,8 @@ Priority order for each tool:
   1. System environment variables (ANDROID_HOME, ANDROID_NDK_ROOT, JAVA_HOME)
   2. Explicit path set in [tool.kivy-school.android] (sdk_path / ndk_path / java_path)
   3. ksproject-managed install under either:
-        <project_dir>/.kivyschool/android-sdk  (when ``local_tools = true``)
-        ~/.kivyschool/android-sdk              (when ``local_tools = false``)
+        <project_dir>/.kivyschool/android-sdk  (when ``global_tools = false``)
+        ~/.kivyschool/android-sdk              (when ``global_tools = true``)
 """
 
 from __future__ import annotations
