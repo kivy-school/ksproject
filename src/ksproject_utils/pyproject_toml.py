@@ -73,7 +73,8 @@ class KivySchoolData:
         sdk_path: Path | None
         ndk_path: Path | None
         java_path: Path | None
-        local_tools: bool
+        global_tools: bool
+        global_tools_path: Path | None
         icon: str | None
         presplash: str | None
         permissions: list[str]
@@ -94,7 +95,8 @@ class KivySchoolData:
             self.sdk_path = Path(data["sdk_path"]) if data.get("sdk_path") else None
             self.ndk_path = Path(data["ndk_path"]) if data.get("ndk_path") else None
             self.java_path = Path(data["java_path"]) if data.get("java_path") else None
-            self.local_tools = bool(data.get("local_tools", True))
+            self.global_tools = bool(data.get("global_tools", False))
+            self.global_tools_path = Path(data["global_tools_path"]) if data.get("global_tools_path") else None
             self.icon = data.get("icon")
             self.presplash = data.get("presplash")
             self.permissions = data.get("permissions", [])
@@ -109,11 +111,13 @@ class KivySchoolData:
         def kivyschool_root(self, working_dir: Path) -> Path:
             """Root for kivy-school managed tools/caches.
 
-            ``local_tools = True``  → ``<working_dir>/.kivyschool`` (project-local).
-            ``local_tools = False`` → ``~/.kivyschool``            (shared user dir).
+            ``global_tools = False`` (default) → ``<working_dir>/.kivyschool`` (project-local).
+            ``global_tools = True``             → ``global_tools_path`` if set, else ``~/.kivyschool``.
             """
-            if self.local_tools:
+            if not self.global_tools:
                 return working_dir / ".kivyschool"
+            if self.global_tools_path is not None:
+                return self.global_tools_path
             return Path.home() / ".kivyschool"
 
         class Arch(Enum):

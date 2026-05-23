@@ -4,8 +4,8 @@ Priority order for each tool:
   1. System environment variables (ANDROID_HOME, ANDROID_NDK_ROOT, JAVA_HOME)
   2. Explicit path set in [tool.kivy-school.android] (sdk_path / ndk_path / java_path)
   3. ksproject-managed install under either:
-        <project_dir>/.kivyschool/android-sdk  (when ``local_tools = true``)
-        ~/.kivyschool/android-sdk              (when ``local_tools = false``)
+        <project_dir>/.kivyschool/android-sdk  (when ``global_tools = false``)
+        ~/.kivyschool/android-sdk              (when ``global_tools = true``)
 """
 
 from __future__ import annotations
@@ -114,6 +114,40 @@ class AndroidToolchain:
         managed = cls.kivyschool_sdk_root(project_dir, android)
         if managed.is_dir():
             return str(managed)
+
+        return None
+
+    @classmethod
+    def find_ndk_path(
+        cls,
+        android: KivySchoolData.AndroidData | None,
+        project_dir: Path,
+    ) -> str | None:
+        """Locate an existing NDK path without downloading or installing anything.
+
+        Returns None if no NDK can be found (e.g. first build hasn't run yet).
+        """
+        env = os.environ.get("ANDROID_NDK_ROOT")
+        if env and Path(env).is_dir():
+            return env
+
+        if android and android.ndk_path and Path(android.ndk_path).is_dir():
+            return str(android.ndk_path)
+
+        ndk_user = android.ndk if android else None
+        if ndk_user:
+            ndk_clean = ndk_user.lower().lstrip("r")
+            ndk_version = _NDK_VERSION_MAP.get(ndk_clean, ndk_user)
+        else:
+            ndk_version = DEFAULT_NDK_VERSION
+
+        sdk = cls.find_sdk_path(android, project_dir)
+        if sdk is None:
+            return None
+
+        ndk_in_sdk = Path(sdk) / "ndk" / ndk_version
+        if ndk_in_sdk.is_dir():
+            return str(ndk_in_sdk)
 
         return None
 

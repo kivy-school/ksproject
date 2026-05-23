@@ -43,7 +43,8 @@ sdk = "{DEFAULT_SDK_VERSION}"
 ndk = "28c"
 ndk_api = 24
 
-local_tools = true # Set to True to use local SDK/NDK (./.kivyschool); set to False to use user-installed versions ~/.kivyschool
+global_tools = false # Set to <false> to use project-local SDK/NDK (./.kivyschool); set to <true> to use shared/global versions (~/.kivyschool or global_tools_path)
+#global_tools_path = "~/.kivyschool" # Override root path when global_tools = true; ignored when global_tools = false
 
 # sdk_path = "/path/to/android-sdk"
 # ndk_path = "/path/to/android-ndk"

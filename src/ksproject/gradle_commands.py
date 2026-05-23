@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 
+from ksproject_utils.gradle.android_toolchain import AndroidToolchain
 from ksproject_utils.gradle.gradle_project import GradleProject
+from ksproject_utils.pyproject_toml import PyProjectToml
 
 
 class GradleCommands:
@@ -36,6 +39,10 @@ class GradleCommands:
         )
         p_build.set_defaults(func=self.build)
 
+        p_get_path = asub.add_parser("get-path", help="Print the resolved path for a tool")
+        p_get_path.add_argument("tool", choices=["sdk", "ndk", "emulator"])
+        p_get_path.set_defaults(func=self.get_path)
+
         p_devices = asub.add_parser("devices", help="List devices and AVDs")
         p_devices.set_defaults(func=self.devices)
 
@@ -49,6 +56,29 @@ class GradleCommands:
             choices=["debug", "release"],
         )
         p_run.set_defaults(func=self.run)
+
+    def get_path(self, args: argparse.Namespace) -> int:
+        pyproject = PyProjectToml(str(Path.cwd() / "pyproject.toml"))
+        android = pyproject.tool.kivy_school.android if pyproject.tool.kivy_school else None
+
+        if args.tool == "sdk":
+            path = AndroidToolchain.find_sdk_path(android, Path.cwd())
+        elif args.tool == "ndk":
+            path = AndroidToolchain.find_ndk_path(android, Path.cwd())
+        else:  # emulator
+            sdk = AndroidToolchain.find_sdk_path(android, Path.cwd())
+            if sdk is None:
+                path = None
+            else:
+                exe_suffix = ".exe" if sys.platform == "win32" else ""
+                emu = Path(sdk) / "emulator" / f"emulator{exe_suffix}"
+                path = str(emu) if emu.exists() else None
+
+        if path is None:
+            print(f"{args.tool} not found", file=sys.stderr)
+            return 1
+        print(path)
+        return 0
 
     def build(self, args: argparse.Namespace) -> int:
         project = GradleProject(Path.cwd())
