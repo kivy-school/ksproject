@@ -118,6 +118,40 @@ class AndroidToolchain:
         return None
 
     @classmethod
+    def find_ndk_path(
+        cls,
+        android: KivySchoolData.AndroidData | None,
+        project_dir: Path,
+    ) -> str | None:
+        """Locate an existing NDK path without downloading or installing anything.
+
+        Returns None if no NDK can be found (e.g. first build hasn't run yet).
+        """
+        env = os.environ.get("ANDROID_NDK_ROOT")
+        if env and Path(env).is_dir():
+            return env
+
+        if android and android.ndk_path and Path(android.ndk_path).is_dir():
+            return str(android.ndk_path)
+
+        ndk_user = android.ndk if android else None
+        if ndk_user:
+            ndk_clean = ndk_user.lower().lstrip("r")
+            ndk_version = _NDK_VERSION_MAP.get(ndk_clean, ndk_user)
+        else:
+            ndk_version = DEFAULT_NDK_VERSION
+
+        sdk = cls.find_sdk_path(android, project_dir)
+        if sdk is None:
+            return None
+
+        ndk_in_sdk = Path(sdk) / "ndk" / ndk_version
+        if ndk_in_sdk.is_dir():
+            return str(ndk_in_sdk)
+
+        return None
+
+    @classmethod
     def resolve(
         cls,
         android: KivySchoolData.AndroidData | None,
