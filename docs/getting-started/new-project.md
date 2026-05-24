@@ -31,29 +31,20 @@ You need **Python 3.13+** and **[uv](https://docs.astral.sh/uv/)** installed on 
 
 ---
 
-## Install ksproject
-
-Install ksproject as a global tool via uv:
-
-```bash
-uv tool install ksproject
-```
-
-This makes the `ksproject` command available system-wide.
-
----
-
 ## Create a New Project
 
 ```bash
-ksproject init myapp
+uv init --package myapp --python 3.13
+cd myapp
+uv add git+https://github.com/kivy-school/ksproject --dev
+uv run ksproject init
 ```
 
-This single command does everything:
+This does everything:
 
-1. **Creates the project directory** (`myapp/`)
-2. **Runs `uv init`** to bootstrap a proper Python project with `pyproject.toml`
-3. **Appends `[tool.kivy-school]`** configuration with sensible defaults for Android, iOS, and macOS
+1. **Creates a proper Python project** with `pyproject.toml` via `uv init`
+2. **Adds ksproject as a dev dependency** — local to this project, not installed globally
+3. **`ksproject init`** appends `[tool.kivy-school]` configuration with sensible defaults for Android, iOS, and macOS
 4. **Writes starter app sources** — a working Kivy app with a `.kv` layout file
 5. **Creates a `wheelhouse/`** directory for caching platform wheels
 6. **Generates `AndroidManifest.tmpl.xml`** — the template for Android manifest generation
@@ -67,15 +58,17 @@ This single command does everything:
 ### Example
 
 ```bash
-ksproject init my-kivy-app --name mykivyapp
+uv init --package my-kivy-app --python 3.13
 cd my-kivy-app
+uv add git+https://github.com/kivy-school/ksproject --dev
+uv run ksproject init --name mykivyapp
 ```
 
 ---
 
 ## What Gets Created
 
-After running `ksproject init myapp`, you'll have this structure:
+After running `uv run ksproject init`, you'll have this structure:
 
 ```
 myapp/
@@ -166,7 +159,6 @@ bundle_id = "org.kivyschool.myapp"
 You can immediately run your app on desktop:
 
 ```bash
-cd myapp
 uv run myapp
 ```
 
@@ -187,11 +179,12 @@ Your project is ready to build for mobile platforms:
 
 ## Initializing Into an Existing Directory
 
-You can also run `ksproject init` in an existing Python project:
+You can also run `ksproject init` in an existing Python project that already has ksproject as a dev dependency:
 
 ```bash
 cd existing-project
-ksproject init .
+uv add git+https://github.com/kivy-school/ksproject --dev
+uv run ksproject init .
 ```
 
 If a `pyproject.toml` already exists, ksproject will:

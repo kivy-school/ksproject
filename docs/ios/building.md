@@ -38,7 +38,7 @@ brew install xcodegen
 ### Build for Simulator
 
 ```bash
-ksproject ios build --sim
+uv run ksproject ios build --sim
 ```
 
 Produces an `.app` bundle for the iOS Simulator (Apple Silicon or Intel, depending on your Mac).
@@ -46,7 +46,7 @@ Produces an `.app` bundle for the iOS Simulator (Apple Silicon or Intel, dependi
 ### Build for Device
 
 ```bash
-ksproject ios build
+uv run ksproject ios build
 ```
 
 Produces an `.app` bundle for physical iOS devices (arm64).
@@ -55,13 +55,13 @@ Produces an `.app` bundle for physical iOS devices (arm64).
 
 ```bash
 # Debug (default)
-ksproject ios build debug
+uv run ksproject ios build debug
 
 # Release (optimized, stripped)
-ksproject ios build release
+uv run ksproject ios build release
 
 # Release for simulator
-ksproject ios build release --sim
+uv run ksproject ios build release --sim
 ```
 
 ---
@@ -71,7 +71,7 @@ ksproject ios build release --sim
 ### List Available Devices
 
 ```bash
-ksproject ios devices
+uv run ksproject ios devices
 ```
 
 This shows:
@@ -83,10 +83,10 @@ This shows:
 
 ```bash
 # By simulator name
-ksproject ios run --name "iPhone 16 Pro"
+uv run ksproject ios run --name "iPhone 16 Pro"
 
 # By UUID
-ksproject ios run --uuid "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
+uv run ksproject ios run --uuid "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
 ```
 
 The `run` command will:
@@ -100,7 +100,7 @@ The `run` command will:
 Connect your iPhone via USB or Wi-Fi, then:
 
 ```bash
-ksproject ios run --name "My iPhone"
+uv run ksproject ios run --name "My iPhone"
 ```
 
 !!! note "Code Signing"
@@ -114,13 +114,13 @@ ksproject can also build native macOS apps:
 
 ```bash
 # Build
-ksproject macos build
+uv run ksproject macos build
 
 # Build release
-ksproject macos build release
+uv run ksproject macos build release
 
 # Run the built app
-ksproject macos run
+uv run ksproject macos run
 ```
 
 The macOS build produces a native `.app` bundle that runs directly on your Mac.

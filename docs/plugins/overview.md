@@ -315,7 +315,7 @@ dependencies = [
 Then build normally:
 
 ```bash
-ksproject android build
+uv run ksproject android build
 ```
 
 ksproject automatically:
