@@ -21,7 +21,7 @@ The Android build pipeline:
 On first build, ksproject automatically installs everything needed:
 
 ```bash
-ksproject android build
+uv run ksproject android build
 ```
 
 This will:
@@ -46,9 +46,9 @@ This will:
 ### Debug Build (default)
 
 ```bash
-ksproject android build
+uv run ksproject android build
 # or explicitly:
-ksproject android build debug
+uv run ksproject android build debug
 ```
 
 Produces: `project_dist/gradle/app/build/outputs/apk/debug/app-debug.apk`
@@ -56,7 +56,7 @@ Produces: `project_dist/gradle/app/build/outputs/apk/debug/app-debug.apk`
 ### Release Build
 
 ```bash
-ksproject android build release
+uv run ksproject android build release
 ```
 
 Produces: `project_dist/gradle/app/build/outputs/apk/release/app-release-unsigned.apk`
@@ -66,7 +66,7 @@ Produces: `project_dist/gradle/app/build/outputs/apk/release/app-release-unsigne
 For Google Play Store distribution:
 
 ```bash
-ksproject android build release --bundle
+uv run ksproject android build release --bundle
 ```
 
 Produces: `project_dist/gradle/app/build/outputs/bundle/release/app-release.aab`
@@ -76,7 +76,7 @@ Produces: `project_dist/gradle/app/build/outputs/bundle/release/app-release.aab`
 For library distribution:
 
 ```bash
-ksproject android build --aar
+uv run ksproject android build --aar
 ```
 
 Produces an AAR library instead of an APK.
@@ -88,7 +88,7 @@ Produces an AAR library instead of an APK.
 ### List Available Devices
 
 ```bash
-ksproject android devices
+uv run ksproject android devices
 ```
 
 This shows both:
@@ -100,10 +100,10 @@ This shows both:
 
 ```bash
 # By device name (AVD name or device serial)
-ksproject android run --name "Pixel_8_API_36"
+uv run ksproject android run --name "Pixel_8_API_36"
 
 # By UUID/serial
-ksproject android run --uuid "emulator-5554"
+uv run ksproject android run --uuid "emulator-5554"
 ```
 
 The `run` command will:
@@ -113,12 +113,12 @@ The `run` command will:
 3. Launch the main activity
 
 !!! warning "Build before running"
-    The `run` command only installs and launches — it does not build. Always run `ksproject android build` first if you've made changes.
+    The `run` command only installs and launches — it does not build. Always run `uv run ksproject android build` first if you've made changes.
 
 ### Specifying Build Variant
 
 ```bash
-ksproject android run --name "Pixel_8" --variant release
+uv run ksproject android run --name "Pixel_8" --variant release
 ```
 
 ---
@@ -129,7 +129,7 @@ If you don't have a physical device, create an AVD:
 
 ```bash
 # Get the path to the SDK tools
-ksproject android get-path sdk
+uv run ksproject android get-path sdk
 
 # Use avdmanager to create a device
 $SDK_PATH/cmdline-tools/latest/bin/avdmanager create avd \
@@ -148,20 +148,20 @@ Query where ksproject installed (or found) the Android tools:
 
 ```bash
 # Android SDK location
-ksproject android get-path sdk
+uv run ksproject android get-path sdk
 
 # Android NDK location
-ksproject android get-path ndk
+uv run ksproject android get-path ndk
 
 # Emulator binary location
-ksproject android get-path emulator
+uv run ksproject android get-path emulator
 ```
 
 ---
 
 ## Generated Project Structure
 
-After `ksproject android build`, the `project_dist/gradle/` directory contains a complete Android Studio-compatible project:
+After `uv run ksproject android build`, the `project_dist/gradle/` directory contains a complete Android Studio-compatible project:
 
 ```
 project_dist/gradle/

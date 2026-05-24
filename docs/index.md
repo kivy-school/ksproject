@@ -47,7 +47,7 @@ One tool to go from Python code to native mobile apps — no manual Gradle or Xc
 
     ---
 
-    `ksproject init` creates a complete project with Kivy app template, pyproject.toml config, and all the scaffolding for mobile builds — ready in seconds.
+    `uv run ksproject init` creates a complete project with Kivy app template, pyproject.toml config, and all the scaffolding for mobile builds — ready in seconds.
 
     [:octicons-arrow-right-24: Create a project](getting-started/new-project.md)
 
@@ -105,14 +105,16 @@ From zero to running on your phone in three commands.
 
 ```bash
 # 1. Create a new project
-ksproject init myapp
+uv init --package myapp --python 3.13
+cd myapp
+uv add git+https://github.com/kivy-school/ksproject --dev
+uv run ksproject init
 
 # 2. Build for Android (SDK/NDK auto-installed on first run)
-cd myapp
-ksproject android build
+uv run ksproject android build
 
 # 3. Run on a connected device
-ksproject android run --name "Pixel_8"
+uv run ksproject android run --name "Pixel_8"
 ```
 
 ---
@@ -129,7 +131,7 @@ ksproject android run --name "Pixel_8"
 
     ---
 
-    `ksproject init` scaffolds a UV-managed Python project with Kivy app sources, a `pyproject.toml` containing `[tool.kivy-school]` config, and platform templates.
+    `uv run ksproject init` scaffolds a UV-managed Python project with Kivy app sources, a `pyproject.toml` containing `[tool.kivy-school]` config, and platform templates.
 
 -   :material-numeric-2-circle:{ .lg .middle } **Configure**
 
@@ -141,7 +143,7 @@ ksproject android run --name "Pixel_8"
 
     ---
 
-    `ksproject android build` or `ksproject ios build` generates native project files, installs cross-compiled site-packages per architecture, and compiles the final app.
+    `uv run ksproject android build` or `uv run ksproject ios build` generates native project files, installs cross-compiled site-packages per architecture, and compiles the final app.
 
 -   :material-numeric-4-circle:{ .lg .middle } **Run**
 
