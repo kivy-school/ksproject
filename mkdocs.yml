@@ -1,0 +1,109 @@
+site_name: ksproject
+site_description: Compile Python apps for Android and iOS with a single command
+site_url: https://kivy-school.github.io/ksproject/
+repo_url: https://github.com/kivy-school/ksproject
+repo_name: kivy-school/ksproject
+
+theme:
+  name: material
+  custom_dir: docs/overrides
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: orange
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: orange
+      toggle:
+        icon: material/weather-night
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.instant.progress
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - navigation.indexes
+    - navigation.footer
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+    - search.highlight
+    - search.suggest
+    - search.share
+    - toc.follow
+    - announce.dismiss
+  icon:
+    repo: fontawesome/brands/github
+    logo: material/cellphone-link
+  font:
+    text: Inter
+    code: JetBrains Mono
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/kivy-school/ksproject
+      name: ksproject on GitHub
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/ksproject/
+      name: ksproject on PyPI
+  generator: false
+
+extra_css:
+  - stylesheets/extra.css
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.snippets
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.mark
+  - pymdownx.critic
+  - pymdownx.keys
+  - attr_list
+  - md_in_html
+  - def_list
+  - tables
+  - footnotes
+  - toc:
+      permalink: true
+      toc_depth: 3
+
+plugins:
+  - search
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - New Project: getting-started/new-project.md
+  - Configuration:
+      - pyproject.toml Reference: configuration/pyproject-toml.md
+  - Android:
+      - Build & Run: android/building.md
+      - Site-Packages & Native Assets: android/site-packages.md
+  - iOS:
+      - Build & Run: ios/building.md
+      - Site-Packages & Frameworks: ios/site-packages.md
+  - Plugins:
+      - Expanding Apps with Pips: plugins/overview.md

@@ -1,0 +1,291 @@
+# Build & Run on iOS
+
+This guide covers building your ksproject app for iOS and running it on a simulator or physical device.
+
+---
+
+## Overview
+
+The iOS build pipeline:
+
+1. **Generate Xcode project** — XcodeGen spec written to `project_dist/xcode/`
+2. **Download frameworks** — Python.xcframework and SDL2 xcframeworks fetched
+3. **Install site-packages** — Cross-compiled Python packages installed per platform slice
+4. **Copy frameworks** — `.frameworks/` from installed packages moved to Xcode project
+5. **xcodebuild** — Compiles the app for simulator or device
+
+---
+
+## Prerequisites
+
+iOS builds require **macOS** with:
+
+- **Xcode** (with command-line tools installed)
+- **XcodeGen** — install via Homebrew: `brew install xcodegen`
+
+```bash
+# Install Xcode command-line tools
+xcode-select --install
+
+# Install XcodeGen
+brew install xcodegen
+```
+
+---
+
+## Build Commands
+
+### Build for Simulator
+
+```bash
+ksproject ios build --sim
+```
+
+Produces an `.app` bundle for the iOS Simulator (Apple Silicon or Intel, depending on your Mac).
+
+### Build for Device
+
+```bash
+ksproject ios build
+```
+
+Produces an `.app` bundle for physical iOS devices (arm64).
+
+### Debug vs Release
+
+```bash
+# Debug (default)
+ksproject ios build debug
+
+# Release (optimized, stripped)
+ksproject ios build release
+
+# Release for simulator
+ksproject ios build release --sim
+```
+
+---
+
+## Run on Simulator or Device
+
+### List Available Devices
+
+```bash
+ksproject ios devices
+```
+
+This shows:
+
+- **iOS Simulators** — via `xcrun simctl list devices`
+- **Physical devices** — via `xcrun devicectl list devices`
+
+### Run on a Simulator
+
+```bash
+# By simulator name
+ksproject ios run --name "iPhone 16 Pro"
+
+# By UUID
+ksproject ios run --uuid "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
+```
+
+The `run` command will:
+
+1. **Boot** the simulator (if not already running)
+2. **Install** the `.app` bundle
+3. **Launch** the app
+
+### Run on a Physical Device
+
+Connect your iPhone via USB or Wi-Fi, then:
+
+```bash
+ksproject ios run --name "My iPhone"
+```
+
+!!! note "Code Signing"
+    Running on a physical device requires a valid Apple Developer certificate configured in your Xcode project. Free developer accounts work for personal testing.
+
+---
+
+## Build for macOS
+
+ksproject can also build native macOS apps:
+
+```bash
+# Build
+ksproject macos build
+
+# Build release
+ksproject macos build release
+
+# Run the built app
+ksproject macos run
+```
+
+The macOS build produces a native `.app` bundle that runs directly on your Mac.
+
+---
+
+## Generated Project Structure
+
+After building, `project_dist/xcode/` contains:
+
+```
+project_dist/xcode/
+├── project.yml                     # XcodeGen specification
+├── <AppName>.xcodeproj/            # Generated Xcode project
+├── Sources/
+│   ├── Shared/
+│   │   └── main.swift              # Python runtime launcher
+│   ├── IphoneOS/
+│   │   └── ...                     # iOS-specific Swift files
+│   └── MacOS/
+│       └── main_macos.swift        # macOS-specific launcher
+├── Resources/
+│   ├── Images.xcassets/            # App icon catalog
+│   └── Launch Screen.storyboard   # iOS splash screen
+├── Support/
+│   ├── Python.xcframework/         # BeeWare's Python runtime
+│   ├── SDL2.xcframework/           # SDL2 for iOS/macOS
+│   ├── SDL2_image.xcframework/     # SDL2 image loading
+│   ├── SDL2_ttf.xcframework/       # SDL2 font rendering
+│   ├── SDL2_mixer.xcframework/     # SDL2 audio
+│   └── dylib-Info-template.plist   # Dynamic library template
+├── site_packages/
+│   ├── iphoneos/                   # Packages for physical device
+│   ├── iphonesimulator/            # Packages for simulator
+│   └── macos/                      # Packages for macOS
+└── app/
+    └── __main__.py                 # Python entry point
+```
+
+### XcodeGen Spec (project.yml)
+
+The `project.yml` file is an [XcodeGen](https://github.com/yonaskolb/XcodeGen) specification that defines:
+
+- **Swift Package Manager dependencies** — CPython, PySwiftKit, KivyLauncher, Kivy_iOS_Module
+- **Build settings** — SDK versions, code signing, search paths
+- **Targets** — iOS and macOS platform targets
+- **Build phases** — Framework embedding, resource copying
+
+You can open the generated `.xcodeproj` directly in Xcode for additional configuration or debugging.
+
+---
+
+## Framework Dependencies
+
+ksproject automatically downloads these frameworks:
+
+| Framework | Source | Purpose |
+|-----------|--------|---------|
+| Python.xcframework | [BeeWare](https://github.com/beeware/cpython-apple-source-deps) | CPython runtime for iOS/macOS |
+| SDL2.xcframework | KivySchool Anaconda | Window management, input, OpenGL |
+| SDL2_image.xcframework | KivySchool Anaconda | Image loading |
+| SDL2_ttf.xcframework | KivySchool Anaconda | TrueType font rendering |
+| SDL2_mixer.xcframework | KivySchool Anaconda | Audio playback |
+
+These are cached in `~/.kivyschool/apple_support/` and reused across projects.
+
+### Swift Package Manager Dependencies
+
+The Xcode project also uses SPM packages:
+
+| Package | Repository | Purpose |
+|---------|-----------|---------|
+| CPython | py-swift/CPython | Python C API bridge for Swift |
+| PySwiftKit | Py-Swift/PySwiftKit | Swift ↔ Python interop |
+| KivyLauncher | kivy-school/KivyLauncher | iOS app lifecycle bootstrap |
+| Kivy_iOS_Module | kivy-school/Kivy_iOS_Module | Kivy ↔ iOS platform bridge |
+
+---
+
+## Platform Slices
+
+iOS builds handle multiple platform variants:
+
+| Platform | Architecture | Use Case |
+|----------|-------------|----------|
+| `iphoneos` | arm64 | Physical iPhone/iPad |
+| `iphonesimulator` (Apple Silicon) | arm64 | Simulator on M1/M2/M3 Macs |
+| `iphonesimulator` (Intel) | x86_64 | Simulator on Intel Macs |
+| `macos` | arm64 / x86_64 | Native macOS app |
+
+Each platform slice gets its own site-packages directory with appropriately cross-compiled wheels.
+
+---
+
+## The Build Process in Detail
+
+### 1. Framework Download
+
+```
+~/.kivyschool/apple_support/
+├── Python.xcframework/          # Contains iOS + macOS slices
+├── kivy_sdl2/                   # SDL2 xcframeworks
+└── ...
+```
+
+Python.xcframework is downloaded from BeeWare's pre-built releases. Both iOS and macOS slices are extracted into a single `.xcframework` bundle.
+
+### 2. Site-Package Installation
+
+```bash
+# For each platform, uv pip install runs with platform-specific flags
+uv pip install --python-platform ios --python-arch arm64 ...
+```
+
+Packages are installed into `project_dist/xcode/site_packages/<platform>/`.
+
+### 3. Framework Collection
+
+After pip install, any `.frameworks/` directories found in site-packages are:
+
+1. Moved out of site-packages
+2. Copied into `project_dist/xcode/Support/`
+3. Referenced in the Xcode project's framework search paths
+
+### 4. XcodeGen + xcodebuild
+
+```bash
+# Generate .xcodeproj from project.yml
+xcodegen generate
+
+# Build with xcodebuild
+xcodebuild -project <App>.xcodeproj \
+    -scheme <App> \
+    -configuration Debug \
+    -destination "generic/platform=iOS Simulator" \
+    build
+```
+
+---
+
+## Troubleshooting
+
+### "No signing certificate found"
+
+For physical device deployment, you need a valid Apple Developer certificate:
+
+1. Open the generated `.xcodeproj` in Xcode
+2. Select the target → "Signing & Capabilities"
+3. Select your development team
+4. Rebuild via ksproject
+
+### Simulator Not Found
+
+```bash
+# List all available simulators
+xcrun simctl list devices available
+
+# Create a new simulator if needed
+xcrun simctl create "iPhone 16 Pro" "com.apple.CoreSimulator.SimDeviceType.iPhone-16-Pro"
+```
+
+### XcodeGen Not Installed
+
+```bash
+brew install xcodegen
+```
+
+XcodeGen is required to convert `project.yml` into a `.xcodeproj`. Without it, the build will fail.
