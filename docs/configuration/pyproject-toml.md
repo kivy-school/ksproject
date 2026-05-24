@@ -232,7 +232,7 @@ version = "1.0.0"
 description = "A location-aware Kivy app"
 requires-python = ">=3.13"
 dependencies = [
-    "kivy==2.3.1",
+    "kivy>=2.3.1,<3.0.0",
     "requests>=2.31.0",
 ]
 

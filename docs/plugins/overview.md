@@ -307,7 +307,7 @@ From the app developer's perspective, it's just `pip install`:
 ```toml
 [project]
 dependencies = [
-    "kivy==2.3.1",
+    "kivy>=2.3.1,<3.0.0",
     "kivy-firebase-push>=1.0.0",  # ← Plugin
 ]
 ```
