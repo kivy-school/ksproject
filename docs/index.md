@@ -18,15 +18,15 @@ Compile <strong>Python + Kivy</strong> apps for Android and iOS — toolchain se
 
 <div class="hero-stats" markdown>
 <div class="stat" markdown>
-<span class="stat-value">1 Command</span>
-<span class="stat-label">Project Init</span>
-</div>
-<div class="stat" markdown>
 <span class="stat-value">Android + iOS</span>
-<span class="stat-label">Cross-Platform</span>
+<span class="stat-label">Native Builds</span>
 </div>
 <div class="stat" markdown>
-<span class="stat-value">pip install</span>
+<span class="stat-value">UV Powered</span>
+<span class="stat-label">Python Toolchain</span>
+</div>
+<div class="stat" markdown>
+<span class="stat-value">Extensible</span>
 <span class="stat-label">Plugin Ecosystem</span>
 </div>
 </div>
