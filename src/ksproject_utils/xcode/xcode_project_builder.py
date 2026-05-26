@@ -60,13 +60,18 @@ class XcodeProjectBuilder:
 
         self.info_plist_extra: dict = {}
         self.entitlements: dict = {}
+        self.developer_team: str | None = None
         if ios is not None:
             self.info_plist_extra.update(ios.info_plist)
             self.entitlements.update(ios.entitlements)
+            if ios.developer_team:
+                self.developer_team = ios.developer_team
         if macos is not None:
             # macOS keys win when both are present (entitlements typically diverge).
             self.info_plist_extra.update(macos.info_plist)
             self.entitlements.update(macos.entitlements)
+            if macos.developer_team:
+                self.developer_team = macos.developer_team
 
     @staticmethod
     def _prefix_from_bundle_id(bundle_id: str) -> str:
@@ -94,7 +99,7 @@ class XcodeProjectBuilder:
             "Resources",
             "Resources/Images.xcassets",
             "Resources/Images.xcassets/AppIcon.appiconset",
-            "Support",
+            "Frameworks",
             "app",
             "site_packages/iphoneos",
             "site_packages/iphonesimulator",
@@ -114,8 +119,8 @@ class XcodeProjectBuilder:
         if not launch.exists():
             launch.write_text(LAUNCH_SCREEN_STORYBOARD)
 
-    def _write_support(self) -> None:
-        plist = self.project_dir / "Support/dylib-Info-template.plist"
+    def _write_frameworks_dir(self) -> None:
+        plist = self.project_dir / "Frameworks/dylib-Info-template.plist"
         plist.write_text(STDLIB_PLIST_XML)
 
     def _write_sources(self) -> None:
@@ -138,13 +143,13 @@ class XcodeProjectBuilder:
             entry.write_text(APP_MAIN_PY_TEMPLATE.format(module_name=self.module_name))
 
     def _install_frameworks(self, platforms: list[str]) -> None:
-        copy_python_xcframework(self.project_dir / "Support", platforms)
+        copy_python_xcframework(self.project_dir / "Frameworks", platforms)
         if "iOS" in platforms:
             fetch_kivy_sdl2_xcframeworks(
-                self.project_dir / "Support"
+                self.project_dir / "Frameworks"
             )  # TEMPORARY: remove once kivy2x ships .frameworks/
             copy_site_frameworks(
-                self.project_dir / "Support",
+                self.project_dir / "Frameworks",
                 self.project_dir / "site_packages",
             )
 
@@ -153,10 +158,13 @@ class XcodeProjectBuilder:
     # ------------------------------------------------------------------
 
     def _build_spec(self) -> dict:
+        ios = self.kivy_school.ios
         target = ProjectTarget(
             name=self.app_name,
             info_plist_extra=self.info_plist_extra,
             entitlements=self.entitlements if self.entitlements else None,
+            ios_site_frameworks=ios.site_frameworks if ios is not None else [],
+            developer_team=self.developer_team,
         )
         spec = ProjectSpec(
             name=self.app_name,
@@ -176,7 +184,7 @@ class XcodeProjectBuilder:
         plats = platforms or ["iOS", "macOS"]
         self._create_root_folders()
         self._write_resources()
-        self._write_support()
+        self._write_frameworks_dir()
         self._write_sources()
         self._write_app()
         self._install_frameworks(plats)

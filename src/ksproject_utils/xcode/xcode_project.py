@@ -67,23 +67,22 @@ class XcodeProject:
         return self.builder.generate(platforms=platforms)
 
     def install_site_packages(
-        self, platforms: list[str], simulator: bool = False
+        self, platforms: list[str]
     ) -> None:
         """Pip-install the project into per-platform site_packages dirs.
 
         After installing, move any ``.frameworks/`` dropped by the kivy wheel
-        into ``Support/`` and clean them out of every site_packages slice.
+        into ``Frameworks/`` and clean them out of every site_packages slice.
         """
         platform_classes = []
         if "iOS" in platforms:
-            if simulator:
-                arch = platform.machine()  # 'arm64' on Apple Silicon, 'x86_64' on Intel
-                if arch == "arm64":
-                    platform_classes.append(IOSSim_Arm64Platform)
-                else:
-                    platform_classes.append(IOSSim_X86_64Platform)
+            # Always install both device and simulator slices so both stay in sync.
+            platform_classes.append(IOSArm64Platform)
+            arch = platform.machine()
+            if arch == "arm64":
+                platform_classes.append(IOSSim_Arm64Platform)
             else:
-                platform_classes.append(IOSArm64Platform)
+                platform_classes.append(IOSSim_X86_64Platform)
         if "macOS" in platforms:
             platform_classes += [MacOSPlatform]
 
@@ -97,7 +96,7 @@ class XcodeProject:
             )
 
         copy_site_frameworks(
-            self.xcode_dir / "Support",
+            self.xcode_dir / "Frameworks",
             self.xcode_dir / "site_packages",
         )
 
@@ -156,7 +155,7 @@ class XcodeProject:
     def ios_build(self, variant: str = "debug", simulator: bool = False) -> Path:
         if not self.xcodeproj.exists():
             self.generate(platforms=["iOS", "macOS"])
-        self.install_site_packages(platforms=["iOS"], simulator=simulator)
+        self.install_site_packages(platforms=["iOS"])
         dest = "generic/platform=iOS Simulator" if simulator else "generic/platform=iOS"
         return self._xcodebuild(dest, variant)
 

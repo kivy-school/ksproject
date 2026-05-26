@@ -42,18 +42,18 @@ fi
 _INSTALL_PY_IOS = r"""mkdir -p "$CODESIGNING_FOLDER_PATH/python/lib"
 if [ "$EFFECTIVE_PLATFORM_NAME" = "-iphonesimulator" ]; then
     echo "Installing Python modules for iOS Simulator"
-    rsync -au --delete "$PROJECT_DIR/Support/ios-arm64_x86_64-simulator/lib/" "$CODESIGNING_FOLDER_PATH/python/lib/"
+    rsync -au --delete "$PROJECT_DIR/Frameworks/ios-arm64_x86_64-simulator/lib/" "$CODESIGNING_FOLDER_PATH/python/lib/"
     rsync -au --delete "$PROJECT_DIR/site_packages/iphonesimulator/" "$CODESIGNING_FOLDER_PATH/site_packages"
 else
     echo "Installing Python modules for iOS Device"
-    rsync -au --delete "$PROJECT_DIR/Support/ios-arm64/lib/" "$CODESIGNING_FOLDER_PATH/python/lib"
+    rsync -au --delete "$PROJECT_DIR/Frameworks/ios-arm64/lib/" "$CODESIGNING_FOLDER_PATH/python/lib"
     rsync -au --delete "$PROJECT_DIR/site_packages/iphoneos/" "$CODESIGNING_FOLDER_PATH/site_packages"
 fi
 rsync -au --delete "$PROJECT_DIR/app/" "$CODESIGNING_FOLDER_PATH/app"
 """
 
 
-_INSTALL_PY_MACOS = r"""rsync -au --delete "$PROJECT_DIR/Support/macos-arm64_x86_64/lib/" "$BUILT_PRODUCTS_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/python/lib"
+_INSTALL_PY_MACOS = r"""rsync -au --delete "$PROJECT_DIR/Frameworks/macos-arm64_x86_64/lib/" "$BUILT_PRODUCTS_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/python/lib"
 
 SITE_DST="$BUILT_PRODUCTS_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/site_packages"
 mkdir -p $SITE_DST
@@ -172,27 +172,34 @@ class ProjectTarget:
         name: str,
         info_plist_extra: dict[str, Any],
         entitlements: dict[str, Any] | None,
+        ios_site_frameworks: list[str] | None = None,
+        developer_team: str | None = None,
     ) -> None:
         self.name = name
         self.info_plist_extra = info_plist_extra
         self.entitlements = entitlements
+        self.ios_site_frameworks = ios_site_frameworks or []
+        self.developer_team = developer_team
 
     # ----- settings -----
 
     def _settings(self) -> dict[str, Any]:
+        base: dict[str, Any] = {
+            "LIBRARY_SEARCH_PATHS": ["$(inherited)"],
+            "LD_RUNPATH_SEARCH_PATHS": [
+                "$(inherited)",
+                "@executable_path/Frameworks",
+                "@executable_path/../Frameworks",
+            ],
+            "ENABLE_BITCODE": False,
+            "CODE_SIGN_STYLE": "Automatic",
+        }
+        if self.developer_team:
+            base["DEVELOPMENT_TEAM"] = self.developer_team
         merged = sp.merged(
             sp.target_settings("auto"),
             sp.supported_destination_settings(["iOS", "macOS"]),
-            {
-                "LIBRARY_SEARCH_PATHS": ["$(inherited)"],
-                "LD_RUNPATH_SEARCH_PATHS": [
-                    "$(inherited)",
-                    "@executable_path/Frameworks",
-                    "@executable_path/../Frameworks",
-                ],
-                "ENABLE_BITCODE": False,
-                "CODE_SIGN_STYLE": "Automatic",
-            },
+            base,
         )
         return {
             "configs": {
@@ -224,13 +231,13 @@ class ProjectTarget:
                 "group": "Resources",
                 "destinationFilters": ["iOS"],
             },
-            {"path": "Support/dylib-Info-template.plist", "group": "Support"},
+            {"path": "Frameworks/dylib-Info-template.plist", "group": "Frameworks"},
         ]
 
     # ----- dependencies -----
 
     def _dependencies(self) -> list[dict[str, Any]]:
-        return [
+        deps: list[dict[str, Any]] = [
             {"package": "PySwiftKit", "product": "PySwiftKitBase"},
             {"package": "CPython", "product": "CPython"},
             {"package": "KivyLauncher", "product": "KivyLauncher"},
@@ -239,13 +246,16 @@ class ProjectTarget:
                 "product": "Kivy_iOS_Module",
                 "platformFilter": "iOS",
             },
-            {"framework": "Support/SDL2.xcframework", "platformFilter": "iOS"},
-            {"framework": "Support/SDL2_image.xcframework", "platformFilter": "iOS"},
-            {"framework": "Support/SDL2_mixer.xcframework", "platformFilter": "iOS"},
-            {"framework": "Support/SDL2_ttf.xcframework", "platformFilter": "iOS"},
-            # {"framework": "Support/libEGL.xcframework", "platformFilter": "iOS"},
-            # {"framework": "Support/libGLESv2.xcframework", "platformFilter": "iOS"},
+            {"framework": "Frameworks/SDL2.xcframework", "platformFilter": "iOS"},
+            {"framework": "Frameworks/SDL2_image.xcframework", "platformFilter": "iOS"},
+            {"framework": "Frameworks/SDL2_mixer.xcframework", "platformFilter": "iOS"},
+            {"framework": "Frameworks/SDL2_ttf.xcframework", "platformFilter": "iOS"},
+            {"framework": "Frameworks/libEGL.xcframework", "platformFilter": "iOS"},
+            {"framework": "Frameworks/libGLESv2.xcframework", "platformFilter": "iOS"},
         ]
+        for fw in self.ios_site_frameworks:
+            deps.append({"framework": f"Frameworks/{fw}", "platformFilter": "iOS"})
+        return deps
 
     # ----- info / entitlements -----
 
