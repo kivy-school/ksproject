@@ -13,7 +13,7 @@ import pytest
 pytestmark = pytest.mark.android
 
 
-def test_android_build(minimal_app: Path) -> None:
+def test_android_build_produces_apk(minimal_app: Path) -> None:
     """``ksproject android build`` exits 0 and prints an APK path that exists."""
     result = subprocess.run(
         ["ksproject", "android", "build"],

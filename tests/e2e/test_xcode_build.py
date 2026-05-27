@@ -19,7 +19,7 @@ def _macos_only() -> None:
         pytest.skip("Apple tests require macOS")
 
 
-def test_ios_simulator_build(minimal_app: Path) -> None:
+def test_ios_simulator_build_produces_app(minimal_app: Path) -> None:
     """``ksproject ios build --sim`` exits 0 and produces a .app."""
     result = subprocess.run(
         ["ksproject", "ios", "build", "--sim"],
@@ -39,7 +39,7 @@ def test_ios_simulator_build(minimal_app: Path) -> None:
     assert app.exists(), f".app reported but not on disk: {app}"
 
 
-def test_macos_build(minimal_app: Path) -> None:
+def test_macos_build_produces_app(minimal_app: Path) -> None:
     """``ksproject macos build`` exits 0 and produces a .app."""
     result = subprocess.run(
         ["ksproject", "macos", "build"],

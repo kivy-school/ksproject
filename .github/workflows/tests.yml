@@ -38,7 +38,7 @@ jobs:
       - uses: astral-sh/setup-uv@v3
       - run: uv python install 3.13
       - run: uv sync --group dev
-      - run: uv run pytest -m "android and not emulator" -ra
+      - run: uv run pytest -m android -ra
 
   apple:
     name: apple
@@ -48,5 +48,5 @@ jobs:
       - uses: astral-sh/setup-uv@v3
       - run: uv python install 3.13
       - run: uv sync --group dev
-      - run: uv run pytest -m "apple and not simulator" -ra
+      - run: uv run pytest -m apple -ra
 
