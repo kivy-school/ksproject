@@ -63,7 +63,7 @@ jobs:
             libxfixes3 \
             libxkbcommon0 \
             libgbm1 \
-            libasound2 \
+            libasound2t64 \
             libpulse0
           Xvfb :1 -screen 0 1280x720x24 &
           echo "DISPLAY=:1" >> "$GITHUB_ENV"
