@@ -28,19 +28,27 @@ def _macos_only() -> None:
 
 def test_ios_simulator_build_produces_app(minimal_app: Path) -> None:
     """``ksproject ios build --sim`` exits 0 and produces a .app."""
-    result = subprocess.run(
+    proc = subprocess.Popen(
         [_ksproject(), "ios", "build", "--sim"],
         cwd=minimal_app,
-        capture_output=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
         text=True,
+        bufsize=1,
     )
-    assert result.returncode == 0, (
-        f"ksproject ios build --sim failed:\n{result.stdout}\n{result.stderr}"
-    )
+    lines: list[str] = []
+    assert proc.stdout is not None
+    for line in proc.stdout:
+        sys.stdout.write(line)
+        sys.stdout.flush()
+        lines.append(line)
+    returncode = proc.wait()
+    output = "".join(lines)
+    assert returncode == 0, f"ksproject ios build --sim failed:\n{output}"
     app_line = next(
-        (line for line in result.stdout.splitlines() if line.startswith("app:")),
+        (line for line in lines if line.startswith("app:")),
         None,
     )
-    assert app_line is not None, f"No app: line in stdout:\n{result.stdout}"
+    assert app_line is not None, f"No app: line in stdout:\n{output}"
     app = Path(app_line.split("app:", 1)[1].strip())
     assert app.exists(), f".app reported but not on disk: {app}"
