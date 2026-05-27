@@ -417,9 +417,17 @@ tasks.named("preBuild") {{
         package_name: str,
         python_version: str,
         python_module: str,
+        presplash_type: str | None = None,
+        presplash_name: str | None = None,
+        presplash_color: str = "#FFFFFF",
     ) -> None:
         java_dir = main_dir / "java" / Path(*package_name.split("."))
         java_dir.mkdir(parents=True, exist_ok=True)
+
+        show_presplash_code = ""
+        if presplash_type and presplash_name:
+            show_presplash_code = f'showLoadingScreen("{presplash_type}", "{presplash_name}", "{presplash_color}");'
+
         content = f"""\
 package {package_name};
 
@@ -451,53 +459,57 @@ public class MainActivity extends PythonActivity {{
     @Override
     protected void onCreate(Bundle savedInstanceState) {{
         mActivity = this;
-        File appDir = new File(getFilesDir(), "app");
-        if (!appDir.exists()) {{
-            appDir.mkdirs();
-            try {{
-                unpackAsset(getAssets(), "python{python_version}", appDir);
-                String abi = pickAbi(getAssets(), "site-packages");
-                if (abi != null) {{
-                    File sitePackages = new File(appDir, "site-packages");
-                    sitePackages.mkdirs();
-                    unpackAssetTree(
-                        getAssets(),
-                        "site-packages/" + abi,
-                        sitePackages
-                    );
-                }} else {{
-                    Log.e(TAG, "no matching ABI found in assets/site-packages");
-                }}
-                String dynAbi = pickAbi(getAssets(), "lib-dynload");
-                if (dynAbi != null) {{
-                    File dynload = new File(
-                        appDir, "python{python_version}/lib-dynload"
-                    );
-                    dynload.mkdirs();
-                    unpackAssetTree(
-                        getAssets(),
-                        "lib-dynload/" + dynAbi,
-                        dynload
-                    );
-                }}
-            }} catch (IOException e) {{
-                Log.e(TAG, "asset unpack failed", e);
-            }}
-        }}
+
+        final File appDir = new File(getFilesDir(), "app");
         String appPath = appDir.getAbsolutePath();
+
         setEnv("ANDROID_APP_PATH", appPath);
         setEnv("ANDROID_ARGUMENT", appPath);
         setEnv("ANDROID_UNPACK", appPath);
-        setEnv("ANDROID_ENTRYPOINT", "{str(python_module).strip().replace("-", "_").replace(".", "_").replace(" ", "_")}");
-        setEnv("ANDROID_NATIVE_LIB_DIR",
-               getApplicationInfo().nativeLibraryDir);
+        setEnv("ANDROID_ENTRYPOINT", "{str(python_module).strip().replace('-', '_').replace('.', '_').replace(' ', '_')}");
+        setEnv("ANDROID_NATIVE_LIB_DIR", getApplicationInfo().nativeLibraryDir);
         setEnv("PYTHONHOME", appPath);
         setEnv("PYTHONNOUSERSITE", "1");
         setEnv("PYTHONUNBUFFERED", "1");
         setEnv("P4A_BOOTSTRAP", "SDL2");
         setEnv("APP_ACTIVITY", "{package_name}.MainActivity");
         setEnv("PYTHONOPTIMIZE", "2");
+
         super.onCreate(savedInstanceState);
+
+        {show_presplash_code}
+
+        final File unpackDoneFile = new File(appDir, ".unpack_done");
+        if (!unpackDoneFile.exists()) {{
+            new Thread(new Runnable() {{
+                @Override
+                public void run() {{
+                    if (!appDir.exists()) appDir.mkdirs();
+                    try {{
+                        unpackAsset(getAssets(), "python{python_version}", appDir);
+                        String abi = pickAbi(getAssets(), "site-packages");
+                        if (abi != null) {{
+                            File sitePackages = new File(appDir, "site-packages");
+                            sitePackages.mkdirs();
+                            unpackAssetTree(getAssets(), "site-packages/" + abi, sitePackages);
+                        }} else {{
+                            Log.e(TAG, "no matching ABI found in assets/site-packages");
+                        }}
+                        String dynAbi = pickAbi(getAssets(), "lib-dynload");
+                        if (dynAbi != null) {{
+                            File dynload = new File(appDir, "python{python_version}/lib-dynload");
+                            dynload.mkdirs();
+                            unpackAssetTree(getAssets(), "lib-dynload/" + dynAbi, dynload);
+                        }}
+                        
+                        // Signal to main.c that extraction is complete
+                        unpackDoneFile.createNewFile();
+                    }} catch (IOException e) {{
+                        Log.e(TAG, "asset unpack failed", e);
+                    }}
+                }}
+            }}).start();
+        }}
     }}
 
     private static String pickAbi(AssetManager am, String root)
@@ -633,9 +645,11 @@ public class Hardware {{
     @staticmethod
     def write_kivy_python_activity(main_dir: Path, package_name: str) -> None:
         """Minimal org.kivy.android.PythonActivity that exposes mActivity to
-        Kivy's fontscale lookup via pyjnius."""
+        Kivy's fontscale lookup via pyjnius, combining native p4a lifecycle safety
+        with dynamic Lottie/GIF/Image loading screens."""
         java_dir = main_dir / "java" / "org" / "kivy" / "android"
         java_dir.mkdir(parents=True, exist_ok=True)
+
         content = f"""\
 package org.kivy.android;
 
@@ -645,20 +659,161 @@ import android.content.pm.PackageManager;
 import android.util.Log;
 import android.content.Context;
 import android.view.inputmethod.InputMethodManager;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
+import android.graphics.Color;
+import android.os.Build;
+import android.os.Bundle;
 
 public class PythonActivity extends SDLActivity {{
     public static PythonActivity mActivity;
-
     public static final String TAG = "PythonActivity";
+    
+    private View loadingView = null;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {{
+        super.onCreate(savedInstanceState);
+        mActivity = this;
+    }}
 
     public static PythonActivity getActivity() {{
         return mActivity;
     }}
 
-    public void removeLoadingScreen() {{
-        // currently does nothing
+    protected void showLoadingScreen(View view) {{
+        try {{
+            if (mLayout == null) {{
+                setContentView(view);
+            }} else if (view.getParent() == null) {{
+                mLayout.addView(view);
+            }}
+        }} catch (IllegalStateException e) {{
+            // The loading screen can be attempted to be applied twice if app
+            // is tabbed in/out, quickly.
+            // (Gives error "The specified child already has a parent.
+            // You must call removeView() on the child's parent first.")
+            Log.w(TAG, "Loading screen attempted to be applied twice.");
+        }}
     }}
-    
+
+    /**
+     * Show custom loading screen overlay using the safe p4a application method.
+     * @param type "lottie", "gif", or "image"
+     * @param resourceName filename without extension (e.g. "loading_anim")
+     * @param bgColor Hex color string for background (e.g. "#FFFFFF")
+     */
+    public void showLoadingScreen(final String type, final String resourceName, final String bgColor) {{
+        runOnUiThread(new Runnable() {{
+            @Override
+            public void run() {{
+                // If the view already exists (e.g., resuming app), just re-apply it safely
+                if (loadingView != null) {{
+                    showLoadingScreen(loadingView);
+                    return;
+                }}
+
+                FrameLayout frameLayout = new FrameLayout(mActivity);
+                
+                // Force the background layout to fill the entire screen
+                frameLayout.setLayoutParams(new ViewGroup.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT
+                ));
+
+                try {{
+                    frameLayout.setBackgroundColor(Color.parseColor(bgColor));
+                }} catch (Exception e) {{
+                    frameLayout.setBackgroundColor(Color.WHITE);
+                }}
+
+                FrameLayout.LayoutParams centerParams = new FrameLayout.LayoutParams(
+                        FrameLayout.LayoutParams.WRAP_CONTENT,
+                        FrameLayout.LayoutParams.WRAP_CONTENT,
+                        android.view.Gravity.CENTER
+                );
+
+                int resId = getResources().getIdentifier(resourceName, "drawable", getPackageName());
+                int rawResId = getResources().getIdentifier(resourceName, "raw", getPackageName());
+
+                try {{
+                    if ("lottie".equalsIgnoreCase(type)) {{
+                        try {{
+                            Class<?> lottieClass = Class.forName("com.airbnb.lottie.LottieAnimationView");
+                            View lottieView = (View) lottieClass.getConstructor(Context.class).newInstance(mActivity);
+                            
+                            if (rawResId != 0) {{
+                                lottieClass.getMethod("setAnimation", int.class).invoke(lottieView, rawResId);
+                            }} else {{
+                                lottieClass.getMethod("setAnimation", String.class).invoke(lottieView, resourceName + ".json");
+                            }}
+                            
+                            lottieClass.getMethod("setRepeatCount", int.class).invoke(lottieView, -1);
+                            lottieClass.getMethod("playAnimation").invoke(lottieView);
+                            frameLayout.addView(lottieView, centerParams);
+                        }} catch (ClassNotFoundException e) {{
+                            Log.e(TAG, "Lottie class not found. Ensure it is in your gradle dependencies.");
+                        }}
+                        
+                    }} else if ("gif".equalsIgnoreCase(type)) {{
+                        ImageView imageView = new ImageView(mActivity);
+                        if (Build.VERSION.SDK_INT >= 28 && resId != 0) {{
+                            android.graphics.ImageDecoder.Source source = android.graphics.ImageDecoder.createSource(getResources(), resId);
+                            android.graphics.drawable.Drawable drawable = android.graphics.ImageDecoder.decodeDrawable(source);
+                            imageView.setImageDrawable(drawable);
+                            if (drawable instanceof android.graphics.drawable.AnimatedImageDrawable) {{
+                                ((android.graphics.drawable.AnimatedImageDrawable) drawable).start();
+                            }}
+                        }} else {{
+                            if (resId != 0) imageView.setImageResource(resId);
+                        }}
+                        frameLayout.addView(imageView, centerParams);
+                        
+                    }} else {{
+                        ImageView imageView = new ImageView(mActivity);
+                        if (resId != 0) imageView.setImageResource(resId);
+                        frameLayout.addView(imageView, centerParams);
+                    }}
+
+                    loadingView = frameLayout;
+                    
+                    // Route the newly constructed View through the safe p4a method
+                    showLoadingScreen(loadingView);
+                    Log.v(TAG, "Loading screen constructed and displayed: " + type);
+
+                }} catch (Exception e) {{
+                    Log.e(TAG, "Error creating loading screen: " + e.getMessage());
+                }}
+            }}
+        }});
+    }}
+
+    public void removeLoadingScreen() {{
+        runOnUiThread(new Runnable() {{
+            @Override
+            public void run() {{
+                if (loadingView != null && loadingView.getParent() != null) {{
+                    loadingView.animate()
+                        .alpha(0f)
+                        .setDuration(300)
+                        .withEndAction(new Runnable() {{
+                            @Override
+                            public void run() {{
+                                if (loadingView != null && loadingView.getParent() != null) {{
+                                    ((ViewGroup) loadingView.getParent()).removeView(loadingView);
+                                    loadingView = null;
+                                    Log.v(TAG, "Loading screen successfully removed");
+                                }}
+                            }}
+                        }})
+                        .start();
+                }}
+            }}
+        }});
+    }}
+
     /**
      * Used by android.permissions module to register a call back after requesting runtime
      * permissions
@@ -1121,6 +1276,12 @@ int main(int argc, char *argv[]) {{
         return 1;
     }}
 
+    char done_path[1024];
+    snprintf(done_path, sizeof(done_path), "%s/.unpack_done", app_path);
+    while (access(done_path, F_OK) != 0) {{
+        usleep(50000); // Sleep for 50ms while presplash is displaying on the UI thread
+    }}
+    
     /* Env vars untill we patch Kivy platform check*/
     setenv("KIVY_NO_FILELOG", "1", 1);
     setenv("KIVY_NO_CONFIG", "1", 1);
@@ -1275,8 +1436,14 @@ Java_org_kivy_android_PythonService_nativeStart(
     const char *app_path = (*env)->GetStringUTFChars(env, j_appPath, NULL);
     const char *entrypoint = (*env)->GetStringUTFChars(env, j_entrypoint, NULL);
     const char *py_version = (*env)->GetStringUTFChars(env, j_pyVersion, NULL);
-
+    
     LOGI("Service starting. App Path: %s, Entry: %s", app_path, entrypoint);
+
+    char done_path[1024];
+    snprintf(done_path, sizeof(done_path), "%s/.unpack_done", app_path);
+    while (access(done_path, F_OK) != 0) {{
+        usleep(50000); // Sleep for 50ms while presplash is displaying on the UI thread
+    }}
 
     if (chdir(app_path) != 0) {
         LOGE("chdir(%s) failed", app_path);

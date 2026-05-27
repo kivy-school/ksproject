@@ -99,11 +99,13 @@ class ProjectInit:
         app_src.mkdir(parents=True, exist_ok=True)
 
         init_py_content = f"""\
-from .app import main
+def main(*args) -> None:
+    from .app import main
+    main()
 """
 
         main_py_content = """\
-from . import main
+from .app import main
 
 if __name__ == "__main__":
     main()
@@ -113,7 +115,7 @@ if __name__ == "__main__":
         files = {
             "app.py": app_py,
             "app.kv": app_kv,
-            # "__init__.py": init_py_content,
+            "__init__.py": init_py_content,
             "__main__.py": main_py_content,
         }
 

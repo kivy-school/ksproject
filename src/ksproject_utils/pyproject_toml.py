@@ -83,6 +83,8 @@ class KivySchoolData:
         global_tools_path: Path | None
         icon: str | None
         presplash: str | None
+        presplash_color: str | None
+        presplash_lottie: str | None
         permissions: list[str]
         meta_data: dict[str, str]
         gradle_dependencies: list[str]
@@ -105,6 +107,8 @@ class KivySchoolData:
             self.global_tools_path = Path(data["global_tools_path"]) if data.get("global_tools_path") else None
             self.icon = data.get("icon")
             self.presplash = data.get("presplash")
+            self.presplash_color = data.get("presplash_color")
+            self.presplash_lottie = data.get("presplash_lottie")
             self.permissions = data.get("permissions", [])
             self.meta_data = data.get("meta_data", {})
             self.gradle_dependencies = data.get("gradle_dependencies", [])
