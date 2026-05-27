@@ -24,6 +24,25 @@ ksproject-gui = "ksproject_gui:main"
 [tool.uv.build-backend]
 module-name = ["ksproject", "ksproject_gui", "ksproject_utils"]
 
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-mock>=3.12",
+    "pytest-xdist>=3.5",
+]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+addopts = "-ra --strict-markers -m 'not slow'"
+markers = [
+    "slow: marks tests as slow / heavy (real builds, emulator, simulator)",
+    "android: marks tests that exercise the Android/gradle pipeline",
+    "apple: marks tests that exercise the Apple/Xcode pipeline",
+    "emulator: marks tests that require booting an Android emulator (set KSPROJECT_RUN_EMULATOR=1)",
+    "simulator: marks tests that require the iOS Simulator (macOS only)",
+]
+
 [build-system]
 requires = ["uv_build>=0.11.3,<0.12.0"]
 build-backend = "uv_build"

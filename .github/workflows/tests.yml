@@ -1,0 +1,80 @@
+name: tests
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fast:
+    name: fast (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Cache .kivyschool
+        uses: actions/cache@v4
+        with:
+          path: ~/.kivyschool
+          key: kivyschool-${{ runner.os }}-v1
+
+      - name: Sync dev dependencies
+        run: uv sync --group dev
+
+      - name: Run fast tests
+        run: uv run pytest -ra
+
+  slow:
+    # Only on manual dispatch.
+    if: github.event_name == 'workflow_dispatch'
+    name: slow (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Cache .kivyschool
+        uses: actions/cache@v4
+        with:
+          path: ~/.kivyschool
+          key: kivyschool-${{ runner.os }}-v1
+
+      - name: Sync dev dependencies
+        run: uv sync --group dev
+
+      - name: Android e2e (no emulator)
+        if: runner.os != 'Windows'
+        run: uv run pytest -m "android and slow and not emulator" -ra
+
+      - name: Apple e2e
+        if: runner.os == 'macOS'
+        run: uv run pytest -m "apple and slow" -ra
