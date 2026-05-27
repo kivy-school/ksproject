@@ -92,11 +92,11 @@ def test_android_emulator_unittests_pass(minimal_app: Path) -> None:
 
     # Always use ksproject's own adb (installed during android build).
     from ksproject_utils.gradle.gradle_project import GradleProject
-    from ksproject_utils.gradle.android_emulator import AndroidEmulatorError
+    from ksproject_utils.gradle.android_emulator import AndroidEmulatorError, DEFAULT_AVD_NAME
     project = GradleProject(minimal_app)
     adb = project.adb.binary  # str path for subprocess; project.adb (ADB object) for boot_and_wait
 
-    # --- Find a running device/emulator, or boot the first available AVD ---
+    # --- Find a running device/emulator, or boot the default AVD ---
     r = subprocess.run([adb, "devices", "-l"], capture_output=True, text=True)
     attached = [
         line.split()[0]
@@ -107,17 +107,20 @@ def test_android_emulator_unittests_pass(minimal_app: Path) -> None:
         serial = attached[0]
         print(f"Device: {serial}")
     else:
-        # No running device — boot the first available AVD.
+        # No running device — ensure the default AVD exists then boot it.
+        # (Avoid list_avds() whose emulator -list-avds output can go to stderr
+        # on some emulator versions, returning an empty list even after creation.)
         if project.emulator is None:
             pytest.skip("No Android device/emulator and no emulator binary found")
-        avds = project.emulator.list_avds()
-        if not avds:
-            pytest.skip("No Android device or emulator attached and no AVDs found")
-        print(f"Booting AVD: {avds[0]}")
         try:
-            serial = project.emulator.boot_and_wait(avds[0], project.adb)
+            project.emulator.ensure_default_avd()
+        except AndroidEmulatorError as exc:
+            pytest.fail(f"Failed to create default AVD: {exc}")
+        print(f"Booting AVD: {DEFAULT_AVD_NAME}")
+        try:
+            serial = project.emulator.boot_and_wait(DEFAULT_AVD_NAME, project.adb)
         except (AndroidEmulatorError, OSError) as exc:
-            pytest.fail(f"AVD {avds[0]} failed to boot: {exc}")
+            pytest.fail(f"AVD {DEFAULT_AVD_NAME} failed to boot: {exc}")
 
     # --- Install ---
     subprocess.run([adb, "-s", serial, "install", "-r", str(apk)], check=True)
