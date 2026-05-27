@@ -417,9 +417,17 @@ tasks.named("preBuild") {{
         package_name: str,
         python_version: str,
         python_module: str,
+        presplash_type: str | None = None,
+        presplash_name: str | None = None,
+        presplash_color: str = "#FFFFFF",
     ) -> None:
         java_dir = main_dir / "java" / Path(*package_name.split("."))
         java_dir.mkdir(parents=True, exist_ok=True)
+
+        show_presplash_code = ""
+        if presplash_type and presplash_name:
+            show_presplash_code = f'showLoadingScreen("{presplash_type}", "{presplash_name}", "{presplash_color}");'
+
         content = f"""\
 package {package_name};
 
@@ -451,6 +459,9 @@ public class MainActivity extends PythonActivity {{
     @Override
     protected void onCreate(Bundle savedInstanceState) {{
         mActivity = this;
+
+        {show_presplash_code}
+
         File appDir = new File(getFilesDir(), "app");
         if (!appDir.exists()) {{
             appDir.mkdirs();

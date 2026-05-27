@@ -75,7 +75,7 @@ class GradleProjectBuilder:
                 p = self.working_dir / p
             return p
         templates = Path(__file__).parent.parent / "templates"
-        for ext in ("png", "jpg"):
+        for ext in ("png", "jpg", "gif", "json"):
             candidate = templates / f"{name}.{ext}"
             if candidate.exists():
                 return candidate
@@ -118,11 +118,19 @@ class GradleProjectBuilder:
             app_dir,
             package_name=self.package_name,
             archs=self.archs,
-            compile_sdk=(self.android.api if self.android and self.android.api else DEFAULT_API_VERSION),
+            compile_sdk=(
+                self.android.api
+                if self.android and self.android.api
+                else DEFAULT_API_VERSION
+            ),
             min_sdk=(
                 self.android.min_api if self.android and self.android.min_api else 24
             ),
-            target_sdk=(self.android.api if self.android and self.android.api else DEFAULT_API_VERSION),
+            target_sdk=(
+                self.android.api
+                if self.android and self.android.api
+                else DEFAULT_API_VERSION
+            ),
             python_version=PY_VERSION,
             ndk_version=toolchain.ndk_version,
             ndk_path=toolchain.ndk_path,
@@ -143,8 +151,45 @@ class GradleProjectBuilder:
         )
         res_dir = main_dir / "res"
         GradleBuildFiles.write_icon(res_dir, self._resolve_asset("icon"))
+
+        presplash_type = None
+        presplash_name = None
+        presplash_color = (
+            getattr(self.android, "presplash_color", "#FFFFFF")
+            if self.android
+            else "#FFFFFF"
+        )
+
+        # Check for Lottie first, then fallback to standard presplash image/gif
+        lottie_path = (
+            getattr(self.android, "presplash_lottie", None) if self.android else None
+        )
+        image_path = getattr(self.android, "presplash", None) if self.android else None
+
+        if lottie_path:
+            asset_src = self._resolve_asset("presplash_lottie")
+            raw_dir = res_dir / "raw"
+            raw_dir.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(asset_src, raw_dir / asset_src.name)
+            presplash_type = "lottie"
+            presplash_name = asset_src.stem
+            merged_deps.append("com.airbnb.android:lottie:6.0.0")
+        elif image_path:
+            asset_src = self._resolve_asset("presplash")
+            drawable_dir = res_dir / "drawable"
+            drawable_dir.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(asset_src, drawable_dir / asset_src.name)
+            presplash_type = "gif" if asset_src.suffix.lower() == ".gif" else "image"
+            presplash_name = asset_src.stem
+
         GradleBuildFiles.write_main_activity(
-            main_dir, self.package_name, PY_VERSION, self.pyproject.project.name
+            main_dir=main_dir,
+            package_name=self.package_name,
+            python_version=PY_VERSION,
+            python_module=self.pyproject.project.name,
+            presplash_type=presplash_type,
+            presplash_name=presplash_name,
+            presplash_color=presplash_color,
         )
         GradleBuildFiles.write_renpy_hardware(main_dir, self.package_name)
         GradleBuildFiles.write_kivy_python_activity(main_dir, self.package_name)
