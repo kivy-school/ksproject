@@ -164,7 +164,6 @@ class GradleProjectBuilder:
         lottie_path = (
             getattr(self.android, "presplash_lottie", None) if self.android else None
         )
-        image_path = getattr(self.android, "presplash", None) if self.android else None
 
         if lottie_path:
             asset_src = self._resolve_asset("presplash_lottie")
@@ -174,13 +173,19 @@ class GradleProjectBuilder:
             presplash_type = "lottie"
             presplash_name = asset_src.stem
             merged_deps.append("com.airbnb.android:lottie:6.0.0")
-        elif image_path:
-            asset_src = self._resolve_asset("presplash")
-            drawable_dir = res_dir / "drawable"
-            drawable_dir.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(asset_src, drawable_dir / asset_src.name)
-            presplash_type = "gif" if asset_src.suffix.lower() == ".gif" else "image"
-            presplash_name = asset_src.stem
+        else:
+            # ALWAYS attempt to resolve "presplash". 
+            # If the user didn't specify one, _resolve_asset will naturally pull from templates/
+            try:
+                asset_src = self._resolve_asset("presplash")
+                drawable_dir = res_dir / "drawable"
+                drawable_dir.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(asset_src, drawable_dir / asset_src.name)
+                presplash_type = "gif" if asset_src.suffix.lower() == ".gif" else "image"
+                presplash_name = asset_src.stem
+            except FileNotFoundError:
+                # Failsafe just in case the templates folder is missing from the environment
+                pass
 
         GradleBuildFiles.write_main_activity(
             main_dir=main_dir,
