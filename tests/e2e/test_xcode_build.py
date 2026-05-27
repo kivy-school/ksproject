@@ -1,66 +1,59 @@
-"""End-to-end Xcode/Apple build smoke tests (macOS only).
+"""Apple build tests — run the real ``ksproject ios build`` CLI command.
 
-Real ``xcodegen`` + ``xcodebuild`` runs. Gated by ``@pytest.mark.slow``.
+macOS only. Downloads xcframeworks on first run (ksproject manages that).
 """
 from __future__ import annotations
 
 import platform
-import shutil
 import subprocess
 from pathlib import Path
 
 import pytest
 
-pytestmark = [pytest.mark.slow, pytest.mark.apple]
+pytestmark = pytest.mark.apple
 
 
 @pytest.fixture(autouse=True)
 def _macos_only() -> None:
     if platform.system() != "Darwin":
-        pytest.skip("Apple e2e tests require macOS")
+        pytest.skip("Apple tests require macOS")
 
 
-def test_xcodegen_generates_xcodeproj(minimal_app: Path) -> None:
-    """**G3**: ``XcodeProject.generate()`` produces a real ``.xcodeproj``."""
-    from ksproject_utils.xcode.xcode_project import XcodeProject
-
-    project = XcodeProject(minimal_app)
-    try:
-        xcodeproj = project.generate(platforms=["iOS", "macOS"])
-    except Exception as exc:  # noqa: BLE001
-        pytest.skip(f"xcodegen not available: {exc}")
-    assert xcodeproj.exists()
-    assert (xcodeproj / "project.pbxproj").is_file()
-
-
-@pytest.mark.simulator
-def test_ios_simulator_build_produces_app(minimal_app: Path) -> None:
-    """**G3 + G4 prep**: run a debug iOS-simulator build, assert .app + xcframeworks."""
-    if not shutil.which("xcodebuild"):
-        pytest.skip("xcodebuild not on PATH")
-    from ksproject_utils.xcode.xcode_project import XcodeProject
-
-    project = XcodeProject(minimal_app)
-    try:
-        artifact = project.ios_build(variant="debug", simulator=True)
-    except Exception as exc:  # noqa: BLE001
-        pytest.skip(f"iOS simulator build unavailable: {exc}")
-    assert artifact.exists()
-    # Required xcframeworks for kivy + python should be present under Support/
-    support = project.xcode_dir / "Support"
-    xcframeworks = sorted(p.name for p in support.glob("*.xcframework"))
-    assert any("Python" in n for n in xcframeworks), xcframeworks
+def test_ios_simulator_build(minimal_app: Path) -> None:
+    """``ksproject ios build --sim`` exits 0 and produces a .app."""
+    result = subprocess.run(
+        ["ksproject", "ios", "build", "--sim"],
+        cwd=minimal_app,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, (
+        f"ksproject ios build --sim failed:\n{result.stdout}\n{result.stderr}"
+    )
+    app_line = next(
+        (line for line in result.stdout.splitlines() if line.startswith("app:")),
+        None,
+    )
+    assert app_line is not None, f"No app: line in stdout:\n{result.stdout}"
+    app = Path(app_line.split("app:", 1)[1].strip())
+    assert app.exists(), f".app reported but not on disk: {app}"
 
 
-@pytest.mark.simulator
-def test_macos_build_produces_app(minimal_app: Path) -> None:
-    if not shutil.which("xcodebuild"):
-        pytest.skip("xcodebuild not on PATH")
-    from ksproject_utils.xcode.xcode_project import XcodeProject
-
-    project = XcodeProject(minimal_app)
-    try:
-        artifact = project.macos_build(variant="debug")
-    except Exception as exc:  # noqa: BLE001
-        pytest.skip(f"macOS build unavailable: {exc}")
-    assert artifact.exists()
+def test_macos_build(minimal_app: Path) -> None:
+    """``ksproject macos build`` exits 0 and produces a .app."""
+    result = subprocess.run(
+        ["ksproject", "macos", "build"],
+        cwd=minimal_app,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, (
+        f"ksproject macos build failed:\n{result.stdout}\n{result.stderr}"
+    )
+    app_line = next(
+        (line for line in result.stdout.splitlines() if line.startswith("app:")),
+        None,
+    )
+    assert app_line is not None, f"No app: line in stdout:\n{result.stdout}"
+    app = Path(app_line.split("app:", 1)[1].strip())
+    assert app.exists(), f".app reported but not on disk: {app}"

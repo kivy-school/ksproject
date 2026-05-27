@@ -6,17 +6,12 @@ default fixture.
 """
 from __future__ import annotations
 
-import shutil
 import sys
 from pathlib import Path
 
 import pytest
 
 from ksproject_utils.pyproject_init import PyProjectInitKeys
-
-
-FIXTURES_DIR = Path(__file__).parent / "fixtures"
-MINIMAL_APP_DIR = FIXTURES_DIR / "minimal_app"
 
 
 def _write_minimal_pyproject(
@@ -93,10 +88,30 @@ def fake_kivyschool(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def minimal_app(tmp_path: Path) -> Path:
-    """Copy the bundled minimal_app fixture into ``tmp_path`` and return it."""
-    dst = tmp_path / "minimal_app"
-    shutil.copytree(MINIMAL_APP_DIR, dst)
-    return dst
+    """A real ksproject project created exactly as per the README:
+      uv init --package minimal-app --python 3.13
+      uv add kivy
+      ksproject init
+    """
+    import subprocess
+
+    subprocess.run(
+        ["uv", "init", "--package", "minimal-app", "--python", "3.13"],
+        cwd=tmp_path, check=True, capture_output=True, text=True,
+    )
+    app_dir = tmp_path / "minimal-app"
+
+    subprocess.run(
+        ["uv", "add", "kivy"],
+        cwd=app_dir, check=True, capture_output=True, text=True,
+    )
+
+    subprocess.run(
+        ["ksproject", "init"],
+        cwd=app_dir, check=True, capture_output=True, text=True,
+    )
+
+    return app_dir
 
 
 @pytest.fixture
