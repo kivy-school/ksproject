@@ -44,7 +44,7 @@ def test_find_sdk_returns_none_when_missing(tmp_path: Path) -> None:
     assert AndroidToolchain.find_sdk_path(a, tmp_path) is None
 
 
-def test_find_sdk_prefers_env_when_set(
+def test_find_sdk_prefers_env_when_global_tools(
     tmp_project: Path,
     fake_kivyschool: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -53,9 +53,23 @@ def test_find_sdk_prefers_env_when_set(
     env_sdk = tmp_path / "envroot-sdk"
     env_sdk.mkdir()
     monkeypatch.setenv("ANDROID_HOME", str(env_sdk))
-    a = _android()
+    a = _android(global_tools=True)
     found = AndroidToolchain.find_sdk_path(a, tmp_project)
     assert Path(found) == env_sdk
+
+
+def test_find_sdk_ignores_env_when_not_global_tools(
+    tmp_project: Path,
+    fake_kivyschool: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    env_sdk = tmp_path / "envroot-sdk"
+    env_sdk.mkdir()
+    monkeypatch.setenv("ANDROID_HOME", str(env_sdk))
+    a = _android()  # global_tools=False by default
+    found = AndroidToolchain.find_sdk_path(a, tmp_project)
+    assert Path(found) == fake_kivyschool / "android-sdk"
 
 
 def test_find_sdk_explicit_path_wins_over_managed(
