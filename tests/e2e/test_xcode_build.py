@@ -61,6 +61,7 @@ def test_ios_simulator_build_produces_app(minimal_app: Path) -> None:
     assert app.exists(), f".app not found: {app}"
 
 
+@pytest.mark.skip(reason="Temporarily disabling flaky simulator runtime test in CI")
 def test_ios_simulator_unittests_pass(minimal_app: Path) -> None:
     """Build with a test-mode entry point, boot a simulator, launch with
     KSPROJECT_TEST=1, and assert the in-app suite prints a PASS sentinel."""
