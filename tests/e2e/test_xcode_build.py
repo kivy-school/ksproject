@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import os
 import platform
+import re
 import subprocess
 import sys
 import textwrap
@@ -28,6 +29,24 @@ from ksproject_utils.xcode.xcode_project import XcodeProject
 pytestmark = pytest.mark.apple
 
 
+def _clear_deps(app_dir: Path) -> None:
+    """Strip [project] dependencies before iOS build.
+
+    ksproject provides kivy (and other native libs) via xcframeworks, not as
+    pip packages.  Kivy has no ios-simulator wheel on PyPI, so leaving it in
+    dependencies causes PipInstallError when building for iOS simulator.
+    """
+    pyproject = app_dir / "pyproject.toml"
+    text = pyproject.read_text()
+    text = re.sub(
+        r'(dependencies\s*=\s*\[)[^\]]*(\])',
+        r'\1\2',
+        text,
+        flags=re.DOTALL,
+    )
+    pyproject.write_text(text)
+
+
 @pytest.fixture(autouse=True)
 def _macos_only() -> None:
     if platform.system() != "Darwin":
@@ -36,6 +55,7 @@ def _macos_only() -> None:
 
 def test_ios_simulator_build_produces_app(minimal_app: Path) -> None:
     """ios_build(simulator=True) exits cleanly and returns an existing .app."""
+    _clear_deps(minimal_app)
     project = XcodeProject(minimal_app)
     app = project.ios_build(simulator=True)
     assert app.exists(), f".app not found: {app}"
@@ -44,6 +64,7 @@ def test_ios_simulator_build_produces_app(minimal_app: Path) -> None:
 def test_ios_simulator_unittests_pass(minimal_app: Path) -> None:
     """Build with a test-mode entry point, boot a simulator, launch with
     KSPROJECT_TEST=1, and assert the in-app suite prints a PASS sentinel."""
+    _clear_deps(minimal_app)
     project = XcodeProject(minimal_app)
     module = project.builder.module_name
 
