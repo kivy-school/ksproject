@@ -12,8 +12,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  fast:
-    name: fast (${{ matrix.os }})
+  ksproject:
+    name: ksproject (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
@@ -21,23 +21,13 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - run: uv python install 3.13
+      - run: uv sync --group dev
+      - run: uv run pytest -m "not android and not apple" -ra
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v3
-
-      - name: Set up Python
-        run: uv python install 3.13
-
-      - name: Sync dev dependencies
-        run: uv sync --group dev
-
-      - name: Run fast tests
-        run: uv run pytest -ra
-
-  slow:
-    # Only on manual dispatch.
-    if: github.event_name == 'workflow_dispatch'
-    name: slow (${{ matrix.os }})
+  android:
+    name: android (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
@@ -45,20 +35,18 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - run: uv python install 3.13
+      - run: uv sync --group dev
+      - run: uv run pytest -m "android and not emulator" -ra
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v3
+  apple:
+    name: apple
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - run: uv python install 3.13
+      - run: uv sync --group dev
+      - run: uv run pytest -m "apple and not simulator" -ra
 
-      - name: Set up Python
-        run: uv python install 3.13
-
-      - name: Sync dev dependencies
-        run: uv sync --group dev
-
-      - name: Android e2e (no emulator)
-        if: runner.os != 'Windows'
-        run: uv run pytest -m "android and slow and not emulator" -ra
-
-      - name: Apple e2e
-        if: runner.os == 'macOS'
-        run: uv run pytest -m "apple and slow" -ra

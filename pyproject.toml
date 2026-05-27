@@ -34,7 +34,7 @@ dev = [
 [tool.pytest.ini_options]
 minversion = "8.0"
 testpaths = ["tests"]
-addopts = "-ra --strict-markers -m 'not slow'"
+addopts = "-ra --strict-markers"
 markers = [
     "slow: marks tests as slow / heavy (real builds, emulator, simulator)",
     "android: marks tests that exercise the Android/gradle pipeline",
