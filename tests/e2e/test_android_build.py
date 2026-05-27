@@ -6,6 +6,7 @@ that itself) and produces a real APK from the ``minimal_app`` fixture.
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -116,45 +117,80 @@ def test_android_emulator_unittests_pass(minimal_app: Path) -> None:
     else:
         if project.emulator is None:
             pytest.skip("No Android device/emulator and no emulator binary found")
-        # ensure_default_avd() silently returns rc=0 but doesn't create the AVD
-        # when avdmanager can't find the system image (no ANDROID_SDK_ROOT set).
-        # Create the AVD ourselves with explicit env vars and verify the ini file.
+        # Recreate the default AVD for this test run so we don't inherit a stale
+        # runner-level AVD pointing to a different SDK root.
         avd_home = Path.home() / ".android" / "avd"
         avd_home.mkdir(parents=True, exist_ok=True)
         avd_ini = avd_home / f"{DEFAULT_AVD_NAME}.ini"
-        if not avd_ini.exists():
-            abi = host_emulator_abi()
-            system_image = (
-                f"system-images;android-{project.emulator.sdk_version}"
-                f";google_apis;{abi}"
+        avd_dir = avd_home / f"{DEFAULT_AVD_NAME}.avd"
+        if avd_ini.exists():
+            avd_ini.unlink()
+        if avd_dir.exists():
+            shutil.rmtree(avd_dir)
+
+        abi = host_emulator_abi()
+        sdk_root = project.emulator.sdk_path
+        system_image = (
+            f"system-images;android-{project.emulator.sdk_version}"
+            f";google_apis;{abi}"
+        )
+        system_image_dir = (
+            Path(sdk_root)
+            / "system-images"
+            / f"android-{project.emulator.sdk_version}"
+            / "google_apis"
+            / abi
+        )
+        if not system_image_dir.is_dir():
+            pytest.fail(f"Android system image missing: {system_image_dir}")
+        avd_env = {
+            **os.environ,
+            "ANDROID_HOME": sdk_root,
+            "ANDROID_SDK_ROOT": sdk_root,
+            "ANDROID_AVD_HOME": str(avd_home),
+        }
+        create = subprocess.run(
+            [
+                project.emulator.avdmanager, "create", "avd",
+                "-n", DEFAULT_AVD_NAME, "-k", system_image,
+                "-d", DEFAULT_AVD_DEVICE, "-f",
+            ],
+            input="no\n",
+            env=avd_env,
+            capture_output=True,
+            text=True,
+        )
+        avd_output = (create.stdout or "") + (create.stderr or "")
+        if create.returncode != 0 or not avd_ini.exists():
+            pytest.fail(
+                f"avdmanager create avd failed (rc={create.returncode}):\n{avd_output}"
             )
-            avd_env = {
-                **os.environ,
-                "ANDROID_SDK_ROOT": project.emulator.sdk_path,
-                "ANDROID_AVD_HOME": str(avd_home),
-            }
-            create = subprocess.run(
-                [
-                    project.emulator.avdmanager, "create", "avd",
-                    "-n", DEFAULT_AVD_NAME, "-k", system_image,
-                    "-d", DEFAULT_AVD_DEVICE, "-f",
-                ],
-                input="no\n",
-                env=avd_env,
-                capture_output=True,
-                text=True,
-            )
-            avd_output = (create.stdout or "") + (create.stderr or "")
-            if create.returncode != 0 or not avd_ini.exists():
-                pytest.fail(
-                    f"avdmanager create avd failed (rc={create.returncode}):\n{avd_output}"
-                )
-            print(f"Created AVD: {DEFAULT_AVD_NAME}\n{avd_output.strip()}")
+        print(f"Created AVD: {DEFAULT_AVD_NAME}\n{avd_output.strip()}")
+
+        old_android_home = os.environ.get("ANDROID_HOME")
+        old_android_sdk_root = os.environ.get("ANDROID_SDK_ROOT")
+        old_android_avd_home = os.environ.get("ANDROID_AVD_HOME")
+        os.environ["ANDROID_HOME"] = sdk_root
+        os.environ["ANDROID_SDK_ROOT"] = sdk_root
+        os.environ["ANDROID_AVD_HOME"] = str(avd_home)
         print(f"Booting AVD: {DEFAULT_AVD_NAME}")
         try:
             serial = project.emulator.boot_and_wait(DEFAULT_AVD_NAME, project.adb)
         except (AndroidEmulatorError, OSError) as exc:
             pytest.fail(f"AVD {DEFAULT_AVD_NAME} failed to boot: {exc}")
+        finally:
+            if old_android_home is None:
+                os.environ.pop("ANDROID_HOME", None)
+            else:
+                os.environ["ANDROID_HOME"] = old_android_home
+            if old_android_sdk_root is None:
+                os.environ.pop("ANDROID_SDK_ROOT", None)
+            else:
+                os.environ["ANDROID_SDK_ROOT"] = old_android_sdk_root
+            if old_android_avd_home is None:
+                os.environ.pop("ANDROID_AVD_HOME", None)
+            else:
+                os.environ["ANDROID_AVD_HOME"] = old_android_avd_home
 
     # --- Install ---
     subprocess.run([adb, "-s", serial, "install", "-r", str(apk)], check=True)
