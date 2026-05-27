@@ -7,7 +7,6 @@ Mirrors:
 Both artifacts are cached under ``~/.kivyschool/`` (one global cache shared
 across projects, matching PSProject's ``Path.ps_support``).
 """
-
 from __future__ import annotations
 
 import shutil
@@ -48,9 +47,7 @@ def python_xcframework() -> Path:
     support = _support_root()
     fw = support / "Python.xcframework"
     # We consider it "fully installed" once both iOS slice dirs exist.
-    have_ios = (fw / "ios-arm64").exists() and (
-        fw / "ios-arm64_x86_64-simulator"
-    ).exists()
+    have_ios = (fw / "ios-arm64").exists() and (fw / "ios-arm64_x86_64-simulator").exists()
     have_macos = (fw / "macos-arm64_x86_64").exists()
     if have_ios and have_macos:
         return fw
@@ -97,29 +94,25 @@ _SLICE_VERSION_MARKER = ".ksproject_slice_version"
 
 def _slice_is_current(dst: Path) -> bool:
     marker = dst / _SLICE_VERSION_MARKER
-    return (
-        dst.exists()
-        and marker.exists()
-        and marker.read_text().strip() == f"{PY_VERSION}-{PY_SUB_VERSION}"
-    )
+    return dst.exists() and marker.exists() and marker.read_text().strip() == f"{PY_VERSION}-{PY_SUB_VERSION}"
 
 
 def _mark_slice_version(dst: Path) -> None:
     (dst / _SLICE_VERSION_MARKER).write_text(f"{PY_VERSION}-{PY_SUB_VERSION}\n")
 
 
-def copy_python_xcframework(workdir_frameworks: Path, platforms: list[str]) -> None:
-    """Copy the relevant Python.xcframework slices into ``<project>/Frameworks/``.
+def copy_python_xcframework(workdir_support: Path, platforms: list[str]) -> None:
+    """Copy the relevant Python.xcframework slices into ``<project>/Support/``.
 
     Mirrors ``XcodeProjectBuilder.copyPythonLibs``.
     """
     xcfw = python_xcframework()
-    workdir_frameworks.mkdir(parents=True, exist_ok=True)
+    workdir_support.mkdir(parents=True, exist_ok=True)
     for p in platforms:
         if p == "iOS":
             for slice_name in ("ios-arm64", "ios-arm64_x86_64-simulator"):
                 src = xcfw / slice_name
-                dst = workdir_frameworks / slice_name
+                dst = workdir_support / slice_name
                 if src.exists() and not _slice_is_current(dst):
                     if dst.exists():
                         shutil.rmtree(dst)
@@ -128,14 +121,14 @@ def copy_python_xcframework(workdir_frameworks: Path, platforms: list[str]) -> N
         elif p == "macOS":
             slice_name = "macos-arm64_x86_64"
             src = xcfw / slice_name
-            dst = workdir_frameworks / slice_name
+            dst = workdir_support / slice_name
             if src.exists() and not _slice_is_current(dst):
                 if dst.exists():
                     shutil.rmtree(dst)
                 shutil.copytree(src, dst)
                 _mark_slice_version(dst)
             # PSProject also flattens lib/include from Python.framework/Versions/3.13
-            # so build scripts can rsync from "$PROJECT_DIR/Frameworks/macos-arm64_x86_64/lib/".
+            # so build scripts can rsync from "$PROJECT_DIR/Support/macos-arm64_x86_64/lib/".
             py_dir = dst / "Python.framework/Versions" / PY_VERSION
             for sub in ("lib", "include"):
                 src_sub = py_dir / sub
@@ -144,13 +137,13 @@ def copy_python_xcframework(workdir_frameworks: Path, platforms: list[str]) -> N
                     shutil.copytree(src_sub, dst_sub)
 
 
-def fetch_kivy_sdl2_xcframeworks(workdir_frameworks: Path) -> None:
-    """TEMPORARY: download kivy_sdl2 wheel and extract all xcframeworks to Frameworks/.
+def fetch_kivy_sdl2_xcframeworks(workdir_support: Path) -> None:
+    """TEMPORARY: download kivy_sdl2 wheel and extract all xcframeworks to Support/.
 
     Mirrors PSProject SDL2Backend.install().  Remove (or comment out) the call
     once kivy 2.x ships .frameworks/ inside its wheel.
     """
-    marker = workdir_frameworks / _KIVY_SDL2_MARKER
+    marker = workdir_support / _KIVY_SDL2_MARKER
     if marker.exists() and marker.read_text().strip() == _KIVY_SDL2_VERSION:
         return
 
@@ -161,14 +154,14 @@ def fetch_kivy_sdl2_xcframeworks(workdir_frameworks: Path) -> None:
             shutil.copyfileobj(resp, f)
 
     print(f"[ksproject] extracting xcframeworks from {_KIVY_SDL2_WHEEL}")
-    workdir_frameworks.mkdir(parents=True, exist_ok=True)
+    workdir_support.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(cache) as zf:
         for info in zf.infolist():
             parts = Path(info.filename).parts
             for i, part in enumerate(parts):
                 if part.endswith(".xcframework"):
                     rel = Path(*parts[i:])
-                    dst = workdir_frameworks / rel
+                    dst = workdir_support / rel
                     if info.filename.endswith("/"):
                         dst.mkdir(parents=True, exist_ok=True)
                     else:
@@ -179,27 +172,28 @@ def fetch_kivy_sdl2_xcframeworks(workdir_frameworks: Path) -> None:
     marker.write_text(f"{_KIVY_SDL2_VERSION}\n")
 
 
-def copy_site_frameworks(workdir_frameworks: Path, site_packages_root: Path) -> None:
-    """Move SDL2*.xcframework from iphoneos site-packages/.frameworks/ into ``<project>/Frameworks/``.
+def copy_site_frameworks(workdir_support: Path, site_packages_root: Path) -> None:
+    """Move xcframeworks from site-packages/.frameworks/ into ``<project>/Support/``.
 
-    Frameworks are always taken from the ``iphoneos`` slice (device build) and
-    always overwrite anything already in Frameworks/. The ``.frameworks/`` dir is
-    then deleted from every slice (simulator's copy is simply discarded).
+    kivy ships xcframeworks inside each pip-installed slice under
+    ``.frameworks/``.  The bundles are identical multi-arch xcframeworks across
+    all slices (iphoneos, iphonesimulator, …), so we iterate every slice:
+    move xcframeworks to Support/ (overwriting), then delete the now-empty
+    ``.frameworks/`` dir.  Whichever slice is processed last wins, but since
+    the content is identical it doesn't matter.
     """
     if not site_packages_root.is_dir():
         return
-    workdir_frameworks.mkdir(parents=True, exist_ok=True)
+    workdir_support.mkdir(parents=True, exist_ok=True)
 
-    iphoneos_frameworks = site_packages_root / "iphoneos" / ".frameworks"
-    if iphoneos_frameworks.is_dir():
-        for fw_path in iphoneos_frameworks.iterdir():
+    for slice_dir in sorted(site_packages_root.iterdir()):
+        fw_dir = slice_dir / ".frameworks"
+        if not fw_dir.is_dir():
+            continue
+        for fw_path in fw_dir.iterdir():
             if fw_path.suffix == ".xcframework":
-                dst = workdir_frameworks / fw_path.name
+                dst = workdir_support / fw_path.name
                 if dst.exists():
                     shutil.rmtree(dst)
                 shutil.move(str(fw_path), dst)
-
-    for slice_dir in site_packages_root.iterdir():
-        fw_dir = slice_dir / ".frameworks"
-        if fw_dir.is_dir():
-            shutil.rmtree(fw_dir)
+        shutil.rmtree(fw_dir)

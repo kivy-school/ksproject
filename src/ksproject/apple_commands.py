@@ -46,6 +46,9 @@ class AppleCommands:
         itarget.add_argument("--name", help="Simulator/device name")
         ip_run.set_defaults(func=self.ios_run)
 
+        ip_open = isub.add_parser("open", help="Open the Xcode project in Xcode")
+        ip_open.set_defaults(func=self.ios_open)
+
     def _register_macos(self, sub: argparse._SubParsersAction) -> None:
         macos = sub.add_parser("macos", help="macOS / Xcode commands")
         msub = macos.add_subparsers(dest="command", required=True)
@@ -61,6 +64,9 @@ class AppleCommands:
 
         mp_run = msub.add_parser("run", help="Launch the built .app on macOS")
         mp_run.set_defaults(func=self.macos_run)
+
+        mp_open = msub.add_parser("open", help="Open the Xcode project in Xcode")
+        mp_open.set_defaults(func=self.macos_open)
 
     def ios_build(self, args: argparse.Namespace) -> int:
         project = XcodeProject(Path.cwd())
@@ -86,6 +92,11 @@ class AppleCommands:
         project.ios_run(uuid=args.uuid, name=args.name)
         return 0
 
+    def ios_open(self, args: argparse.Namespace) -> int:
+        project = XcodeProject(Path.cwd())
+        project.open_in_xcode()
+        return 0
+
     def macos_build(self, args: argparse.Namespace) -> int:
         project = XcodeProject(Path.cwd())
         app = project.macos_build(variant=args.variant)
@@ -95,4 +106,9 @@ class AppleCommands:
     def macos_run(self, args: argparse.Namespace) -> int:
         project = XcodeProject(Path.cwd())
         project.macos_run()
+        return 0
+
+    def macos_open(self, args: argparse.Namespace) -> int:
+        project = XcodeProject(Path.cwd())
+        project.open_in_xcode()
         return 0

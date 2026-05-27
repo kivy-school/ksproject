@@ -3,7 +3,6 @@
 Cached under ``~/.kivyschool/xcodegen/<version>/`` to mirror the existing
 ``cpython_android.py`` pattern.
 """
-
 from __future__ import annotations
 
 import os
@@ -45,7 +44,9 @@ def _binary_path() -> Path:
     for c in fallbacks:
         if c.is_file() and os.access(c, os.X_OK):
             return c
-    raise XcodeGenError(f"No xcodegen executable found under {root}")
+    raise XcodeGenError(
+        f"No xcodegen executable found under {root}"
+    )
 
 
 def _download_and_extract() -> None:
@@ -53,10 +54,7 @@ def _download_and_extract() -> None:
     root.mkdir(parents=True, exist_ok=True)
     zip_path = root / "xcodegen.artifactbundle.zip"
     print(f"[ksproject] downloading XcodeGen {XCODEGEN_VERSION}...")
-    with (
-        urllib.request.urlopen(XCODEGEN_ARTIFACTBUNDLE_URL) as resp,
-        zip_path.open("wb") as f,
-    ):
+    with urllib.request.urlopen(XCODEGEN_ARTIFACTBUNDLE_URL) as resp, zip_path.open("wb") as f:
         shutil.copyfileobj(resp, f)
     with zipfile.ZipFile(zip_path) as zf:
         zf.extractall(root)
@@ -72,7 +70,9 @@ class XcodeGenRunner:
 
     def __init__(self) -> None:
         if platform.system() != "Darwin":
-            raise XcodeGenError("XcodeGen is only supported on macOS hosts")
+            raise XcodeGenError(
+                "XcodeGen is only supported on macOS hosts"
+            )
         self._ensure_installed()
         self.binary = _binary_path()
 
@@ -92,12 +92,12 @@ class XcodeGenRunner:
             [
                 str(self.binary),
                 "generate",
-                "--spec",
-                str(spec_path),
-                "--project",
-                str(project_dir),
+                "--spec", str(spec_path),
+                "--project", str(project_dir),
             ],
             cwd=project_dir,
         )
         if result.returncode != 0:
-            raise XcodeGenError(f"xcodegen exited with code {result.returncode}")
+            raise XcodeGenError(
+                f"xcodegen exited with code {result.returncode}"
+            )

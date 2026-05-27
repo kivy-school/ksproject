@@ -3,7 +3,6 @@
 Ports ``PSProject/Sources/XcodeProjectBuilder/XcodeProjectBuilder.swift`` and
 ``XcodeProjectBuilder+folders.swift``.
 """
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -15,11 +14,7 @@ from .main_files import render_main_swift
 from .plist_templates import STDLIB_PLIST_XML
 from .project_spec import ProjectSpec
 from .project_target import ProjectTarget
-from .python_apple import (
-    copy_python_xcframework,
-    copy_site_frameworks,
-    fetch_kivy_sdl2_xcframeworks,
-)
+from .python_apple import copy_python_xcframework, fetch_kivy_sdl2_xcframeworks
 from .static_templates import (
     APP_ICON_CONTENTS,
     APP_MAIN_PY_TEMPLATE,
@@ -99,7 +94,7 @@ class XcodeProjectBuilder:
             "Resources",
             "Resources/Images.xcassets",
             "Resources/Images.xcassets/AppIcon.appiconset",
-            "Frameworks",
+            "Support",
             "app",
             "site_packages/iphoneos",
             "site_packages/iphonesimulator",
@@ -119,8 +114,8 @@ class XcodeProjectBuilder:
         if not launch.exists():
             launch.write_text(LAUNCH_SCREEN_STORYBOARD)
 
-    def _write_frameworks_dir(self) -> None:
-        plist = self.project_dir / "Frameworks/dylib-Info-template.plist"
+    def _write_support(self) -> None:
+        plist = self.project_dir / "Support/dylib-Info-template.plist"
         plist.write_text(STDLIB_PLIST_XML)
 
     def _write_sources(self) -> None:
@@ -143,27 +138,26 @@ class XcodeProjectBuilder:
             entry.write_text(APP_MAIN_PY_TEMPLATE.format(module_name=self.module_name))
 
     def _install_frameworks(self, platforms: list[str]) -> None:
-        copy_python_xcframework(self.project_dir / "Frameworks", platforms)
+        self._write_support()  # ensure dylib-Info-template.plist exists for XcodeGen validation
+        copy_python_xcframework(self.project_dir / "Support", platforms)
         if "iOS" in platforms:
-            fetch_kivy_sdl2_xcframeworks(
-                self.project_dir / "Frameworks"
-            )  # TEMPORARY: remove once kivy2x ships .frameworks/
-            copy_site_frameworks(
-                self.project_dir / "Frameworks",
-                self.project_dir / "site_packages",
-            )
+            fetch_kivy_sdl2_xcframeworks(self.project_dir / "Support")  # TEMPORARY: remove once kivy2x ships .frameworks/
 
     # ------------------------------------------------------------------
     # Spec + xcodegen
     # ------------------------------------------------------------------
 
     def _build_spec(self) -> dict:
-        ios = self.kivy_school.ios
+        support = self.project_dir / "Support"
+        site_xcframeworks = sorted(
+            p.name for p in support.iterdir()
+            if p.is_dir() and p.suffix == ".xcframework"
+        ) if support.is_dir() else []
         target = ProjectTarget(
             name=self.app_name,
             info_plist_extra=self.info_plist_extra,
             entitlements=self.entitlements if self.entitlements else None,
-            ios_site_frameworks=ios.site_frameworks if ios is not None else [],
+            site_xcframeworks=site_xcframeworks,
             developer_team=self.developer_team,
         )
         spec = ProjectSpec(
@@ -179,15 +173,39 @@ class XcodeProjectBuilder:
             yaml.safe_dump(self._build_spec(), f, sort_keys=False)
         return spec_path
 
+    def sync_site_xcframeworks(self) -> None:
+        """Sync Support/*.xcframework into the Xcode project.
+
+        Compares what is physically present in Support/ against what is
+        currently in project.yml.  If the sets differ (new xcframework added
+        or one removed), rewrites project.yml and re-runs XcodeGen.
+        Called after pip-install + copy_site_frameworks, just before xcodebuild.
+        """
+        spec_path = self.project_dir / "project.yml"
+        if not spec_path.exists():
+            return
+        new_text = yaml.safe_dump(self._build_spec(), sort_keys=False)
+        if spec_path.read_text() == new_text:
+            return
+        print("[ksproject] xcframework list changed — regenerating Xcode project")
+        spec_path.write_text(new_text)
+        runner = XcodeGenRunner()
+        runner.generate(spec_path=spec_path, project_dir=self.project_dir)
+
     def generate(self, platforms: list[str] | None = None) -> Path:
-        """Materialize the Xcode project and return the path to the .xcodeproj."""
+        """Scaffold the Xcode project and return the path to the .xcodeproj.
+
+        Only creates folder layout, source files, and runs XcodeGen.
+        Runtime assets (Support/ stdlib slices, xcframeworks) are handled
+        separately by _install_frameworks(), which is always called by the
+        build methods regardless of whether the project already exists.
+        """
         plats = platforms or ["iOS", "macOS"]
         self._create_root_folders()
         self._write_resources()
-        self._write_frameworks_dir()
+        self._write_support()
         self._write_sources()
         self._write_app()
-        self._install_frameworks(plats)
         spec_path = self._write_spec()
 
         runner = XcodeGenRunner()

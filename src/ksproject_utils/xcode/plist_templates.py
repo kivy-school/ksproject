@@ -1,5 +1,4 @@
 """Plist templates ported from ``ProjectTarget+Plist.swift``."""
-
 from __future__ import annotations
 
 from typing import Any
