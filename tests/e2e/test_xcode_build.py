@@ -39,10 +39,10 @@ def _clear_deps(app_dir: Path) -> None:
     pyproject = app_dir / "pyproject.toml"
     text = pyproject.read_text()
     text = re.sub(
-        r'(dependencies\s*=\s*\[)[^\]]*(\])',
+        r'^(dependencies\s*=\s*\[)[^\]]*(\])',
         r'\1\2',
         text,
-        flags=re.DOTALL,
+        flags=re.DOTALL | re.MULTILINE,
     )
     pyproject.write_text(text)
 
