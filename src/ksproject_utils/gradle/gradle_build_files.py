@@ -633,9 +633,11 @@ public class Hardware {{
     @staticmethod
     def write_kivy_python_activity(main_dir: Path, package_name: str) -> None:
         """Minimal org.kivy.android.PythonActivity that exposes mActivity to
-        Kivy's fontscale lookup via pyjnius."""
+        Kivy's fontscale lookup via pyjnius, combining native p4a lifecycle safety
+        with dynamic Lottie/GIF/Image loading screens."""
         java_dir = main_dir / "java" / "org" / "kivy" / "android"
         java_dir.mkdir(parents=True, exist_ok=True)
+
         content = f"""\
 package org.kivy.android;
 
@@ -645,20 +647,154 @@ import android.content.pm.PackageManager;
 import android.util.Log;
 import android.content.Context;
 import android.view.inputmethod.InputMethodManager;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
+import android.graphics.Color;
+import android.os.Build;
+import android.os.Bundle;
 
 public class PythonActivity extends SDLActivity {{
     public static PythonActivity mActivity;
-
     public static final String TAG = "PythonActivity";
+    
+    private View loadingView = null;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {{
+        super.onCreate(savedInstanceState);
+        mActivity = this;
+    }}
 
     public static PythonActivity getActivity() {{
         return mActivity;
     }}
 
-    public void removeLoadingScreen() {{
-        // currently does nothing
+    protected void showLoadingScreen(View view) {{
+        try {{
+            if (mLayout == null) {{
+                setContentView(view);
+            }} else if (view.getParent() == null) {{
+                mLayout.addView(view);
+            }}
+        }} catch (IllegalStateException e) {{
+            // The loading screen can be attempted to be applied twice if app
+            // is tabbed in/out, quickly.
+            // (Gives error "The specified child already has a parent.
+            // You must call removeView() on the child's parent first.")
+            Log.w(TAG, "Loading screen attempted to be applied twice.");
+        }}
     }}
-    
+
+    /**
+     * Show custom loading screen overlay using the safe p4a application method.
+     * @param type "lottie", "gif", or "image"
+     * @param resourceName filename without extension (e.g. "loading_anim")
+     * @param bgColor Hex color string for background (e.g. "#FFFFFF")
+     */
+    public void showLoadingScreen(final String type, final String resourceName, final String bgColor) {{
+        runOnUiThread(new Runnable() {{
+            @Override
+            public void run() {{
+                // If the view already exists (e.g., resuming app), just re-apply it safely
+                if (loadingView != null) {{
+                    showLoadingScreen(loadingView);
+                    return;
+                }}
+
+                FrameLayout frameLayout = new FrameLayout(mActivity);
+                try {{
+                    frameLayout.setBackgroundColor(Color.parseColor(bgColor));
+                }} catch (Exception e) {{
+                    frameLayout.setBackgroundColor(Color.WHITE);
+                }}
+
+                FrameLayout.LayoutParams centerParams = new FrameLayout.LayoutParams(
+                        FrameLayout.LayoutParams.WRAP_CONTENT,
+                        FrameLayout.LayoutParams.WRAP_CONTENT,
+                        android.view.Gravity.CENTER
+                );
+
+                int resId = getResources().getIdentifier(resourceName, "drawable", getPackageName());
+                int rawResId = getResources().getIdentifier(resourceName, "raw", getPackageName());
+
+                try {{
+                    if ("lottie".equalsIgnoreCase(type)) {{
+                        try {{
+                            Class<?> lottieClass = Class.forName("com.airbnb.lottie.LottieAnimationView");
+                            View lottieView = (View) lottieClass.getConstructor(Context.class).newInstance(mActivity);
+                            
+                            if (rawResId != 0) {{
+                                lottieClass.getMethod("setAnimation", int.class).invoke(lottieView, rawResId);
+                            }} else {{
+                                lottieClass.getMethod("setAnimation", String.class).invoke(lottieView, resourceName + ".json");
+                            }}
+                            
+                            lottieClass.getMethod("setRepeatCount", int.class).invoke(lottieView, -1);
+                            lottieClass.getMethod("playAnimation").invoke(lottieView);
+                            frameLayout.addView(lottieView, centerParams);
+                        }} catch (ClassNotFoundException e) {{
+                            Log.e(TAG, "Lottie class not found. Ensure it is in your gradle dependencies.");
+                        }}
+                        
+                    }} else if ("gif".equalsIgnoreCase(type)) {{
+                        ImageView imageView = new ImageView(mActivity);
+                        if (Build.VERSION.SDK_INT >= 28 && resId != 0) {{
+                            android.graphics.ImageDecoder.Source source = android.graphics.ImageDecoder.createSource(getResources(), resId);
+                            android.graphics.drawable.Drawable drawable = android.graphics.ImageDecoder.decodeDrawable(source);
+                            imageView.setImageDrawable(drawable);
+                            if (drawable instanceof android.graphics.drawable.AnimatedImageDrawable) {{
+                                ((android.graphics.drawable.AnimatedImageDrawable) drawable).start();
+                            }}
+                        }} else {{
+                            if (resId != 0) imageView.setImageResource(resId);
+                        }}
+                        frameLayout.addView(imageView, centerParams);
+                        
+                    }} else {{
+                        ImageView imageView = new ImageView(mActivity);
+                        if (resId != 0) imageView.setImageResource(resId);
+                        frameLayout.addView(imageView, centerParams);
+                    }}
+
+                    loadingView = frameLayout;
+                    
+                    // Route the newly constructed View through the safe p4a method
+                    showLoadingScreen(loadingView);
+                    Log.v(TAG, "Loading screen constructed and displayed: " + type);
+
+                }} catch (Exception e) {{
+                    Log.e(TAG, "Error creating loading screen: " + e.getMessage());
+                }}
+            }}
+        }});
+    }}
+
+    public void removeLoadingScreen() {{
+        runOnUiThread(new Runnable() {{
+            @Override
+            public void run() {{
+                if (loadingView != null && loadingView.getParent() != null) {{
+                    loadingView.animate()
+                        .alpha(0f)
+                        .setDuration(300)
+                        .withEndAction(new Runnable() {{
+                            @Override
+                            public void run() {{
+                                if (loadingView != null && loadingView.getParent() != null) {{
+                                    ((ViewGroup) loadingView.getParent()).removeView(loadingView);
+                                    loadingView = null;
+                                    Log.v(TAG, "Loading screen successfully removed");
+                                }}
+                            }}
+                        }})
+                        .start();
+                }}
+            }}
+        }});
+    }}
+
     /**
      * Used by android.permissions module to register a call back after requesting runtime
      * permissions
