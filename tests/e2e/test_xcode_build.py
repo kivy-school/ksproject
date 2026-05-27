@@ -5,6 +5,7 @@ macOS only. Downloads xcframeworks on first run (ksproject manages that).
 from __future__ import annotations
 
 import json
+import os
 import platform
 import plistlib
 import subprocess
@@ -103,13 +104,13 @@ def test_ios_simulator_unittests_pass(minimal_app: Path) -> None:
     subprocess.run(["xcrun", "simctl", "boot", sim_uuid], check=False, capture_output=True)
     subprocess.run(["xcrun", "simctl", "install", sim_uuid, str(app)], check=True)
 
-    # --- Launch with KSPROJECT_TEST=1, stream console ---
+    # --- Launch with KSPROJECT_TEST=1 via SIMCTL_CHILD_ prefix ---
+    # simctl forwards any env var prefixed SIMCTL_CHILD_ to the launched app
+    # (stripping the prefix).  -e / --setenv are not valid flags.
+    launch_env = {**os.environ, "SIMCTL_CHILD_KSPROJECT_TEST": "1"}
     launch = subprocess.Popen(
-        [
-            "xcrun", "simctl", "launch", "--console-pty",
-            "-e", "KSPROJECT_TEST=1",
-            sim_uuid, bundle_id,
-        ],
+        ["xcrun", "simctl", "launch", "--console-pty", sim_uuid, bundle_id],
+        env=launch_env,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,

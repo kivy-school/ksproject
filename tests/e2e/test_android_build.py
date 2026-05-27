@@ -67,6 +67,8 @@ def test_android_emulator_unittests_pass(minimal_app: Path) -> None:
     """Build APK, install on a running emulator/device, push an adb marker
     file so the app runs its in-app unittest suite, stream logcat, and
     assert KSPROJECT_TEST_RESULT: PASS."""
+    if sys.platform != "linux":
+        pytest.skip("Android emulator test requires Linux with KVM")
     # --- Build ---
     proc = subprocess.Popen(
         [_ksproject(), "android", "build"],
@@ -115,8 +117,7 @@ def test_android_emulator_unittests_pass(minimal_app: Path) -> None:
         try:
             serial = project.emulator.boot_and_wait(avds[0], project.adb)
         except (AndroidEmulatorError, OSError) as exc:
-            # AVD exists but won't boot — xfail (yellow) not silent skip.
-            pytest.xfail(f"AVD {avds[0]} exists but could not boot: {exc}")
+            pytest.fail(f"AVD {avds[0]} failed to boot: {exc}")
 
     # --- Install ---
     subprocess.run([adb, "-s", serial, "install", "-r", str(apk)], check=True)
