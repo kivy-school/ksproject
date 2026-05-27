@@ -114,7 +114,10 @@ def test_android_emulator_unittests_pass(minimal_app: Path) -> None:
         try:
             serial = project.emulator.boot_and_wait(avds[0], project.adb)
         except (AndroidEmulatorError, OSError) as exc:
-            pytest.skip(f"Could not boot AVD {avds[0]}: {exc}")
+            # AVD exists but won't boot — mark xfail so it shows as yellow in
+            # CI history instead of a silent skip.  If this regresses after
+            # previously passing you will see the result change from green → yellow.
+            pytest.xfail(f"AVD {avds[0]} exists but could not boot: {exc}")
 
     # --- Install ---
     subprocess.run([adb, "-s", serial, "install", "-r", str(apk)], check=True)
