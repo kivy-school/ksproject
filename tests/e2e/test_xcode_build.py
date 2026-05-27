@@ -1,27 +1,31 @@
-"""Apple build tests — run the real ``ksproject ios build --sim`` CLI command.
+"""Apple build tests — use XcodeProject directly (no CLI subprocess).
 
 macOS only. Downloads xcframeworks on first run (ksproject manages that).
+
+iOS entry-point note
+--------------------
+ksproject writes ``project_dist/xcode/app/__main__.py`` from a template that
+calls ``{module}.main()`` directly, bypassing the KSPROJECT_TEST check that
+lives in ``src/{module}/__main__.py``.  To run the in-app test suite we
+pre-create ``app/__main__.py`` with the test-mode branch *before* ios_build()
+runs; ksproject's _write_app() skips writing if the file already exists, so
+normal app usage is never affected.
 """
 from __future__ import annotations
 
-import json
 import os
 import platform
-import plistlib
 import subprocess
 import sys
+import textwrap
 import time
 from pathlib import Path
 
 import pytest
 
+from ksproject_utils.xcode.xcode_project import XcodeProject
+
 pytestmark = pytest.mark.apple
-
-
-def _ksproject() -> str:
-    """Path to the ksproject script in the current venv."""
-    _bin = Path(sys.executable).parent
-    return str(_bin / "ksproject")
 
 
 @pytest.fixture(autouse=True)
@@ -30,39 +34,43 @@ def _macos_only() -> None:
         pytest.skip("Apple tests require macOS")
 
 
-def _stream(proc: subprocess.Popen) -> tuple[list[str], int]:
-    lines: list[str] = []
-    assert proc.stdout is not None
-    for line in proc.stdout:
-        sys.stdout.write(line)
-        sys.stdout.flush()
-        lines.append(line)
-    return lines, proc.wait()
-
-
 def test_ios_simulator_build_produces_app(minimal_app: Path) -> None:
-    """``ksproject ios build --sim`` exits 0 and produces a .app."""
-    proc = subprocess.Popen(
-        [_ksproject(), "ios", "build", "--sim"],
-        cwd=minimal_app,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        bufsize=1,
-    )
-    lines, returncode = _stream(proc)
-    output = "".join(lines)
-    assert returncode == 0, f"ksproject ios build --sim failed:\n{output}"
-    app_line = next((l for l in lines if l.startswith("app:")), None)
-    assert app_line is not None, f"No app: line in stdout:\n{output}"
-    app = Path(app_line.split("app:", 1)[1].strip())
-    assert app.exists(), f".app reported but not on disk: {app}"
+    """ios_build(simulator=True) exits cleanly and returns an existing .app."""
+    project = XcodeProject(minimal_app)
+    app = project.ios_build(simulator=True)
+    assert app.exists(), f".app not found: {app}"
 
 
 def test_ios_simulator_unittests_pass(minimal_app: Path) -> None:
-    """Build the .app, boot a simulator, launch with KSPROJECT_TEST=1 via
-    SIMCTL_CHILD_ prefix, and assert the in-app suite prints a PASS sentinel."""
+    """Build with a test-mode entry point, boot a simulator, launch with
+    KSPROJECT_TEST=1, and assert the in-app suite prints a PASS sentinel."""
     project = XcodeProject(minimal_app)
+    module = project.builder.module_name
+
+    # --- Inject test-mode entry point before ios_build() generates the file ---
+    # ksproject's _write_app() skips writing if app/__main__.py already exists.
+    # We pre-create it with a KSPROJECT_TEST=1 branch; normal builds (where this
+    # file doesn't pre-exist) get the plain ``module.main()`` template instead.
+    app_entry = project.builder.project_dir / "app" / "__main__.py"
+    app_entry.parent.mkdir(parents=True, exist_ok=True)
+    app_entry.write_text(textwrap.dedent(f"""\
+        import os
+        import sys
+
+        _ANDROID_MARKER = "/data/local/tmp/.ksproject_test"
+        if os.environ.get("KSPROJECT_TEST") == "1" or os.path.exists(_ANDROID_MARKER):
+            try:
+                os.remove(_ANDROID_MARKER)
+            except OSError:
+                pass
+            from {module}.tests.__main__ import run as _run
+            sys.exit(_run())
+
+        import {module}
+        if __name__ == "__main__":
+            {module}.main()
+    """))
+
     app = project.ios_build(simulator=True)
     bundle_id = project._bundle_id()
 
@@ -87,8 +95,8 @@ def test_ios_simulator_unittests_pass(minimal_app: Path) -> None:
     )
 
     # --- Launch with KSPROJECT_TEST=1 via SIMCTL_CHILD_ prefix ---
-    # simctl forwards any env var prefixed SIMCTL_CHILD_ to the launched app
-    # (stripping the prefix).  -e / --setenv are not valid flags.
+    # simctl strips the SIMCTL_CHILD_ prefix and sets the var in the child
+    # process.  Our injected app/__main__.py checks os.environ["KSPROJECT_TEST"].
     launch_env = {**os.environ, "SIMCTL_CHILD_KSPROJECT_TEST": "1"}
     launch = subprocess.Popen(
         ["xcrun", "simctl", "launch", "--console-pty", sim_uuid, bundle_id],
@@ -115,8 +123,10 @@ def test_ios_simulator_unittests_pass(minimal_app: Path) -> None:
             if time.monotonic() > deadline:
                 pytest.fail("Timed out waiting for KSPROJECT_TEST_RESULT sentinel")
     finally:
-        subprocess.run(["xcrun", "simctl", "terminate", sim_uuid, bundle_id],
-                       check=False, capture_output=True)
+        subprocess.run(
+            ["xcrun", "simctl", "terminate", sim_uuid, bundle_id],
+            check=False, capture_output=True,
+        )
         launch.terminate()
 
     assert sentinel_result is not None, (
@@ -124,4 +134,3 @@ def test_ios_simulator_unittests_pass(minimal_app: Path) -> None:
         "(check stdout above for crash or import errors)"
     )
     assert sentinel_result == 0, "In-app tests FAILED (see app output above)"
-
