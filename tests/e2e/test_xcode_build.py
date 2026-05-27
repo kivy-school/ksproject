@@ -107,7 +107,7 @@ def test_ios_simulator_unittests_pass(minimal_app: Path) -> None:
     launch = subprocess.Popen(
         [
             "xcrun", "simctl", "launch", "--console-pty",
-            "--setenv", "KSPROJECT_TEST=1",
+            "-e", "KSPROJECT_TEST=1",
             sim_uuid, bundle_id,
         ],
         stdout=subprocess.PIPE,
