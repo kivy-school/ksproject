@@ -188,11 +188,14 @@ def _write_app_tests(app_dir: Path, module: str) -> None:
 
     (tests_dir / "test_main_widget.py").write_text(textwrap.dedent(f"""\
         import os
+        import sys
         import unittest
 
         os.environ.setdefault("KIVY_USE_DEFAULTCONFIG", "1")
         os.environ.setdefault("KIVY_NO_ARGS", "1")
 
+        @unittest.skipIf(sys.platform in ("ios", "android"),
+                         "window lifecycle test requires desktop")
         class MainWidgetTest(unittest.TestCase):
             def test_renders(self):
                 from {module}.app import KivyIntroApp

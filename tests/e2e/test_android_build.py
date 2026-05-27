@@ -88,7 +88,11 @@ def test_android_emulator_unittests_pass(minimal_app: Path) -> None:
     project_name = data["project"]["name"]
     pkg = f"org.kivyschool.{project_name}"
 
-    adb = _adb()
+    # Always use ksproject's own adb (installed during android build).
+    from ksproject_utils.gradle.gradle_project import GradleProject
+    from ksproject_utils.gradle.android_emulator import AndroidEmulatorError
+    project = GradleProject(minimal_app)
+    adb = project.adb
 
     # --- Find a running device/emulator, or boot the first available AVD ---
     r = subprocess.run([adb, "devices", "-l"], capture_output=True, text=True)
@@ -101,10 +105,7 @@ def test_android_emulator_unittests_pass(minimal_app: Path) -> None:
         serial = attached[0]
         print(f"Device: {serial}")
     else:
-        # No running device — boot the first available AVD via GradleProject.
-        from ksproject_utils.gradle.gradle_project import GradleProject
-        from ksproject_utils.gradle.android_emulator import AndroidEmulatorError
-        project = GradleProject(minimal_app)
+        # No running device — boot the first available AVD.
         if project.emulator is None:
             pytest.skip("No Android device/emulator and no emulator binary found")
         avds = project.emulator.list_avds()
@@ -112,11 +113,9 @@ def test_android_emulator_unittests_pass(minimal_app: Path) -> None:
             pytest.skip("No Android device or emulator attached and no AVDs found")
         print(f"Booting AVD: {avds[0]}")
         try:
-            serial = project.emulator.boot_and_wait(avds[0], project.adb)
+            serial = project.emulator.boot_and_wait(avds[0], adb)
         except (AndroidEmulatorError, OSError) as exc:
-            # AVD exists but won't boot — mark xfail so it shows as yellow in
-            # CI history instead of a silent skip.  If this regresses after
-            # previously passing you will see the result change from green → yellow.
+            # AVD exists but won't boot — xfail (yellow) not silent skip.
             pytest.xfail(f"AVD {avds[0]} exists but could not boot: {exc}")
 
     # --- Install ---
