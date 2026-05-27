@@ -460,55 +460,56 @@ public class MainActivity extends PythonActivity {{
     protected void onCreate(Bundle savedInstanceState) {{
         mActivity = this;
 
-        {show_presplash_code}
-
-        File appDir = new File(getFilesDir(), "app");
-        if (!appDir.exists()) {{
-            appDir.mkdirs();
-            try {{
-                unpackAsset(getAssets(), "python{python_version}", appDir);
-                String abi = pickAbi(getAssets(), "site-packages");
-                if (abi != null) {{
-                    File sitePackages = new File(appDir, "site-packages");
-                    sitePackages.mkdirs();
-                    unpackAssetTree(
-                        getAssets(),
-                        "site-packages/" + abi,
-                        sitePackages
-                    );
-                }} else {{
-                    Log.e(TAG, "no matching ABI found in assets/site-packages");
-                }}
-                String dynAbi = pickAbi(getAssets(), "lib-dynload");
-                if (dynAbi != null) {{
-                    File dynload = new File(
-                        appDir, "python{python_version}/lib-dynload"
-                    );
-                    dynload.mkdirs();
-                    unpackAssetTree(
-                        getAssets(),
-                        "lib-dynload/" + dynAbi,
-                        dynload
-                    );
-                }}
-            }} catch (IOException e) {{
-                Log.e(TAG, "asset unpack failed", e);
-            }}
-        }}
+        final File appDir = new File(getFilesDir(), "app");
         String appPath = appDir.getAbsolutePath();
+
         setEnv("ANDROID_APP_PATH", appPath);
         setEnv("ANDROID_ARGUMENT", appPath);
         setEnv("ANDROID_UNPACK", appPath);
-        setEnv("ANDROID_ENTRYPOINT", "{str(python_module).strip().replace("-", "_").replace(".", "_").replace(" ", "_")}");
-        setEnv("ANDROID_NATIVE_LIB_DIR",
-               getApplicationInfo().nativeLibraryDir);
+        setEnv("ANDROID_ENTRYPOINT", "{str(python_module).strip().replace('-', '_').replace('.', '_').replace(' ', '_')}");
+        setEnv("ANDROID_NATIVE_LIB_DIR", getApplicationInfo().nativeLibraryDir);
         setEnv("PYTHONHOME", appPath);
         setEnv("PYTHONNOUSERSITE", "1");
         setEnv("PYTHONUNBUFFERED", "1");
         setEnv("P4A_BOOTSTRAP", "SDL2");
         setEnv("APP_ACTIVITY", "{package_name}.MainActivity");
         setEnv("PYTHONOPTIMIZE", "2");
+
         super.onCreate(savedInstanceState);
+
+        {show_presplash_code}
+
+        final File unpackDoneFile = new File(appDir, ".unpack_done");
+        if (!unpackDoneFile.exists()) {{
+            new Thread(new Runnable() {{
+                @Override
+                public void run() {{
+                    if (!appDir.exists()) appDir.mkdirs();
+                    try {{
+                        unpackAsset(getAssets(), "python{python_version}", appDir);
+                        String abi = pickAbi(getAssets(), "site-packages");
+                        if (abi != null) {{
+                            File sitePackages = new File(appDir, "site-packages");
+                            sitePackages.mkdirs();
+                            unpackAssetTree(getAssets(), "site-packages/" + abi, sitePackages);
+                        }} else {{
+                            Log.e(TAG, "no matching ABI found in assets/site-packages");
+                        }}
+                        String dynAbi = pickAbi(getAssets(), "lib-dynload");
+                        if (dynAbi != null) {{
+                            File dynload = new File(appDir, "python{python_version}/lib-dynload");
+                            dynload.mkdirs();
+                            unpackAssetTree(getAssets(), "lib-dynload/" + dynAbi, dynload);
+                        }}
+                        
+                        // Signal to main.c that extraction is complete
+                        unpackDoneFile.createNewFile();
+                    }} catch (IOException e) {{
+                        Log.e(TAG, "asset unpack failed", e);
+                    }}
+                }}
+            }}).start();
+        }}
     }}
 
     private static String pickAbi(AssetManager am, String root)
@@ -715,6 +716,13 @@ public class PythonActivity extends SDLActivity {{
                 }}
 
                 FrameLayout frameLayout = new FrameLayout(mActivity);
+                
+                // Force the background layout to fill the entire screen
+                frameLayout.setLayoutParams(new ViewGroup.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT
+                ));
+
                 try {{
                     frameLayout.setBackgroundColor(Color.parseColor(bgColor));
                 }} catch (Exception e) {{
@@ -1268,6 +1276,12 @@ int main(int argc, char *argv[]) {{
         return 1;
     }}
 
+    char done_path[1024];
+    snprintf(done_path, sizeof(done_path), "%s/.unpack_done", app_path);
+    while (access(done_path, F_OK) != 0) {{
+        usleep(50000); // Sleep for 50ms while presplash is displaying on the UI thread
+    }}
+    
     /* Env vars untill we patch Kivy platform check*/
     setenv("KIVY_NO_FILELOG", "1", 1);
     setenv("KIVY_NO_CONFIG", "1", 1);
@@ -1422,8 +1436,14 @@ Java_org_kivy_android_PythonService_nativeStart(
     const char *app_path = (*env)->GetStringUTFChars(env, j_appPath, NULL);
     const char *entrypoint = (*env)->GetStringUTFChars(env, j_entrypoint, NULL);
     const char *py_version = (*env)->GetStringUTFChars(env, j_pyVersion, NULL);
-
+    
     LOGI("Service starting. App Path: %s, Entry: %s", app_path, entrypoint);
+
+    char done_path[1024];
+    snprintf(done_path, sizeof(done_path), "%s/.unpack_done", app_path);
+    while (access(done_path, F_OK) != 0) {{
+        usleep(50000); // Sleep for 50ms while presplash is displaying on the UI thread
+    }}
 
     if (chdir(app_path) != 0) {
         LOGE("chdir(%s) failed", app_path);
