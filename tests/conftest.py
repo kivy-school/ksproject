@@ -146,6 +146,7 @@ def _write_app_tests(app_dir: Path, module: str) -> None:
     """))
 
     (tests_dir / "__main__.py").write_text(textwrap.dedent(f"""\
+        import io
         import os
         import sys
         import unittest
@@ -153,17 +154,40 @@ def _write_app_tests(app_dir: Path, module: str) -> None:
         os.environ.setdefault("KIVY_USE_DEFAULTCONFIG", "1")
         os.environ.setdefault("KIVY_NO_ARGS", "1")
 
+
+        def _emit(line: str) -> None:
+            # Write to fd 1 directly, bypassing any Python-level sys.stdout
+            # redirect (e.g. kivy-ios replaces sys.stdout with an NSLog proxy
+            # but leaves fd 1 connected to the console PTY).
+            data = (line + "\\n").encode()
+            try:
+                os.write(1, data)
+            except OSError:
+                pass
+            try:
+                sys.stdout.write(line + "\\n")
+                sys.stdout.flush()
+            except Exception:
+                pass
+
+
         def run() -> int:
-            loader = unittest.TestLoader()
-            suite = loader.loadTestsFromName("{module}.tests")
-            runner = unittest.TextTestRunner(stream=sys.stdout, verbosity=2)
-            result = runner.run(suite)
-            ok = result.wasSuccessful()
-            print(f"KSPROJECT_TEST_RESULT: {{'PASS' if ok else 'FAIL'}}", flush=True)
-            print(
+            try:
+                stream = sys.stdout if sys.stdout is not None else io.StringIO()
+                loader = unittest.TestLoader()
+                suite = loader.loadTestsFromName("{module}.tests")
+                runner = unittest.TextTestRunner(stream=stream, verbosity=2)
+                result = runner.run(suite)
+                ok = result.wasSuccessful()
+            except Exception as exc:
+                _emit("KSPROJECT_TEST_RESULT: FAIL")
+                _emit("KSPROJECT_TEST_TOTALS: ran=0 failed=0 errored=1")
+                _emit(f"ERROR: {{exc}}")
+                return 1
+            _emit(f"KSPROJECT_TEST_RESULT: {{'PASS' if ok else 'FAIL'}}")
+            _emit(
                 f"KSPROJECT_TEST_TOTALS: ran={{result.testsRun}} "
-                f"failed={{len(result.failures)}} errored={{len(result.errors)}}",
-                flush=True,
+                f"failed={{len(result.failures)}} errored={{len(result.errors)}}"
             )
             return 0 if ok else 1
 
