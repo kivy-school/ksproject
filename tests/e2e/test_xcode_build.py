@@ -60,49 +60,31 @@ def test_ios_simulator_build_produces_app(minimal_app: Path) -> None:
 
 
 def test_ios_simulator_unittests_pass(minimal_app: Path) -> None:
-    """Build the .app, boot a simulator, launch with KSPROJECT_TEST=1, and
-    assert the in-app suite prints a PASS sentinel."""
-    # --- Build ---
-    proc = subprocess.Popen(
-        [_ksproject(), "ios", "build", "--sim"],
-        cwd=minimal_app,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        bufsize=1,
-    )
-    build_lines, rc = _stream(proc)
-    build_output = "".join(build_lines)
-    assert rc == 0, f"ios build --sim failed:\n{build_output}"
-    app_line = next((l for l in build_lines if l.startswith("app:")), None)
-    assert app_line is not None, f"No app: line:\n{build_output}"
-    app = Path(app_line.split("app:", 1)[1].strip())
+    """Build the .app, boot a simulator, launch with KSPROJECT_TEST=1 via
+    SIMCTL_CHILD_ prefix, and assert the in-app suite prints a PASS sentinel."""
+    project = XcodeProject(minimal_app)
+    app = project.ios_build(simulator=True)
+    bundle_id = project._bundle_id()
 
-    # --- Bundle ID ---
-    with open(app / "Info.plist", "rb") as f:
-        bundle_id = plistlib.load(f)["CFBundleIdentifier"]
-
-    # --- Pick first available simulator ---
-    r = subprocess.run(
-        ["xcrun", "simctl", "list", "--json", "devices", "available"],
-        capture_output=True, text=True,
-    )
-    data = json.loads(r.stdout)
-    sim_uuid: str | None = None
-    for _runtime, devs in (data.get("devices") or {}).items():
-        if "iOS" in _runtime or "iphonesimulator" in _runtime.lower():
-            for d in devs:
-                if d.get("isAvailable"):
-                    sim_uuid = d["udid"]
-                    print(f"Simulator: {d['name']} ({sim_uuid})")
-                    break
-        if sim_uuid:
-            break
-    assert sim_uuid is not None, "No iOS simulator available"
+    # --- Pick first available iOS simulator ---
+    sims = [
+        s for s in project._list_simulators()
+        if "iOS" in s.get("runtime", "")
+        or "iphonesimulator" in s.get("runtime", "").lower()
+    ]
+    assert sims, "No iOS simulator available"
+    sim_uuid = sims[0]["uuid"]
+    print(f"Simulator: {sims[0]['name']} ({sim_uuid})")
 
     # --- Boot + install ---
-    subprocess.run(["xcrun", "simctl", "boot", sim_uuid], check=False, capture_output=True)
-    subprocess.run(["xcrun", "simctl", "install", sim_uuid, str(app)], check=True)
+    subprocess.run(
+        ["xcrun", "simctl", "boot", sim_uuid],
+        check=False, capture_output=True,
+    )
+    subprocess.run(
+        ["xcrun", "simctl", "install", sim_uuid, str(app)],
+        check=True,
+    )
 
     # --- Launch with KSPROJECT_TEST=1 via SIMCTL_CHILD_ prefix ---
     # simctl forwards any env var prefixed SIMCTL_CHILD_ to the launched app
