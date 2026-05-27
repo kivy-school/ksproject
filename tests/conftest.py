@@ -183,7 +183,7 @@ def _write_app_tests(app_dir: Path, module: str) -> None:
                 import {module}.app  # noqa: F401
 
             def test_platform_known(self):
-                self.assertIn(sys.platform, ("linux", "darwin", "win32", "android"))
+                self.assertIn(sys.platform, ("linux", "darwin", "win32", "android", "ios"))
     """))
 
     (tests_dir / "test_main_widget.py").write_text(textwrap.dedent(f"""\

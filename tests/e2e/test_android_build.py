@@ -103,6 +103,7 @@ def test_android_emulator_unittests_pass(minimal_app: Path) -> None:
     else:
         # No running device — boot the first available AVD via GradleProject.
         from ksproject_utils.gradle.gradle_project import GradleProject
+        from ksproject_utils.gradle.android_emulator import AndroidEmulatorError
         project = GradleProject(minimal_app)
         if project.emulator is None:
             pytest.skip("No Android device/emulator and no emulator binary found")
@@ -110,7 +111,10 @@ def test_android_emulator_unittests_pass(minimal_app: Path) -> None:
         if not avds:
             pytest.skip("No Android device or emulator attached and no AVDs found")
         print(f"Booting AVD: {avds[0]}")
-        serial = project.emulator.boot_and_wait(avds[0], project.adb)
+        try:
+            serial = project.emulator.boot_and_wait(avds[0], project.adb)
+        except (AndroidEmulatorError, OSError) as exc:
+            pytest.skip(f"Could not boot AVD {avds[0]}: {exc}")
 
     # --- Install ---
     subprocess.run([adb, "-s", serial, "install", "-r", str(apk)], check=True)

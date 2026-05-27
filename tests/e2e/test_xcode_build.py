@@ -136,5 +136,9 @@ def test_ios_simulator_unittests_pass(minimal_app: Path) -> None:
                        check=False, capture_output=True)
         launch.terminate()
 
-    assert sentinel_result == 0, "In-app tests did not PASS"
+    assert sentinel_result is not None, (
+        "App exited without printing KSPROJECT_TEST_RESULT sentinel "
+        "(check stdout above for crash or import errors)"
+    )
+    assert sentinel_result == 0, "In-app tests FAILED (see app output above)"
 
