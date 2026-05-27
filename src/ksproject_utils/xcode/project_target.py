@@ -4,7 +4,6 @@ Ports ``PSProject/Sources/XcodeProjectBuilder/ProjectTarget/*.swift``
 (including ``BuildScripts.swift``) for the single supported "kivy" stack
 (SDL2 + KivyLauncher + PySwiftKit + CPython).
 """
-
 from __future__ import annotations
 
 from typing import Any
@@ -42,18 +41,18 @@ fi
 _INSTALL_PY_IOS = r"""mkdir -p "$CODESIGNING_FOLDER_PATH/python/lib"
 if [ "$EFFECTIVE_PLATFORM_NAME" = "-iphonesimulator" ]; then
     echo "Installing Python modules for iOS Simulator"
-    rsync -au --delete "$PROJECT_DIR/Frameworks/ios-arm64_x86_64-simulator/lib/" "$CODESIGNING_FOLDER_PATH/python/lib/"
+    rsync -au --delete "$PROJECT_DIR/Support/ios-arm64_x86_64-simulator/lib/" "$CODESIGNING_FOLDER_PATH/python/lib/"
     rsync -au --delete "$PROJECT_DIR/site_packages/iphonesimulator/" "$CODESIGNING_FOLDER_PATH/site_packages"
 else
     echo "Installing Python modules for iOS Device"
-    rsync -au --delete "$PROJECT_DIR/Frameworks/ios-arm64/lib/" "$CODESIGNING_FOLDER_PATH/python/lib"
+    rsync -au --delete "$PROJECT_DIR/Support/ios-arm64/lib/" "$CODESIGNING_FOLDER_PATH/python/lib"
     rsync -au --delete "$PROJECT_DIR/site_packages/iphoneos/" "$CODESIGNING_FOLDER_PATH/site_packages"
 fi
 rsync -au --delete "$PROJECT_DIR/app/" "$CODESIGNING_FOLDER_PATH/app"
 """
 
 
-_INSTALL_PY_MACOS = r"""rsync -au --delete "$PROJECT_DIR/Frameworks/macos-arm64_x86_64/lib/" "$BUILT_PRODUCTS_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/python/lib"
+_INSTALL_PY_MACOS = r"""rsync -au --delete "$PROJECT_DIR/Support/macos-arm64_x86_64/lib/" "$BUILT_PRODUCTS_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/python/lib"
 
 SITE_DST="$BUILT_PRODUCTS_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/site_packages"
 mkdir -p $SITE_DST
@@ -163,7 +162,6 @@ SIGN_PYTHON_BINARY_SCRIPT = _sign_python_binary_script(PY_SUB_VERSION)
 # Target builder
 # --------------------------------------------------------------------------
 
-
 class ProjectTarget:
     """One XcodeGen target (single multi-platform "auto" application target)."""
 
@@ -172,13 +170,13 @@ class ProjectTarget:
         name: str,
         info_plist_extra: dict[str, Any],
         entitlements: dict[str, Any] | None,
-        ios_site_frameworks: list[str] | None = None,
+        site_xcframeworks: list[str] | None = None,
         developer_team: str | None = None,
     ) -> None:
         self.name = name
         self.info_plist_extra = info_plist_extra
         self.entitlements = entitlements
-        self.ios_site_frameworks = ios_site_frameworks or []
+        self.site_xcframeworks: list[str] = site_xcframeworks or []
         self.developer_team = developer_team
 
     # ----- settings -----
@@ -231,7 +229,7 @@ class ProjectTarget:
                 "group": "Resources",
                 "destinationFilters": ["iOS"],
             },
-            {"path": "Frameworks/dylib-Info-template.plist", "group": "Frameworks"},
+            {"path": "Support/dylib-Info-template.plist", "group": "Support"},
         ]
 
     # ----- dependencies -----
@@ -246,15 +244,9 @@ class ProjectTarget:
                 "product": "Kivy_iOS_Module",
                 "platformFilter": "iOS",
             },
-            {"framework": "Frameworks/SDL2.xcframework", "platformFilter": "iOS"},
-            {"framework": "Frameworks/SDL2_image.xcframework", "platformFilter": "iOS"},
-            {"framework": "Frameworks/SDL2_mixer.xcframework", "platformFilter": "iOS"},
-            {"framework": "Frameworks/SDL2_ttf.xcframework", "platformFilter": "iOS"},
-            {"framework": "Frameworks/libEGL.xcframework", "platformFilter": "iOS"},
-            {"framework": "Frameworks/libGLESv2.xcframework", "platformFilter": "iOS"},
         ]
-        for fw in self.ios_site_frameworks:
-            deps.append({"framework": f"Frameworks/{fw}", "platformFilter": "iOS"})
+        for fw_name in self.site_xcframeworks:
+            deps.append({"framework": f"Support/{fw_name}", "platformFilter": "iOS"})
         return deps
 
     # ----- info / entitlements -----
