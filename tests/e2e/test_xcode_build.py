@@ -110,6 +110,12 @@ def test_ios_simulator_unittests_pass(minimal_app: Path) -> None:
         ["xcrun", "simctl", "boot", sim_uuid],
         check=False, capture_output=True,
     )
+    # bootstatus -b blocks until the simulator finishes booting; simctl install
+    # exits 16 (DeviceNotReadyError) if the simulator is still booting.
+    subprocess.run(
+        ["xcrun", "simctl", "bootstatus", sim_uuid, "-b"],
+        check=True, capture_output=True,
+    )
     subprocess.run(
         ["xcrun", "simctl", "install", sim_uuid, str(app)],
         check=True,

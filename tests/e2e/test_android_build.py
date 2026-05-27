@@ -5,6 +5,7 @@ that itself) and produces a real APK from the ``minimal_app`` fixture.
 """
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 import time
@@ -12,6 +13,14 @@ import tomllib
 from pathlib import Path
 
 import pytest
+
+from ksproject_utils.gradle.android_emulator import (
+    AndroidEmulatorError,
+    DEFAULT_AVD_DEVICE,
+    DEFAULT_AVD_NAME,
+)
+from ksproject_utils.gradle.android_toolchain import host_emulator_abi
+from ksproject_utils.gradle.gradle_project import GradleProject
 
 pytestmark = pytest.mark.android
 
@@ -91,12 +100,10 @@ def test_android_emulator_unittests_pass(minimal_app: Path) -> None:
     pkg = f"org.kivyschool.{project_name}"
 
     # Always use ksproject's own adb (installed during android build).
-    from ksproject_utils.gradle.gradle_project import GradleProject
-    from ksproject_utils.gradle.android_emulator import AndroidEmulatorError, DEFAULT_AVD_NAME
     project = GradleProject(minimal_app)
     adb = project.adb.binary  # str path for subprocess; project.adb (ADB object) for boot_and_wait
 
-    # --- Find a running device/emulator, or boot the default AVD ---
+    # --- Find a running device/emulator, or create+boot the default AVD ---
     r = subprocess.run([adb, "devices", "-l"], capture_output=True, text=True)
     attached = [
         line.split()[0]
@@ -107,15 +114,42 @@ def test_android_emulator_unittests_pass(minimal_app: Path) -> None:
         serial = attached[0]
         print(f"Device: {serial}")
     else:
-        # No running device — ensure the default AVD exists then boot it.
-        # (Avoid list_avds() whose emulator -list-avds output can go to stderr
-        # on some emulator versions, returning an empty list even after creation.)
         if project.emulator is None:
             pytest.skip("No Android device/emulator and no emulator binary found")
-        try:
-            project.emulator.ensure_default_avd()
-        except AndroidEmulatorError as exc:
-            pytest.fail(f"Failed to create default AVD: {exc}")
+        # ensure_default_avd() silently returns rc=0 but doesn't create the AVD
+        # when avdmanager can't find the system image (no ANDROID_SDK_ROOT set).
+        # Create the AVD ourselves with explicit env vars and verify the ini file.
+        avd_home = Path.home() / ".android" / "avd"
+        avd_home.mkdir(parents=True, exist_ok=True)
+        avd_ini = avd_home / f"{DEFAULT_AVD_NAME}.ini"
+        if not avd_ini.exists():
+            abi = host_emulator_abi()
+            system_image = (
+                f"system-images;android-{project.emulator.sdk_version}"
+                f";google_apis;{abi}"
+            )
+            avd_env = {
+                **os.environ,
+                "ANDROID_SDK_ROOT": project.emulator.sdk_path,
+                "ANDROID_AVD_HOME": str(avd_home),
+            }
+            create = subprocess.run(
+                [
+                    project.emulator.avdmanager, "create", "avd",
+                    "-n", DEFAULT_AVD_NAME, "-k", system_image,
+                    "-d", DEFAULT_AVD_DEVICE, "-f",
+                ],
+                input="no\n",
+                env=avd_env,
+                capture_output=True,
+                text=True,
+            )
+            avd_output = (create.stdout or "") + (create.stderr or "")
+            if create.returncode != 0 or not avd_ini.exists():
+                pytest.fail(
+                    f"avdmanager create avd failed (rc={create.returncode}):\n{avd_output}"
+                )
+            print(f"Created AVD: {DEFAULT_AVD_NAME}\n{avd_output.strip()}")
         print(f"Booting AVD: {DEFAULT_AVD_NAME}")
         try:
             serial = project.emulator.boot_and_wait(DEFAULT_AVD_NAME, project.adb)
