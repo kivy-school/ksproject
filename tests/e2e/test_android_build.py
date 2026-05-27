@@ -6,6 +6,7 @@ that itself) and produces a real APK from the ``minimal_app`` fixture.
 from __future__ import annotations
 
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -13,10 +14,16 @@ import pytest
 pytestmark = pytest.mark.android
 
 
+def _ksproject() -> str:
+    """Path to the ksproject script in the current venv."""
+    _bin = Path(sys.executable).parent
+    return str(_bin / ("ksproject.exe" if sys.platform == "win32" else "ksproject"))
+
+
 def test_android_build_produces_apk(minimal_app: Path) -> None:
     """``ksproject android build`` exits 0 and prints an APK path that exists."""
     result = subprocess.run(
-        ["ksproject", "android", "build"],
+        [_ksproject(), "android", "build"],
         cwd=minimal_app,
         capture_output=True,
         text=True,

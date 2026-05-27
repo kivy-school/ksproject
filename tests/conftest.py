@@ -95,6 +95,10 @@ def minimal_app(tmp_path: Path) -> Path:
     """
     import subprocess
 
+    # Resolve ksproject from the same venv that is running pytest.
+    _bin = Path(sys.executable).parent
+    ksproject = str(_bin / ("ksproject.exe" if sys.platform == "win32" else "ksproject"))
+
     subprocess.run(
         ["uv", "init", "--package", "minimal-app", "--python", "3.13"],
         cwd=tmp_path, check=True, capture_output=True, text=True,
@@ -107,7 +111,7 @@ def minimal_app(tmp_path: Path) -> Path:
     )
 
     subprocess.run(
-        ["ksproject", "init"],
+        [ksproject, "init"],
         cwd=app_dir, check=True, capture_output=True, text=True,
     )
 
