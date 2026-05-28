@@ -41,6 +41,18 @@ def _stream(proc: subprocess.Popen) -> tuple[list[str], int]:
     return lines, proc.wait()
 
 
+def _linux_has_kvm_accel() -> bool:
+    if sys.platform != "linux":
+        return False
+    if not Path("/dev/kvm").exists():
+        return False
+    try:
+        cpuinfo = Path("/proc/cpuinfo").read_text().lower()
+    except OSError:
+        return False
+    return ("vmx" in cpuinfo) or ("svm" in cpuinfo)
+
+
 def _app_pid(adb: str, serial: str, pkg: str) -> str:
     result = subprocess.run(
         [adb, "-s", serial, "shell", "pidof", pkg],
@@ -76,6 +88,8 @@ def test_android_emulator_unittests_pass(minimal_app: Path) -> None:
     assert KSPROJECT_TEST_RESULT: PASS."""
     if sys.platform != "linux":
         pytest.skip("Android emulator test requires Linux with KVM")
+    if not _linux_has_kvm_accel():
+        pytest.skip("Android emulator test requires /dev/kvm and vmx/svm CPU flags")
     # --- Build ---
     proc = subprocess.Popen(
         [_ksproject(), "android", "build"],
