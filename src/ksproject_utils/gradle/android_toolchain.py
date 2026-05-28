@@ -104,9 +104,11 @@ class AndroidToolchain:
 
         Returns None if no SDK can be found (e.g. first build hasn't run yet).
         """
-        env = os.environ.get("ANDROID_HOME")
-        if env and Path(env).is_dir():
-            return env
+        global_tools = android.global_tools if android is not None else False
+        if global_tools:
+            env = os.environ.get("ANDROID_HOME")
+            if env and Path(env).is_dir():
+                return env
 
         if android and android.sdk_path and Path(android.sdk_path).is_dir():
             return str(android.sdk_path)
@@ -127,9 +129,11 @@ class AndroidToolchain:
 
         Returns None if no NDK can be found (e.g. first build hasn't run yet).
         """
-        env = os.environ.get("ANDROID_NDK_ROOT")
-        if env and Path(env).is_dir():
-            return env
+        global_tools = android.global_tools if android is not None else False
+        if global_tools:
+            env = os.environ.get("ANDROID_NDK_ROOT")
+            if env and Path(env).is_dir():
+                return env
 
         if android and android.ndk_path and Path(android.ndk_path).is_dir():
             return str(android.ndk_path)
@@ -244,9 +248,11 @@ def _resolve_sdk(
     java_path: str,
     project_dir: Path,
 ) -> str:
-    env = os.environ.get("ANDROID_HOME")
-    if env:
-        return env
+    global_tools = android.global_tools if android is not None else False
+    if global_tools:
+        env = os.environ.get("ANDROID_HOME")
+        if env:
+            return env
 
     if android and android.sdk_path:
         return str(android.sdk_path)
@@ -272,9 +278,11 @@ def _resolve_ndk(
     ndk_version: str,
     java_path: str,
 ) -> str:
-    env = os.environ.get("ANDROID_NDK_ROOT")
-    if env:
-        return env
+    global_tools = android.global_tools if android is not None else False
+    if global_tools:
+        env = os.environ.get("ANDROID_NDK_ROOT")
+        if env:
+            return env
 
     if android and android.ndk_path:
         return str(android.ndk_path)

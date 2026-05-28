@@ -129,9 +129,11 @@ class XcodeProject:
             "-configuration", config,
             "-destination", destination,
             "-derivedDataPath", str(derived),
+            "-skipPackagePluginValidation",
+            "-skipMacroValidation",
             "build",
         ]
-        result = subprocess.run(cmd, cwd=self.xcode_dir)
+        result = subprocess.run(cmd, cwd=self.xcode_dir, stdin=subprocess.DEVNULL)
         if result.returncode != 0:
             raise XcodeProjectError(
                 f"xcodebuild exited with code {result.returncode}"

@@ -1,0 +1,91 @@
+name: tests
+
+on:
+  push:
+    branches: [master, test_suite_1]
+#   pull_request:
+#     branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ksproject:
+    name: ksproject (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - run: uv python install 3.13
+      - run: uv sync --group dev
+      - run: uv run pytest -m "not android and not apple" -ra
+
+  android:
+    name: android (${{ matrix.os }})
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - name: Check KVM availability
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          kvm-ok || true
+          ls -l /dev/kvm
+      - name: Configure KVM permissions
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger
+      - name: Install virtual display
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            xvfb \
+            libnss3 \
+            libx11-6 \
+            libxcb1 \
+            libxcomposite1 \
+            libxcursor1 \
+            libxi6 \
+            libxrandr2 \
+            libxdamage1 \
+            libxfixes3 \
+            libxkbcommon0 \
+            libgbm1 \
+            libasound2t64 \
+            libpulse0
+          Xvfb :1 -screen 0 1280x720x24 &
+          echo "DISPLAY=:1" >> "$GITHUB_ENV"
+      - run: uv python install 3.13
+      - run: uv sync --group dev
+      - name: Increase JVM code cache for Gradle
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          echo "JAVA_TOOL_OPTIONS=-XX:ReservedCodeCacheSize=512m -XX:TieredStopAtLevel=1 -Xshare:off" >> "$GITHUB_ENV"
+      - run: uv run pytest -m android -ra
+
+  apple:
+    name: apple
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - name: Select Xcode 26
+        run: sudo xcode-select --switch $(ls -d /Applications/Xcode*26*.app | sort -V | tail -1)
+      - run: uv python install 3.13
+      - run: uv sync --group dev
+      - run: uv run pytest -m apple -ra -s
+
