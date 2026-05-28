@@ -481,9 +481,11 @@ public class MainActivity extends PythonActivity {{
 
         final File appDir = new File(getFilesDir(), "app");
         String appPath = appDir.getAbsolutePath();
+        String privatePath = getFilesDir().getAbsolutePath();
 
         setEnv("ANDROID_APP_PATH", appPath);
         setEnv("ANDROID_ARGUMENT", appPath);
+        setEnv("ANDROID_PRIVATE", privatePath);
         setEnv("ANDROID_UNPACK", appPath);
         setEnv("ANDROID_ENTRYPOINT", "{str(python_module).strip().replace('-', '_').replace('.', '_').replace(' ', '_')}");
         setEnv("ANDROID_NATIVE_LIB_DIR", getApplicationInfo().nativeLibraryDir);
@@ -1186,8 +1188,7 @@ public class {service_name} extends PythonService {{
     @Override
     protected Intent getThisDefaultIntent(Context ctx, String pythonServiceArgument) {{
         Intent intent = new Intent(ctx, {service_name}.class);
-        File appDir = new File(ctx.getFilesDir(), "app");
-        intent.putExtra("androidPrivate", appDir.getAbsolutePath());
+        intent.putExtra("androidPrivate", ctx.getFilesDir().getAbsolutePath());
         intent.putExtra("serviceEntrypoint", "{entrypoint}");
         intent.putExtra("pythonVersion", "{python_version}");
         intent.putExtra("pythonName", "{service_name.lower()}");
