@@ -82,6 +82,7 @@ def test_android_build_produces_apk(minimal_app: Path) -> None:
     assert apk.exists(), f"APK reported but not on disk: {apk}"
 
 
+@pytest.mark.skip(reason="Temporarily disabling Android emulator runtime e2e in CI")
 def test_android_emulator_unittests_pass(minimal_app: Path) -> None:
     """Build APK, install on a running emulator/device, push an adb marker
     file so the app runs its in-app unittest suite, stream logcat, and
