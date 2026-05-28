@@ -41,16 +41,14 @@ def _stream(proc: subprocess.Popen) -> tuple[list[str], int]:
     return lines, proc.wait()
 
 
-def _adb() -> str:
-    """Locate adb in ANDROID_HOME or on PATH."""
-    import os
-    from pathlib import Path as P
-    home = os.environ.get("ANDROID_HOME") or os.environ.get("ANDROID_SDK_ROOT", "")
-    if home:
-        candidate = P(home) / "platform-tools" / "adb"
-        if candidate.exists():
-            return str(candidate)
-    return "adb"
+def _app_pid(adb: str, serial: str, pkg: str) -> str:
+    result = subprocess.run(
+        [adb, "-s", serial, "shell", "pidof", pkg],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return (result.stdout or "").strip()
 
 
 def test_android_build_produces_apk(minimal_app: Path) -> None:
@@ -198,15 +196,23 @@ def test_android_emulator_unittests_pass(minimal_app: Path) -> None:
 
     # --- Clear logcat, launch ---
     subprocess.run([adb, "-s", serial, "logcat", "-c"], check=True)
-    subprocess.run(
+    launch = subprocess.run(
         [adb, "-s", serial, "shell", "am", "start", "-S",
          "-n", f"{pkg}/.MainActivity"],
+        capture_output=True,
+        text=True,
         check=True,
     )
+    if launch.stdout:
+        sys.stdout.write(launch.stdout)
+        sys.stdout.flush()
+    if launch.stderr:
+        sys.stdout.write(launch.stderr)
+        sys.stdout.flush()
 
-    # --- Stream logcat (python tag only) for sentinels ---
+    # --- Stream logcat for sentinels ---
     logcat = subprocess.Popen(
-        [adb, "-s", serial, "logcat", "-s", "python:V"],
+        [adb, "-s", serial, "logcat", "-v", "brief"],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
@@ -214,20 +220,34 @@ def test_android_emulator_unittests_pass(minimal_app: Path) -> None:
     )
     sentinel_result: int | None = None
     totals_seen = False
-    deadline = time.monotonic() + 300
+    deadline = time.monotonic() + 120
+    last_lines: list[str] = []
     try:
         assert logcat.stdout is not None
         for line in logcat.stdout:
             sys.stdout.write(line)
             sys.stdout.flush()
+            last_lines.append(line)
+            if len(last_lines) > 50:
+                last_lines.pop(0)
             if "KSPROJECT_TEST_RESULT:" in line:
                 sentinel_result = 0 if "PASS" in line else 1
             if "KSPROJECT_TEST_TOTALS:" in line:
                 totals_seen = True
             if sentinel_result is not None and totals_seen:
                 break
+            if sentinel_result is None and not _app_pid(adb, serial, pkg):
+                recent = "".join(last_lines).strip()
+                pytest.fail(
+                    "App exited before printing KSPROJECT_TEST_RESULT sentinel"
+                    + (f"\n\nRecent logcat:\n{recent}" if recent else "")
+                )
             if time.monotonic() > deadline:
-                pytest.fail("Timed out waiting for KSPROJECT_TEST_RESULT sentinel")
+                recent = "".join(last_lines).strip()
+                pytest.fail(
+                    "Timed out waiting for KSPROJECT_TEST_RESULT sentinel"
+                    + (f"\n\nRecent logcat:\n{recent}" if recent else "")
+                )
     finally:
         logcat.terminate()
         subprocess.run(
