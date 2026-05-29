@@ -45,9 +45,11 @@ Everything else (Android SDK, NDK, JDK, Gradle) is downloaded automatically.
 | `ksproject init` | Scaffold a new project |
 | `ksproject android build [debug\|release]` | Build an APK |
 | `ksproject android build --aar` | Build an AAR library |
+| `ksproject android build --bundle` | Build an AAB (Android App Bundle) |
 | `ksproject android devices` | List adb devices and AVDs |
 | `ksproject android run --name <AVD>` | Install and launch on an emulator |
 | `ksproject android run --uuid <serial>` | Install and launch on a USB device |
+| `ksproject android get-path <tool>` | Print resolved path (sdk, ndk, emulator) |
 
 ---
 

@@ -78,7 +78,9 @@ ksproject resolves SDK/NDK/Java locations in this order:
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | `icon` | `string` (path) | Built-in default | Path to app icon PNG. Copied to `app/src/main/res/mipmap/ic_launcher.png`. |
-| `presplash` | `string` (path) | Built-in default | Path to splash screen image. |
+| `presplash` | `string` (path) | Built-in default | Path to splash screen image (PNG, JPG, or GIF). |
+| `presplash_color` | `string` | `"#FFFFFF"` | Background color for the splash screen. |
+| `presplash_lottie` | `string` (path) | None | Path to a Lottie JSON animation file. When set, uses an animated splash screen instead of a static image. Automatically adds `com.airbnb.android:lottie:6.0.0` to Gradle dependencies. |
 
 ### Permissions
 
@@ -136,7 +138,11 @@ Each service entry:
 | `name` | `string` | Yes | Java class name for the service (e.g., `LocationService`) |
 | `entrypoint` | `string` | Yes | Python module path to run in the service (e.g., `myapp.services.location`) |
 | `foreground` | `bool` | No | Whether this is a foreground service (shows persistent notification). Default: `false` |
-| `foreground_service_type` | `string` | No | Required for foreground services on Android 14+. Values: `location`, `dataSync`, `camera`, `mediaPlayback`, etc. |
+| `foreground_service_type` | `string` | No | Required for foreground services on Android 14+. Pipe-separated values: `location`, `dataSync`, `camera`, `mediaPlayback`, etc. |
+| `start_type` | `string` | No | Android service start type. Default: `START_NOT_STICKY`. Options: `START_STICKY`, `START_NOT_STICKY`, `START_REDELIVER_INTENT` |
+| `notification_title` | `string` | No | Title for the foreground service notification. |
+| `notification_text` | `string` | No | Body text for the foreground service notification. |
+| `notification_icon` | `string` | No | Android resource name for the notification icon. Default: `stat_notify_sync` |
 
 ```toml
 [[tool.kivy-school.android.services]]
@@ -144,6 +150,10 @@ name = "LocationService"
 entrypoint = "myapp.services.location"
 foreground = true
 foreground_service_type = "location"
+start_type = "START_STICKY"
+notification_title = "Tracking Active"
+notification_text = "Location service is running."
+notification_icon = "stat_notify_sync"
 
 [[tool.kivy-school.android.services]]
 name = "SyncService"

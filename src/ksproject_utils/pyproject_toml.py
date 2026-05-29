@@ -56,6 +56,10 @@ class KivySchoolData:
         entrypoint: str
         foreground: bool
         foreground_service_type: str | None
+        start_type: str
+        notification_title: str | None
+        notification_text: str | None
+        notification_icon: str
 
         def __init__(self, data: dict):
             self.name = data["name"]
@@ -65,6 +69,10 @@ class KivySchoolData:
 
             self.foreground = data.get("foreground", False)
             self.foreground_service_type = data.get("foreground_service_type")
+            self.start_type = data.get("start_type", "START_NOT_STICKY")
+            self.notification_title = data.get("notification_title")
+            self.notification_text = data.get("notification_text")
+            self.notification_icon = data.get("notification_icon", "stat_notify_sync")
 
     class AndroidData:
         package_name: str

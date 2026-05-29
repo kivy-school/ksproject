@@ -8,11 +8,10 @@ This guide covers building your ksproject app into an APK (or AAB) and running i
 
 The Android build pipeline:
 
-1. **Resolve toolchain** — SDK, NDK, Java are downloaded/located automatically
-2. **Install site-packages** — Cross-compiled Python packages installed per target architecture
-3. **Collect plugin configs** — `.gradle/*.json` files from installed packages are merged
-4. **Generate Gradle project** — Complete Android project written to `project_dist/gradle/`
-5. **Gradle assemble** — `./gradlew assembleDebug` (or `Release`) produces the APK
+1. **Install site-packages** — Cross-compiled Python packages installed per target architecture via `uv pip install`
+2. **Collect plugin configs** — `.gradle/*.json` files from installed packages are merged (permissions + dependencies)
+3. **Generate Gradle project** — Resolves toolchain (SDK, NDK, Java downloaded automatically), builds/downloads CPython, writes complete Android project to `project_dist/gradle/`
+4. **Gradle assemble** — `./gradlew assembleDebug` (or `Release`) produces the APK
 
 ---
 
@@ -169,23 +168,31 @@ project_dist/gradle/
 │   ├── build.gradle.kts          # App module config
 │   └── src/main/
 │       ├── AndroidManifest.xml   # Generated from template + config
-│       ├── java/                 # Java sources
+│       ├── java/                 # Java sources (SDL2 + app + plugins)
 │       │   └── org/example/myapp/
 │       │       └── MainActivity.java
 │       ├── cpp/                  # Native bootstrap
 │       │   ├── CMakeLists.txt
 │       │   ├── main.c            # SDL_main → CPython entry point
-│       │   └── python_include/   # CPython headers
+│       │   ├── sdl2_include/     # SDL2 headers
+│       │   └── python_include/   # CPython headers (per ABI)
 │       ├── jniLibs/              # Native libraries per ABI
 │       │   └── arm64-v8a/
-│       │       └── libpython3.13.so
-│       ├── assets/               # Python runtime + app code
+│       │       ├── libpython3.so
+│       │       ├── libcrypto.so
+│       │       └── libssl.so
+│       ├── assets/               # Python runtime
 │       │   ├── python3.13/       # Standard library
-│       │   ├── lib-dynload/      # Extension modules per ABI
-│       │   └── site_packages/    # Your app + dependencies per ABI
+│       │   └── lib-dynload/      # Extension modules per ABI
 │       └── res/
-│           └── mipmap/
-│               └── ic_launcher.png
+│           ├── mipmap/
+│           │   └── ic_launcher.png
+│           └── drawable/
+│               └── presplash.png
+├── site_packages/                # Cross-compiled Python packages per ABI
+│   └── arm64-v8a/                # (copied to APK assets at Gradle build time)
+│       ├── kivy/
+│       └── myapp/
 ├── build.gradle.kts              # Root Gradle plugins
 ├── settings.gradle.kts           # Repository config
 ├── gradle.properties             # JVM settings
@@ -274,7 +281,10 @@ These environment variables override ksproject's toolchain resolution:
 | `JAVA_HOME` | Use this JDK (must be 17–21) |
 | `KIVYSCHOOL_PREBUILT_INDEX` | Custom index URL for pre-built CPython wheels |
 | `KIVYSCHOOL_PREBUILT_BUILD` | Override CPython build number |
-| `KIVYSCHOOL_PREBUILT_API` | Override CPython target API |
+| `KIVYSCHOOL_PREBUILT_API` | Override CPython target API level (default: 21) |
+| `KIVYSCHOOL_PREBUILT_DISABLE` | Set to `1` to skip prebuilt wheels and build CPython from source |
+| `KIVYSCHOOL_PREBUILT_FILE_ARM64_V8A` | Path to a local prebuilt wheel for arm64-v8a (for CI/dev) |
+| `KIVYSCHOOL_PREBUILT_FILE_X86_64` | Path to a local prebuilt wheel for x86_64 (for CI/dev) |
 
 ---
 

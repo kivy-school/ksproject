@@ -46,7 +46,7 @@ class GradleCommands:
         p_devices = asub.add_parser("devices", help="List devices and AVDs")
         p_devices.set_defaults(func=self.devices)
 
-        p_run = asub.add_parser("run", help="Build, install, and launch")
+        p_run = asub.add_parser("run", help="Install and launch an existing APK")
         target = p_run.add_mutually_exclusive_group(required=True)
         target.add_argument("--uuid", help="adb serial of a device or running emulator")
         target.add_argument("--name", help="AVD name to boot")
