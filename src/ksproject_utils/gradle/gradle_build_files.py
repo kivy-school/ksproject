@@ -1228,7 +1228,7 @@ public class {service_name} extends PythonService {{
     # -------------------------------------------------------------------------
 
     @staticmethod
-    def write_main_c(cpp_dir: Path, python_version: str) -> None:
+    def write_main_c(cpp_dir: Path, python_version: str, project_name: str) -> None:
         cpp_dir.mkdir(parents=True, exist_ok=True)
         content = f"""\
 /* ksproject native bootstrap: SDL_main -> CPython
@@ -1326,15 +1326,18 @@ int main(int argc, char *argv[]) {{
     wchar_t w_stdlib[1024];
     wchar_t w_dynload[1024];
     wchar_t w_site[1024];
+    wchar_t w_project_site[1024];
     wchar_t w_app[1024];
     swprintf(w_stdlib,  1024, L"%s/python{python_version}", app_path);
     swprintf(w_dynload, 1024, L"%s/python{python_version}/lib-dynload", app_path);
     swprintf(w_site,    1024, L"%s/site-packages", app_path);
+    swprintf(w_project_site, 1024, L"%s/site-packages/{project_name}", app_path);
     swprintf(w_app,     1024, L"%s", app_path);
     config.module_search_paths_set = 1;
     PyWideStringList_Append(&config.module_search_paths, w_stdlib);
     PyWideStringList_Append(&config.module_search_paths, w_dynload);
     PyWideStringList_Append(&config.module_search_paths, w_site);
+    PyWideStringList_Append(&config.module_search_paths, w_project_site);
     PyWideStringList_Append(&config.module_search_paths, w_app);
     const char *native_lib_dir = getenv("ANDROID_NATIVE_LIB_DIR");
     if (native_lib_dir) {{
@@ -1399,7 +1402,7 @@ int main(int argc, char *argv[]) {{
         (cpp_dir / "main.c").write_text(content, encoding="utf-8")
 
     @staticmethod
-    def write_service_main_c(cpp_dir: Path) -> None:
+    def write_service_main_c(cpp_dir: Path, project_name: str) -> None:
         cpp_dir.mkdir(parents=True, exist_ok=True)
         content = """\
 #define PY_SSIZE_T_CLEAN
@@ -1487,9 +1490,7 @@ Java_org_kivy_android_PythonService_nativeStart(
     setenv("KIVY_NO_FILELOG", "1", 1);
     setenv("KIVY_NO_CONFIG", "1", 1);
     setenv("KIVY_BUILD", "android", 1);
-    if (app_path) {
-        setenv("KIVY_HOME", app_path, 1);
-    }
+    setenv("KIVY_HOME", app_path, 1);
 
     PyImport_AppendInittab("androidembed", PyInit_androidembed);
 
@@ -1501,16 +1502,19 @@ Java_org_kivy_android_PythonService_nativeStart(
     config.use_environment = 1;
 
     // Build paths
-    wchar_t w_stdlib[1024], w_dynload[1024], w_site[1024], w_app[1024];
+    wchar_t w_stdlib[1024], w_dynload[1024], w_site[1024], w_project_site[1024], w_app[1024];
     swprintf(w_stdlib,  1024, L"%s/python%s", app_path, py_version);
     swprintf(w_dynload, 1024, L"%s/python%s/lib-dynload", app_path, py_version);
+    swprintf(w_project_site, 1024, L"%s/site-packages/{project_name}", app_path);
     swprintf(w_site,    1024, L"%s/site-packages", app_path);
+
     swprintf(w_app,     1024, L"%s", app_path);
 
     config.module_search_paths_set = 1;
     PyWideStringList_Append(&config.module_search_paths, w_stdlib);
     PyWideStringList_Append(&config.module_search_paths, w_dynload);
     PyWideStringList_Append(&config.module_search_paths, w_site);
+    PyWideStringList_Append(&config.module_search_paths, w_project_site);
     PyWideStringList_Append(&config.module_search_paths, w_app);
 
     const char *native_lib_dir = getenv("ANDROID_NATIVE_LIB_DIR");

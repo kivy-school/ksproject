@@ -174,14 +174,16 @@ class GradleProjectBuilder:
             presplash_name = asset_src.stem
             merged_deps.append("com.airbnb.android:lottie:6.0.0")
         else:
-            # ALWAYS attempt to resolve "presplash". 
+            # ALWAYS attempt to resolve "presplash".
             # If the user didn't specify one, _resolve_asset will naturally pull from templates/
             try:
                 asset_src = self._resolve_asset("presplash")
                 drawable_dir = res_dir / "drawable"
                 drawable_dir.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(asset_src, drawable_dir / asset_src.name)
-                presplash_type = "gif" if asset_src.suffix.lower() == ".gif" else "image"
+                presplash_type = (
+                    "gif" if asset_src.suffix.lower() == ".gif" else "image"
+                )
                 presplash_name = asset_src.stem
             except FileNotFoundError:
                 # Failsafe just in case the templates folder is missing from the environment
@@ -222,8 +224,11 @@ class GradleProjectBuilder:
 
         # Native bootstrap (libmain.so) — provides SDL_main → CPython
         cpp_dir = main_dir / "cpp"
-        GradleBuildFiles.write_main_c(cpp_dir, PY_VERSION)
-        GradleBuildFiles.write_service_main_c(cpp_dir)
+        project_name = (
+            self.pyproject.project.name.strip().replace("-", "_").replace(" ", "_")
+        )
+        GradleBuildFiles.write_main_c(cpp_dir, PY_VERSION, project_name)
+        GradleBuildFiles.write_service_main_c(cpp_dir, project_name)
         GradleBuildFiles.write_cmake_lists(cpp_dir)
 
         # Generate the wrapper now that the app module exists on disk
