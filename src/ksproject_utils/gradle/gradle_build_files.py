@@ -1487,9 +1487,7 @@ Java_org_kivy_android_PythonService_nativeStart(
     setenv("KIVY_NO_FILELOG", "1", 1);
     setenv("KIVY_NO_CONFIG", "1", 1);
     setenv("KIVY_BUILD", "android", 1);
-    if (app_path) {
-        setenv("KIVY_HOME", app_path, 1);
-    }
+    setenv("KIVY_HOME", app_path, 1);
 
     PyImport_AppendInittab("androidembed", PyInit_androidembed);
 
