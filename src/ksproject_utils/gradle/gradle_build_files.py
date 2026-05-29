@@ -587,7 +587,7 @@ public class MainActivity extends PythonActivity {{
     }}
 
     /** Like unpackAsset but strips the leading {{srcRoot}} so that
-     *  assets/site-packages/x86_64/foo lands as destRoot/foo. */
+     * assets/site-packages/x86_64/foo lands as destRoot/foo. */
     private static void unpackAssetTree(
         AssetManager am, String srcRoot, File destRoot
     ) throws IOException {{
@@ -1085,7 +1085,7 @@ public class PythonService extends Service implements Runnable {
     }
 
     public static native void nativeStart(
-            String appPath,
+            String androidPrivate,
             String entrypoint,
             String pyVersion);
 }
@@ -1451,19 +1451,22 @@ static const char *REDIRECT_STDIO =
 
 JNIEXPORT jint JNICALL
 Java_org_kivy_android_PythonService_nativeStart(
-    JNIEnv *env, jobject thiz, jstring j_appPath, jstring j_entrypoint, jstring j_pyVersion) {
-    
-    const char *app_path = (*env)->GetStringUTFChars(env, j_appPath, NULL);
+    JNIEnv *env, jobject thiz, jstring j_androidPrivate, jstring j_entrypoint, jstring j_pyVersion) {
+
+    const char *private_path = (*env)->GetStringUTFChars(env, j_androidPrivate, NULL);
     const char *entrypoint = (*env)->GetStringUTFChars(env, j_entrypoint, NULL);
     const char *py_version = (*env)->GetStringUTFChars(env, j_pyVersion, NULL);
-    
+
+    char app_path[1024];
+    snprintf(app_path, sizeof(app_path), "%s/app", private_path);
+
     LOGI("Service starting. App Path: %s, Entry: %s", app_path, entrypoint);
 
     char done_path[1024];
     snprintf(done_path, sizeof(done_path), "%s/.unpack_done", app_path);
-    while (access(done_path, F_OK) != 0) {{
+    while (access(done_path, F_OK) != 0) {
         usleep(50000); // Sleep for 50ms while presplash is displaying on the UI thread
-    }}
+    }
 
     if (chdir(app_path) != 0) {
         LOGE("chdir(%s) failed", app_path);
@@ -1472,7 +1475,7 @@ Java_org_kivy_android_PythonService_nativeStart(
     setenv("ANDROID_APP_PATH", app_path, 1);
     setenv("ANDROID_ENTRYPOINT", entrypoint, 1);
     setenv("ANDROID_ARGUMENT", app_path, 1);
-    setenv("ANDROID_PRIVATE", app_path, 1);
+    setenv("ANDROID_PRIVATE", private_path, 1);
     setenv("ANDROID_UNPACK", app_path, 1);
 
     setenv("PYTHONHOME", app_path, 1);
@@ -1503,7 +1506,7 @@ Java_org_kivy_android_PythonService_nativeStart(
     swprintf(w_dynload, 1024, L"%s/python%s/lib-dynload", app_path, py_version);
     swprintf(w_site,    1024, L"%s/site-packages", app_path);
     swprintf(w_app,     1024, L"%s", app_path);
-    
+
     config.module_search_paths_set = 1;
     PyWideStringList_Append(&config.module_search_paths, w_stdlib);
     PyWideStringList_Append(&config.module_search_paths, w_dynload);
@@ -1530,9 +1533,9 @@ Java_org_kivy_android_PythonService_nativeStart(
     PyObject *func = PyObject_GetAttrString(runpy, "run_module");
     PyObject *args_tuple = PyTuple_Pack(1, PyUnicode_FromString(entrypoint));
     PyObject *kwargs = Py_BuildValue("{s:s, s:i}", "run_name", "__main__", "alter_sys", 1);
-    
+
     PyObject *result = PyObject_Call(func, args_tuple, kwargs);
-    
+
     int ret = 0;
     if (!result) {
         LOGE("python service entrypoint raised an exception");
@@ -1544,7 +1547,7 @@ Java_org_kivy_android_PythonService_nativeStart(
 
     Py_FinalizeEx();
 
-    (*env)->ReleaseStringUTFChars(env, j_appPath, app_path);
+    (*env)->ReleaseStringUTFChars(env, j_androidPrivate, private_path);
     (*env)->ReleaseStringUTFChars(env, j_entrypoint, entrypoint);
     (*env)->ReleaseStringUTFChars(env, j_pyVersion, py_version);
 
