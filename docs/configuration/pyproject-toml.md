@@ -207,14 +207,14 @@ ksproject projects use [uv](https://docs.astral.sh/uv/) as the package manager. 
 ```toml
 [tool.uv]
 extra-index-url = [
-    "https://pypi.anaconda.org/pyswift/simple",
+    "https://pypi-index.psychowaspx.workers.dev/simple/",
     "https://pypi.anaconda.org/kivyschool/simple",
 ]
 ```
 
 | Channel | Purpose |
 |---------|---------|
-| `pyswift/simple` | Cross-compiled Python wheels (CPython, PySwiftKit) for iOS/macOS |
+| `pypi-index.psychowaspx.workers.dev` | Cross-compiled Python wheels (CPython, PySwiftKit) for iOS/macOS |
 | `kivyschool/simple` | Pre-built wheels for Android (libpython, Kivy, SDL2) |
 
 These channels provide the pre-compiled native wheels that ksproject uses when installing site-packages for mobile platforms.
@@ -241,7 +241,7 @@ myapp = "myapp:main"
 
 [tool.uv]
 extra-index-url = [
-    "https://pypi.anaconda.org/pyswift/simple",
+    "https://pypi-index.psychowaspx.workers.dev/simple/",
     "https://pypi.anaconda.org/kivyschool/simple",
 ]
 

@@ -130,7 +130,7 @@ myapp = "myapp:main"
 
 [tool.uv]
 extra-index-url = [
-    "https://pypi.anaconda.org/pyswift/simple",
+    "https://pypi-index.psychowaspx.workers.dev/simple/",
     "https://pypi.anaconda.org/kivyschool/simple",
 ]
 
@@ -150,7 +150,7 @@ bundle_id = "org.kivyschool.myapp"
 ```
 
 !!! tip "Extra Index URLs"
-    The `extra-index-url` entries point to the **PySwift** and **KivySchool** Anaconda channels. These host pre-compiled cross-platform wheels (Kivy for Android/iOS, CPython builds, SDL2 frameworks) that ksproject downloads during mobile builds.
+    The `extra-index-url` entries point to the **PySwift** index and the **KivySchool** Anaconda channel. These host pre-compiled cross-platform wheels (Kivy for Android/iOS, CPython builds, SDL2 frameworks) that ksproject downloads during mobile builds.
 
 ---
 
