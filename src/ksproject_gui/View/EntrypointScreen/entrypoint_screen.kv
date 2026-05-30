@@ -1,54 +1,109 @@
 <EntrypointScreenView>:
+    UIShellLayout:
+        padding: [0, dp(48), 0, 0]
 
-    CBoxLayout:
-        size_hint: 1, 1
-        orientation: "vertical"
-        spacing: dp(16)
-        padding: [0, 0, 0, dp(16)]
+        CBoxLayout:
+            size_hint: 1, 1
+            orientation: "horizontal"
+            spacing: dp(16)
 
-        UI:
-            id: manager_screens
+            CBoxLayout:
+                padding: [dp(16), dp(32)]
+                bg_color: app.layer_01
+                adaptive: [True, False]
 
-        CTabHeader:
-            tab_manager: manager_screens
-            adaptive: [True, True]
-            pos_hint: {"center_x": 0.5}
-            spacing: dp(8)
+                UIShellPanelSelectionLayout:
+                    id: selection_layout
+                    orientation: "vertical"
+                    adaptive: [True, True]
+                    pos_hint: {"top": 1.0}
+                    spacing: dp(32)
 
-            # CTabHeaderItem:
-            #     icon: "home"
-            #     icon_size: plex_20
-            #     adaptive: [True, True]
-            #     name_tab: "home"
-            #     selected: True
+                    SelectionItem:
+                        source: "assets/python64.png"
+                        default: True
+                        on_press:
+                            manager_screens.current = "python"
 
-            # CTabHeaderItem:
-            #     icon: "notification"
-            #     icon_size: plex_20
-            #     adaptive: [True, True]
-            #     name_tab: "notification"
+                    SelectionItem:
+                        source: "assets/android64.png"
+                        on_press:
+                            manager_screens.current = "android"
 
-            # CTabHeaderItem:
-            #     icon: "user"
-            #     icon_size: plex_20
-            #     adaptive: [True, True]
-            #     name_tab: "profile"
+                    SelectionItem:
+                        source: "assets/apple64.png"
+                        on_press:
+                            manager_screens.current = "ios"
 
-            # CTabHeaderItem:
-            #     icon: "settings"
-            #     icon_size: plex_20
-            #     adaptive: [True, True]
-            #     name_tab: "settings"
+            UI:
+                id: manager_screens
 
-    AnchorLayout:
-        anchor_x: "right"
-        anchor_y: "top"
-        padding: dp(16)
+                Python:
+                    name: "python"
+                Android:
+                    name: "android"
+                iOS:
+                    name: "ios"
 
-        UIShellButton:
-            id: shell_theme_btn
-            icon: "moon" if (app.theme in ["White", "Gray10"]) else "sun"
-            role: "Medium"
-            on_press:
-                app.theme = "Gray100" if (app.theme == "White") else "White"
 
+    UIShell:
+        id: right_panel_shell
+
+        UIShellRightPanel:
+            panel_shell: right_panel_shell
+            visibility: shell_notification_btn.focus
+
+    UIShell:
+        id: header_shell
+
+        UIShellHeader:
+            id: shell_header
+            bg_color: app.layer_01
+
+            UIShellHeaderName:
+                markup: True
+                text: "[font=ibmplexsans]KSProject[/font]"
+
+            CAnchorLayout:
+                anchor_x: "right"
+
+                CGridLayout:
+                    adaptive: [True, True]
+                    rows: 1
+
+                    UIShellButton:
+                        id: shell_search_btn
+                        icon: "search"
+
+                    UIShellButton:
+                        id: shell_notification_btn
+                        icon: "notification"
+
+                    UIShellButton:
+                        id: shell_switcher_btn
+                        icon: "switcher"
+
+                    UIShellButton:
+                        id: shell_theme_btn
+                        icon: "moon" if (app.theme in ["White", "Gray10"]) else "sun"
+                        on_press:
+                            app.theme = "Gray100" if (app.theme == "White") else "White"
+
+<SelectionItem>:
+    canvas.after:
+        Color:
+            rgba: app.interactive if self.selected else app.transparent
+        Line:
+            width: dp(1)
+            cap: "square"
+            points: [self.x, self.y, self.right, self.y]
+    size_hint: None, None
+    width: dp(64)
+    height: dp(64)
+    padding: [0, dp(8)]
+    on_press:
+        self.selected = True
+    AsyncImage:
+        source: root.source
+        size_hint: 1, None
+        height: self.width

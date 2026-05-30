@@ -5,7 +5,7 @@
     CStackLayout:
         size_hint: 1, 1
         spacing: dp(8)
-        padding: [0, 0, 0, dp(16)]
+        padding: [0, 0, 0, 0]
 
         CBoxLayout:
             id: main_layout
@@ -17,6 +17,9 @@
 
 <LoadingLayout>:
     size_hint: 1, 1
+
+<ActiveButton>:
+    radius: self.height/2
 
 <BanLayout>:
     bg_color: app.background

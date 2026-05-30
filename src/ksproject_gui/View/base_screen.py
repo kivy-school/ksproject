@@ -1,5 +1,6 @@
 from typing import Literal
 
+from carbonkivy.uix.button import CButtonCircular
 from carbonkivy.uix.loading import CLoadingLayout
 from carbonkivy.uix.notification import CNotificationInline, CNotificationToast
 from carbonkivy.uix.screen import CScreen
@@ -9,6 +10,9 @@ from kivy.input.providers.mouse import MouseMotionEvent
 from kivy.properties import ObjectProperty
 
 from Utility.observer import Observer
+
+class ActiveButton(CButtonCircular):
+    pass
 
 
 class BanLayout(CLoadingLayout):
