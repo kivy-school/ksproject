@@ -89,6 +89,8 @@ class KivySchoolData:
         meta_data: dict[str, str]
         gradle_dependencies: list[str]
         services: list["KivySchoolData.ServiceData"]
+        version_code: int
+        version_name: str
 
         def __init__(self, data: dict):
             self.package_name = data["package_name"]
@@ -117,6 +119,8 @@ class KivySchoolData:
             self.services = [
                 KivySchoolData.ServiceData(s) for s in data.get("services", [])
             ]
+            self.version_code = data.get("version_code", 1)
+            self.version_name = data.get("version_name", "1.0")
 
         def kivyschool_root(self, working_dir: Path) -> Path:
             """Root for kivy-school managed tools/caches.
