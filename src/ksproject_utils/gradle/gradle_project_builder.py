@@ -102,6 +102,10 @@ class GradleProjectBuilder:
         merged_deps = _merge_unique(base_deps, extra_gradle_dependencies or [])
         merged_perms = _merge_unique(base_perms, extra_permissions or [])
 
+        # Extract version metadata safely out of the parsed configuration object
+        v_code = getattr(self.android, "version_code", 1) if self.android else 1
+        v_name = getattr(self.android, "version_name", "1.0") if self.android else "1.0"
+
         # Resolve toolchain first — we need the SDK path for local.properties
         toolchain = AndroidToolchain.resolve(self.android, self.working_dir)
 
@@ -136,6 +140,8 @@ class GradleProjectBuilder:
             ndk_path=toolchain.ndk_path,
             aar=aar,
             gradle_dependencies=merged_deps,
+            version_code=v_code,
+            version_name=v_name,
         )
 
         main_dir = app_dir / "src" / "main"
@@ -249,12 +255,6 @@ class GradleProjectBuilder:
             jni_abi = main_dir / "jniLibs" / arch.value
             jni_abi.mkdir(parents=True, exist_ok=True)
 
-            # libpython gets renamed to libpython3.so (matches the SONAME the
-            # native bootstrap dlopen()s). All other lib*.so siblings in
-            # prefix/lib/ (libcrypto, libssl, libsqlite3 and their _python
-            # shims) are shipped verbatim — Android's nativeLibraryDir only
-            # exposes files matching lib*.so, and CPython extensions like
-            # _ssl/_hashlib/_sqlite3 dlopen these at runtime.
             lib_src_dir = prefix / "lib"
             src_lib = lib_src_dir / f"libpython{PY_VERSION}.so"
             if src_lib.exists():
@@ -268,10 +268,6 @@ class GradleProjectBuilder:
                 if not dst.exists():
                     shutil.copy2(so_file, dst)
 
-            # Extension modules go into assets/lib-dynload/<abi> so they can be
-            # unpacked to a writable filesystem path at runtime (AGP 8 keeps
-            # native libs compressed inside the APK, and only files matching
-            # lib*.so are exposed via nativeLibraryDir).
             lib_dynload = prefix / f"lib/python{PY_VERSION}/lib-dynload"
             if lib_dynload.exists():
                 dynload_dst = main_dir / "assets" / "lib-dynload" / arch.value
@@ -282,7 +278,6 @@ class GradleProjectBuilder:
                         if not dst.exists():
                             shutil.copy2(so_file, dst)
 
-            # Python headers for the native bootstrap (per-ABI: pyconfig.h differs)
             py_inc_src = prefix / f"include/python{PY_VERSION}"
             py_inc_dst = main_dir / "cpp" / "python_include" / arch.value
             if py_inc_src.exists() and not py_inc_dst.exists():
