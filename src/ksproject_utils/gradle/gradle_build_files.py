@@ -135,6 +135,8 @@ include(":app")
         ndk_path: str | None | Path = None,
         aar: bool = False,
         gradle_dependencies: list[str] | None = None,
+        version_name: str = "1.0",
+        version_code: int = 1,
     ) -> None:
         (app_dir / "build.gradle.kts").write_text(
             GradleBuildFiles._app_build_gradle_content(
@@ -148,6 +150,8 @@ include(":app")
                 ndk_path=ndk_path,
                 aar=aar,
                 gradle_dependencies=gradle_dependencies or [],
+                version_name=version_name,
+                version_code=version_code,
             ),
             encoding="utf-8",
         )
@@ -165,6 +169,8 @@ include(":app")
         ndk_path: str | None | Path = None,
         aar: bool = False,
         gradle_dependencies: list[str] | None = None,
+        version_name: str = "1.0",
+        version_code: int = 1,
     ) -> str:
         abi_filters = ", ".join(f'"{a.value}"' for a in archs)
         arch_list_kts = ", ".join(f'"{a.value}"' for a in archs)
@@ -174,8 +180,8 @@ include(":app")
             ""
             if aar
             else f'        applicationId = "{package_name}"\n'
-            f"        versionCode = 1\n"
-            f'        versionName = "1.0"\n'
+            f"        versionCode = {version_code}\n"
+            f'        versionName = "{version_name}"\n'
         )
         extra_deps = "".join(
             f'    implementation("{dep}")\n' for dep in (gradle_dependencies or [])
