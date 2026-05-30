@@ -1,0 +1,54 @@
+<EntrypointScreenView>:
+
+    CBoxLayout:
+        size_hint: 1, 1
+        orientation: "vertical"
+        spacing: dp(16)
+        padding: [0, 0, 0, dp(16)]
+
+        UI:
+            id: manager_screens
+
+        CTabHeader:
+            tab_manager: manager_screens
+            adaptive: [True, True]
+            pos_hint: {"center_x": 0.5}
+            spacing: dp(8)
+
+            # CTabHeaderItem:
+            #     icon: "home"
+            #     icon_size: plex_20
+            #     adaptive: [True, True]
+            #     name_tab: "home"
+            #     selected: True
+
+            # CTabHeaderItem:
+            #     icon: "notification"
+            #     icon_size: plex_20
+            #     adaptive: [True, True]
+            #     name_tab: "notification"
+
+            # CTabHeaderItem:
+            #     icon: "user"
+            #     icon_size: plex_20
+            #     adaptive: [True, True]
+            #     name_tab: "profile"
+
+            # CTabHeaderItem:
+            #     icon: "settings"
+            #     icon_size: plex_20
+            #     adaptive: [True, True]
+            #     name_tab: "settings"
+
+    AnchorLayout:
+        anchor_x: "right"
+        anchor_y: "top"
+        padding: dp(16)
+
+        UIShellButton:
+            id: shell_theme_btn
+            icon: "moon" if (app.theme in ["White", "Gray10"]) else "sun"
+            role: "Medium"
+            on_press:
+                app.theme = "Gray100" if (app.theme == "White") else "White"
+
