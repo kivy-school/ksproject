@@ -1,0 +1,155 @@
+<Home>:
+    CStackLayout:
+        size_hint: [1, 1]
+        padding: [dp(16), 0]
+
+        CBoxLayout:
+            adaptive: [False, True]
+            spacing: dp(16)
+
+            CGridLayout:
+                responsive: True
+                min_cols: 2
+                cols: 2
+                max_cols: 2
+                adaptive: [False, True]
+                spacing: dp(16)
+
+                RoundedBoxLayout:
+                    bg_color: app.layer_01
+                    adaptive: [False, True]
+                    padding: [dp(16), dp(32), dp(16), dp(32)]
+
+                    CTextInputLayout:
+                        CTextInput:
+                        CTextInputLabel:
+                            text: "Package name"
+                            -color: app.text_primary
+                            weight_style: "SemiBold"
+                        CTextInputHelperText:
+                            text: "e.g. com.kivyschool.yourapp"
+
+                RoundedBoxLayout:
+                    bg_color: app.layer_01
+                    adaptive: [False, True]
+                    padding: [dp(16), dp(32), dp(16), dp(32)]
+
+                    CTextInputLayout:
+                        CTextInput:
+                        CTextInputLabel:
+                            text: "Minimum api version"
+                            -color: app.text_primary
+                            weight_style: "SemiBold"
+                        CTextInputHelperText:
+                            text: "recommended: 24"
+
+                RoundedBoxLayout:
+                    bg_color: app.layer_01
+                    adaptive: [False, True]
+                    padding: [dp(16), dp(32), dp(16), dp(32)]
+
+                    CTextInputLayout:
+                        CTextInput:
+                        CTextInputLabel:
+                            text: "Maximum api version"
+                            -color: app.text_primary
+                            weight_style: "SemiBold"
+                        CTextInputHelperText:
+                            text: "recommended: 36"
+
+                RoundedBoxLayout:
+                    bg_color: app.layer_01
+                    adaptive: [False, True]
+                    padding: [dp(16), dp(32), dp(16), dp(32)]
+
+                    CTextInputLayout:
+                        CTextInput:
+                        CTextInputLabel:
+                            text: "Android sdk version"
+                            -color: app.text_primary
+                            weight_style: "SemiBold"
+                        CTextInputHelperText:
+                            text: "recommended: 36"
+
+                RoundedBoxLayout:
+                    bg_color: app.layer_01
+                    adaptive: [False, True]
+                    padding: [dp(16), dp(32), dp(16), dp(32)]
+
+                    CTextInputLayout:
+                        CTextInput:
+                        CTextInputLabel:
+                            text: "Android ndk version"
+                            -color: app.text_primary
+                            weight_style: "SemiBold"
+                        CTextInputHelperText:
+                            text: "recommended: 28c"
+
+                RoundedBoxLayout:
+                    bg_color: app.layer_01
+                    adaptive: [False, True]
+                    padding: [dp(16), dp(32), dp(16), dp(32)]
+
+                    CTextInputLayout:
+                        CTextInput:
+                        CTextInputLabel:
+                            text: "Android ndk api version"
+                            -color: app.text_primary
+                            weight_style: "SemiBold"
+                        CTextInputHelperText:
+                            text: "recommended: =minapi=24"
+
+            CDivider:
+                orientation: "vertical"
+
+            CScrollView:
+                do_scroll_x: False
+
+                RightLayout:
+
+
+<RightLayout@CBoxLayout>:
+    adaptive: [False, True]
+    orientation: "vertical"
+    padding: [dp(2), 0]
+    spacing: dp(16)
+
+    CBoxLayout:
+        adaptive: [True, True]
+        padding: [0, dp(32)]
+
+        CRadioGroupLayout:
+
+            CRadioGroupLabel:
+                text: "Android aarchs"
+                style: "heading_02"
+                -color: app.text_primary
+                padding: [0, dp(8)]
+
+            CRadioGroupHelperText:
+                text: "Select x86_64 for emulator."
+
+            CRadioGroup:
+                id: group_master
+                pos_hint: {"center_x": 0.5, "center_y": 0.5}
+                size_hint_x: None
+                width: dp(256)
+                spacing: dp(8)
+
+                CRadioItem:
+
+                    CCheckbox:
+                        pos_hint: {"center_y": 0.5}
+
+                    CRadioButtonLabel:
+                        text: "arm64-v8a"
+                        pos_hint: {"center_y": 0.5}
+
+                CRadioItem:
+
+                    CCheckbox:
+                        pos_hint: {"center_y": 0.5}
+
+                    CRadioButtonLabel:
+                        text: "x86_64"
+                        pos_hint: {"center_y": 0.5}

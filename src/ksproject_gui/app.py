@@ -5,7 +5,6 @@ import ssl
 
 # ssl.create_default_context = ssl._create_unverified_context
 
-os.environ["devicetype"] = "mobile"
 
 import time
 import weakref

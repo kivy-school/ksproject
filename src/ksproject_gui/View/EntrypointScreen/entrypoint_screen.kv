@@ -21,12 +21,12 @@
 
                     SelectionItem:
                         source: "assets/python64.png"
-                        default: True
                         on_press:
                             manager_screens.current = "python"
 
                     SelectionItem:
                         source: "assets/android64.png"
+                        default: True
                         on_press:
                             manager_screens.current = "android"
 
@@ -38,10 +38,10 @@
             UI:
                 id: manager_screens
 
-                Python:
-                    name: "python"
                 Android:
                     name: "android"
+                Python:
+                    name: "python"
                 iOS:
                     name: "ios"
 
