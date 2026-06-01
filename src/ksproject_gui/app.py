@@ -1,7 +1,12 @@
-import os
+import os, sys
 import registers
 import threading
 import ssl
+
+from kivy.resources import resource_add_path
+
+resource_add_path(os.path.dirname(__file__))
+
 
 # ssl.create_default_context = ssl._create_unverified_context
 
@@ -25,6 +30,12 @@ from Model.application_layer_model import ApplicationLayerModel
 
 
 Clock.max_iteration = 60
+
+Window.maximize()
+
+
+Window.minimum_width = 1000
+Window.minimum_height = 500
 
 
 def set_softinput(*args) -> None:

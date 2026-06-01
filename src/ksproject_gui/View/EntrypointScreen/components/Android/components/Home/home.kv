@@ -1,112 +1,130 @@
+#: import datamodel libs.datamodel.datamodel
+
 <Home>:
     CStackLayout:
         size_hint: [1, 1]
         padding: [dp(16), 0]
 
         CBoxLayout:
-            adaptive: [False, True]
+            adaptive: [False, False]
             spacing: dp(16)
 
-            CGridLayout:
-                responsive: True
-                min_cols: 2
-                cols: 2
-                max_cols: 2
-                adaptive: [False, True]
-                spacing: dp(16)
+            ScrollView:
+                always_overscroll: False
 
-                RoundedBoxLayout:
-                    bg_color: app.layer_01
+                CGridLayout:
+                    responsive: True
+                    min_cols: 2
+                    cols: 2
+                    max_cols: 2
                     adaptive: [False, True]
-                    padding: [dp(16), dp(32), dp(16), dp(32)]
+                    spacing: dp(16)
 
-                    CTextInputLayout:
-                        CTextInput:
-                        CTextInputLabel:
-                            text: "Package name"
-                            -color: app.text_primary
-                            weight_style: "SemiBold"
-                        CTextInputHelperText:
-                            text: "e.g. com.kivyschool.yourapp"
+                    RoundedBoxLayout:
+                        bg_color: app.layer_01
+                        adaptive: [False, True]
+                        padding: [dp(16), dp(32), dp(16), dp(32)]
 
-                RoundedBoxLayout:
-                    bg_color: app.layer_01
-                    adaptive: [False, True]
-                    padding: [dp(16), dp(32), dp(16), dp(32)]
+                        CTextInputLayout:
+                            CTextInput:
+                                # Two-way binding for strings
+                                text: datamodel.android_package_name or ""
+                                on_text: datamodel.android_package_name = self.text
+                            CTextInputLabel:
+                                text: "Package name"
+                                -color: app.text_primary
+                                weight_style: "SemiBold"
+                            CTextInputHelperText:
+                                text: "e.g. com.kivyschool.yourapp"
 
-                    CTextInputLayout:
-                        CTextInput:
-                        CTextInputLabel:
-                            text: "Minimum api version"
-                            -color: app.text_primary
-                            weight_style: "SemiBold"
-                        CTextInputHelperText:
-                            text: "recommended: 24"
+                    RoundedBoxLayout:
+                        bg_color: app.layer_01
+                        adaptive: [False, True]
+                        padding: [dp(16), dp(32), dp(16), dp(32)]
 
-                RoundedBoxLayout:
-                    bg_color: app.layer_01
-                    adaptive: [False, True]
-                    padding: [dp(16), dp(32), dp(16), dp(32)]
+                        CTextInputLayout:
+                            CTextInput:
+                                # Convert int to string for UI, convert back to int on save
+                                text: str(datamodel.android_min_api or "")
+                                on_text: datamodel.android_min_api = int(self.text) if self.text.isdigit() else None
+                            CTextInputLabel:
+                                text: "Minimum api version"
+                                -color: app.text_primary
+                                weight_style: "SemiBold"
+                            CTextInputHelperText:
+                                text: "recommended: 24"
 
-                    CTextInputLayout:
-                        CTextInput:
-                        CTextInputLabel:
-                            text: "Maximum api version"
-                            -color: app.text_primary
-                            weight_style: "SemiBold"
-                        CTextInputHelperText:
-                            text: "recommended: 36"
+                    RoundedBoxLayout:
+                        bg_color: app.layer_01
+                        adaptive: [False, True]
+                        padding: [dp(16), dp(32), dp(16), dp(32)]
 
-                RoundedBoxLayout:
-                    bg_color: app.layer_01
-                    adaptive: [False, True]
-                    padding: [dp(16), dp(32), dp(16), dp(32)]
+                        CTextInputLayout:
+                            CTextInput:
+                                text: str(datamodel.android_api or "")
+                                on_text: datamodel.android_api = int(self.text) if self.text.isdigit() else None
+                            CTextInputLabel:
+                                text: "Maximum api version"
+                                -color: app.text_primary
+                                weight_style: "SemiBold"
+                            CTextInputHelperText:
+                                text: "recommended: 36"
 
-                    CTextInputLayout:
-                        CTextInput:
-                        CTextInputLabel:
-                            text: "Android sdk version"
-                            -color: app.text_primary
-                            weight_style: "SemiBold"
-                        CTextInputHelperText:
-                            text: "recommended: 36"
+                    RoundedBoxLayout:
+                        bg_color: app.layer_01
+                        adaptive: [False, True]
+                        padding: [dp(16), dp(32), dp(16), dp(32)]
 
-                RoundedBoxLayout:
-                    bg_color: app.layer_01
-                    adaptive: [False, True]
-                    padding: [dp(16), dp(32), dp(16), dp(32)]
+                        CTextInputLayout:
+                            CTextInput:
+                                text: datamodel.android_sdk or ""
+                                on_text: datamodel.android_sdk = self.text
+                            CTextInputLabel:
+                                text: "Android sdk version"
+                                -color: app.text_primary
+                                weight_style: "SemiBold"
+                            CTextInputHelperText:
+                                text: "recommended: 36"
 
-                    CTextInputLayout:
-                        CTextInput:
-                        CTextInputLabel:
-                            text: "Android ndk version"
-                            -color: app.text_primary
-                            weight_style: "SemiBold"
-                        CTextInputHelperText:
-                            text: "recommended: 28c"
+                    RoundedBoxLayout:
+                        bg_color: app.layer_01
+                        adaptive: [False, True]
+                        padding: [dp(16), dp(32), dp(16), dp(32)]
 
-                RoundedBoxLayout:
-                    bg_color: app.layer_01
-                    adaptive: [False, True]
-                    padding: [dp(16), dp(32), dp(16), dp(32)]
+                        CTextInputLayout:
+                            CTextInput:
+                                text: datamodel.android_ndk or ""
+                                on_text: datamodel.android_ndk = self.text
+                            CTextInputLabel:
+                                text: "Android ndk version"
+                                -color: app.text_primary
+                                weight_style: "SemiBold"
+                            CTextInputHelperText:
+                                text: "recommended: 28c"
 
-                    CTextInputLayout:
-                        CTextInput:
-                        CTextInputLabel:
-                            text: "Android ndk api version"
-                            -color: app.text_primary
-                            weight_style: "SemiBold"
-                        CTextInputHelperText:
-                            text: "recommended: =minapi=24"
+                    RoundedBoxLayout:
+                        bg_color: app.layer_01
+                        adaptive: [False, True]
+                        padding: [dp(16), dp(32), dp(16), dp(32)]
+
+                        CTextInputLayout:
+                            CTextInput:
+                                text: str(datamodel.android_ndk_api or "")
+                                on_text: datamodel.android_ndk_api = int(self.text) if self.text.isdigit() else None
+                            CTextInputLabel:
+                                text: "Android ndk api version"
+                                -color: app.text_primary
+                                weight_style: "SemiBold"
+                            CTextInputHelperText:
+                                text: "recommended: =minapi=24"
 
             CDivider:
                 orientation: "vertical"
 
-            CScrollView:
-                do_scroll_x: False
+            ScrollView:
+                always_overscroll: False
 
                 RightLayout:
-
 
 <RightLayout@CBoxLayout>:
     adaptive: [False, True]
@@ -137,19 +155,17 @@
                 spacing: dp(8)
 
                 CRadioItem:
-
                     CCheckbox:
                         pos_hint: {"center_y": 0.5}
-
+                        active: "arm64-v8a" in [a.value for a in datamodel.android_archs] if datamodel.android_archs else False
                     CRadioButtonLabel:
                         text: "arm64-v8a"
                         pos_hint: {"center_y": 0.5}
 
                 CRadioItem:
-
                     CCheckbox:
                         pos_hint: {"center_y": 0.5}
-
+                        active: "x86_64" in [a.value for a in datamodel.android_archs] if datamodel.android_archs else False
                     CRadioButtonLabel:
                         text: "x86_64"
                         pos_hint: {"center_y": 0.5}

@@ -10,19 +10,14 @@
             text: "Add permission"
             icon: "add--large"
 
-        CStackLayout:
-            spacing: dp(16)
-            padding: [dp(2), 0]
+        ScrollView:
+            always_overscroll: False
 
-            Permission:
-                name: "INTERNET"
-
-            Permission:
-                name: "POST_NOTIFICATIONS"
-
-            Permission:
-                name: "ACCESS_NETWORK_STATE"
-
+            CStackLayout:
+                id: PermLayout
+                spacing: dp(16)
+                adaptive: [False, True]
+                padding: [dp(2), 0, dp(2), dp(128)]
 
 <Permission>:
     canvas.after:

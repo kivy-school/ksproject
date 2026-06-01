@@ -62,7 +62,7 @@
 
             UIShellHeaderName:
                 markup: True
-                text: "[font=ibmplexsans]KSProject[/font]"
+                text: "[font=ibmplexsans]KSProject[/font] Studio"
 
             CAnchorLayout:
                 anchor_x: "right"
@@ -98,12 +98,14 @@
             cap: "square"
             points: [self.x, self.y, self.right, self.y]
     size_hint: None, None
-    width: dp(64)
-    height: dp(64)
+    width: dp(48)
+    height: dp(48)
     padding: [0, dp(8)]
     on_press:
         self.selected = True
     AsyncImage:
         source: root.source
-        size_hint: 1, None
-        height: self.width
+        size_hint: None, None
+        width: dp(48)
+        height: dp(48)
+        fit_mode: "contain"

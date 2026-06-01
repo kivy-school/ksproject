@@ -7,17 +7,21 @@
         CButtonPrimary:
             text: "Add services"
             icon: "add--large"
+            on_press:
+                root.launch_modal()
 
-        CGridLayout:
-            responsive: True
-            min_cols: 2
-            cols: 2
-            adaptive: [False, True]
+        ScrollView:
+            always_overscroll: False
 
-            Service:
-                name: "MyService"
-                entrypoint: "myapp.services.myservice"
-                foreground_service_type: "dataSync"
+            CGridLayout:
+                id: ServiceLayout
+                responsive: True
+                min_cols: 2
+                cols: 4
+                max_cols: 4
+                adaptive: [False, True]
+                spacing: dp(16)
+                padding: [dp(2), 0, dp(2), dp(128)]
 
 <Service>:
     adaptive: [False, True]
@@ -49,8 +53,9 @@
             CToggle:
                 role: "Small"
                 active: root.foreground
+                readonly: True
 
-        CLabelNeutral:
+        CLabel:
             markup: True
             radius: self.height/2
             text: f"[font=ibmplexsans]Foreground Service Type:[/font] {root.foreground_service_type}"
