@@ -86,7 +86,7 @@ class PyProjectInitKeys:
     ]
 
     def __init__(self, project_name: str):
-        self.module_name = project_name.lower().replace("-", "_").replace(".", "_")
+        self.module_name = project_name.lower().replace("-", "_").replace(".", "_").replace(" ", "")
         self.app_name = project_name
 
     def main_keys(self) -> str:
