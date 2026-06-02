@@ -2,9 +2,12 @@ import threading
 
 from kivy.app import App
 from kivy.clock import Clock
+from kivy.properties import OptionProperty, DictProperty
 
 from carbonkivy.uix.modal import CModal
 from carbonkivy.uix.dropdown import CDropdown
+
+
 
 
 class StartTypeDropdown(CDropdown):
@@ -15,6 +18,10 @@ class StartTypeDropdown(CDropdown):
 
 
 class ServicesModal(CModal):
+
+    data = DictProperty()
+
+    mode = OptionProperty("add", options=["add", "edit"])
 
     def __init__(self, **kwargs) -> None:
         super(ServicesModal, self).__init__(**kwargs)

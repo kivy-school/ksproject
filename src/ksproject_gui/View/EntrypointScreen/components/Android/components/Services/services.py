@@ -37,6 +37,7 @@ class Service(HoverBehavior, RoundedBoxLayout):
 class Services(CTab):
     def __init__(self, *args, **kwargs):
         super(Services, self).__init__(*args, **kwargs)
+        self.modal = ServicesModal()
         Clock.schedule_once(self._setup_bindings)
 
     def _setup_bindings(self, dt=None):
@@ -65,5 +66,4 @@ class Services(CTab):
             layout.add_widget(widget)
 
     def launch_modal(self, *args) -> None:
-        self.modal = ServicesModal()
         self.modal.open()

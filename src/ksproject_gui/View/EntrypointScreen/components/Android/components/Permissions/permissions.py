@@ -6,6 +6,8 @@ from carbonkivy.uix.boxlayout import CBoxLayout
 
 from libs.datamodel import datamodel
 
+from ..PermissionsModal import PermissionsModal
+
 
 class Permission(CBoxLayout):
     name = StringProperty()
@@ -14,6 +16,7 @@ class Permission(CBoxLayout):
 class Permissions(CTab):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.modal = PermissionsModal()
         Clock.schedule_once(self._setup_bindings)
 
     def _setup_bindings(self, dt=None):
@@ -36,3 +39,5 @@ class Permissions(CTab):
         for perm in (permissions_list or []):
             layout.add_widget(Permission(name=perm))
 
+    def launch_modal(self, *args) -> None:
+        self.modal.open()

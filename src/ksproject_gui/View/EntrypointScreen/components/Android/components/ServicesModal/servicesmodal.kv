@@ -33,6 +33,7 @@
                     CTextInputLayout:
                         bg_color: app.layer_02
                         CTextInput:
+                            text: root.data.get("name", "")
                             hint_text: "MyService"
                         CTextInputLabel:
                             text: "Service name"
@@ -53,11 +54,13 @@
                         CToggle:
                             id: foreground_toggle
                             role: "Small"
+                            active: root.data.get("foreground", False)
 
                     CTextInputLayout:
                         bg_color: app.layer_02
                         cstate: "normal" if foreground_toggle.active else "disabled"
                         CTextInput:
+                            text: root.data.get("foreground_service_type", "")
                             hint_text: "location|dataSync"
                         CTextInputLabel:
                             text: "Foreground service type"
@@ -69,7 +72,7 @@
                     CTextInputLayout:
                         bg_color: app.layer_02
                         CTextInput:
-                            text: "START_NOT_STICKY"
+                            text: root.data.get("start_type", "START_NOT_STICKY")
                             hint_text: "START_NOT_STICKY"
                             readonly: True
                         CTextInputLabel:
@@ -87,6 +90,7 @@
                     CTextInputLayout:
                         bg_color: app.layer_02
                         CTextInput:
+                            text: root.data.get("entrypoint", "")
                             hint_text: "yourapp.services.myservice"
                         CTextInputLabel:
                             text: "Service entrypoint"
@@ -94,6 +98,42 @@
                             weight_style: "SemiBold"
                         CTextInputHelperText:
                             text: "Python file as a python module"
+
+                    CTextInputLayout:
+                        bg_color: app.layer_02
+                        CTextInput:
+                            text: root.data.get("notification_title", "")
+                            hint_text: "MyService is running"
+                        CTextInputLabel:
+                            text: "Notification title"
+                            -color: app.text_primary
+                            weight_style: "SemiBold"
+                        CTextInputHelperText:
+                            text: "e.g. MyService is running"
+
+                    CTextInputLayout:
+                        bg_color: app.layer_02
+                        CTextInput:
+                            text: root.data.get("notification_text", "")
+                            hint_text: "Performing background tasks"
+                        CTextInputLabel:
+                            text: "Notification text"
+                            -color: app.text_primary
+                            weight_style: "SemiBold"
+                        CTextInputHelperText:
+                            text: "e.g. Performing background tasks.."
+
+                    CTextInputLayout:
+                        bg_color: app.layer_02
+                        CTextInput:
+                            text: root.data.get("notification_icon", "stat_notif_sync")
+                            hint_text: "stat_notif_sync"
+                        CTextInputLabel:
+                            text: "Notification icon"
+                            -color: app.text_primary
+                            weight_style: "SemiBold"
+                        CTextInputHelperText:
+                            text: "e.g. stat_notif_sync"
 
         CModalFooter:
             id: footer
