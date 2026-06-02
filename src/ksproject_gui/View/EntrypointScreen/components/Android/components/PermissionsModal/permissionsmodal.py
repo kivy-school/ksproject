@@ -17,6 +17,8 @@ class NewPermission(CBoxLayout):
 class PermissionsModal(CModal):
     available_perms = ListProperty()
 
+    in_use_perms = ListProperty()
+
     def __init__(self, **kwargs) -> None:
         super(PermissionsModal, self).__init__(**kwargs)
         self.app = App.get_running_app()
@@ -36,7 +38,7 @@ class PermissionsModal(CModal):
     def _update_ui_data(self, raw_permissions):
         self._all_raw_perms = raw_permissions
 
-        self.available_perms = [{"name": perm} for perm in raw_permissions]
+        self.available_perms = [{"name": perm, "cstate": "disabled" if perm in self.in_use_perms else "normal"} for perm in raw_permissions]
         self.app.loading_state(False, master=self)
 
     def filter_perms(self, text: str) -> None:
@@ -50,4 +52,4 @@ class PermissionsModal(CModal):
             perm for perm in self._all_raw_perms if search_query in perm.upper()
         ]
 
-        self.available_perms = [{"name": perm} for perm in filtered_list]
+        self.available_perms = [{"name": perm, "cstate": "disabled" if perm in self.in_use_perms else "normal"} for perm in filtered_list]

@@ -101,7 +101,7 @@
 <NewPermission>:
     canvas.after:
         Color:
-            rgba: app.interactive
+            rgba: app.interactive if root.cstate == "normal" else app.support_success
         Line:
             width: dp(2)
             cap: "square"
@@ -117,3 +117,4 @@
 
     UIShellButton:
         icon: "add"
+        disabled_color: app.transparent

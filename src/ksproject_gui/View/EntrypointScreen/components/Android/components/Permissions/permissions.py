@@ -16,7 +16,7 @@ class Permission(CBoxLayout):
 class Permissions(CTab):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.modal = PermissionsModal()
+        self.modal = PermissionsModal(in_use_perms=datamodel.android_permissions)
         Clock.schedule_once(self._setup_bindings)
 
     def _setup_bindings(self, dt=None):
