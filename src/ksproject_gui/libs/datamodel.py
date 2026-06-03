@@ -7,7 +7,7 @@ from watchdog.events import FileSystemEventHandler
 
 from kivy.app import App
 from kivy.clock import mainthread
-from kivy.properties import AliasProperty, ObjectProperty
+from kivy.properties import AliasProperty, ObjectProperty, StringProperty
 from kivy.event import EventDispatcher
 from ksproject_utils.pyproject_toml import KivySchoolData
 
@@ -19,6 +19,8 @@ class PyProjectData(EventDispatcher):
     """
 
     data = ObjectProperty(None, allownone=True)
+
+    pyproject_toml = StringProperty()
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
@@ -471,11 +473,9 @@ class PyProjectData(EventDispatcher):
             return
 
         try:
-            # 1. Tell the watchdog to ignore the next file modification event
-            if hasattr(self, 'watchdog_handler'):
+            if hasattr(self, "watchdog_handler"):
                 self.watchdog_handler.pause_temporarily()
 
-            # 2. Read the current TOML to preserve non-kivyschool sections (like [project])
             toml_file = os.path.join(os.getcwd(), "pyproject.toml")
             if os.path.exists(toml_file):
                 with open(toml_file, "r") as f:
@@ -483,11 +483,9 @@ class PyProjectData(EventDispatcher):
             else:
                 full_toml_dict = {}
 
-            # Ensure the structure exists
             if "tool" not in full_toml_dict:
                 full_toml_dict["tool"] = {}
 
-            # 3. Serialize the data from Kivy properties into a dictionary
             new_kivy_school_dict = {
                 "app_name": self.app_name,
                 "ios": {
@@ -525,43 +523,55 @@ class PyProjectData(EventDispatcher):
                     "permissions": self.android_permissions,
                     "meta_data": self.android_meta_data,
                     "gradle_dependencies": self.android_gradle_dependencies,
-                    
-                    # SERVICES BLOCK: Safely get all extended properties using getattr
-                    "services": [
-                        {
-                            "name": getattr(s, "name", ""),
-                            "start_type": getattr(s, "start_type", "START_NOT_STICKY"),
-                            "entrypoint": getattr(s, "entrypoint", ""),
-                            "foreground": getattr(s, "foreground", True),
-                            "foreground_service_type": getattr(s, "foreground_service_type", ""),
-                            "notification_title": getattr(s, "notification_title", ""),
-                            "notification_text": getattr(s, "notification_text", ""),
-                            "notification_icon": getattr(s, "notification_icon", "")
-                        } for s in self.android_services
-                    ] if self.android_services else []
-                }
+
+                    "services": (
+                        [
+                            {
+                                "name": getattr(s, "name", ""),
+                                "start_type": getattr(
+                                    s, "start_type", "START_NOT_STICKY"
+                                ),
+                                "entrypoint": getattr(s, "entrypoint", ""),
+                                "foreground": getattr(s, "foreground", True),
+                                "foreground_service_type": getattr(
+                                    s, "foreground_service_type", ""
+                                ),
+                                "notification_title": getattr(
+                                    s, "notification_title", ""
+                                ),
+                                "notification_text": getattr(
+                                    s, "notification_text", ""
+                                ),
+                                "notification_icon": getattr(
+                                    s, "notification_icon", ""
+                                ),
+                            }
+                            for s in self.android_services
+                        ]
+                        if self.android_services
+                        else []
+                    ),
+                },
             }
-            
-            # Clean up None values so the resulting TOML doesn't have empty/null keys
+
             for platform in ["ios", "macos", "android"]:
                 new_kivy_school_dict[platform] = {
-                    k: v for k, v in new_kivy_school_dict[platform].items() if v is not None
+                    k: v
+                    for k, v in new_kivy_school_dict[platform].items()
+                    if v is not None
                 }
 
-            # 4. Inject the updated dictionary back into the master TOML dictionary
             full_toml_dict["tool"]["kivy-school"] = new_kivy_school_dict
 
-            # 5. Write back to the file
             with open(toml_file, "w") as f:
                 toml.dump(full_toml_dict, f)
-                
+
             print("[Save] Successfully saved to pyproject.toml")
 
         except Exception as e:
             print(f"[Save] Error saving to pyproject.toml: {e}")
-            
-            # If writing failed, unpause the watchdog so it doesn't get permanently stuck
-            if hasattr(self, 'watchdog_handler'):
+
+            if hasattr(self, "watchdog_handler"):
                 self.watchdog_handler._is_paused = False
 
 
@@ -573,7 +583,6 @@ class TomlChangeHandler(FileSystemEventHandler):
         self.toml_path = os.path.abspath(toml_path)
 
     def on_modified(self, event):
-        # Watchdog fires events for the whole directory. We only care about our TOML file.
         if os.path.abspath(event.src_path) == self.toml_path:
             print(f"[Watchdog] Detected change in {self.toml_path}. Reloading...")
             self.reload_toml()
@@ -585,8 +594,6 @@ class TomlChangeHandler(FileSystemEventHandler):
         The @mainthread decorator ensures UI bindings trigger safely on the main Kivy thread.
         """
         try:
-            # Brief pause: text editors sometimes fire the 'modified' event a few
-            # milliseconds before the OS fully flushes the new file contents to disk.
             time.sleep(0.1)
 
             with open(self.toml_path, "r") as f:
@@ -595,7 +602,6 @@ class TomlChangeHandler(FileSystemEventHandler):
             kivy_school_dict = full_toml_dict.get("tool", {}).get("kivy-school", {})
             new_kivyschool_data = KivySchoolData(data=kivy_school_dict)
 
-            # Assign the new data instance to the datamodel
             self.datamodel.data = new_kivyschool_data
             print("[Watchdog] Successfully updated PyProjectData.")
 
@@ -603,24 +609,19 @@ class TomlChangeHandler(FileSystemEventHandler):
             print(f"[Watchdog] Failed to reload TOML file: {e}")
 
 
-# =========================================================================
-# INITIALIZATION & OBSERVER SETUP
-# =========================================================================
 toml_path = os.path.join(os.getcwd(), "pyproject.toml")
 
-# 1. Initial Load
 with open(toml_path, "r") as f:
     full_toml_dict = toml.load(f)
 
 kivy_school_dict = full_toml_dict.get("tool", {}).get("kivy-school", {})
 datamodel = PyProjectData()
 datamodel.data = KivySchoolData(data=kivy_school_dict)
+datamodel.pyproject_toml = toml.dumps(full_toml_dict)
 
-# 2. Watchdog Setup
 event_handler = TomlChangeHandler(datamodel, toml_path)
 observer = Observer()
 
-# Watch the directory containing the toml file (Watchdog requires a directory path, not a file path)
 target_dir = os.path.dirname(toml_path)
 observer.schedule(event_handler, target_dir, recursive=False)
 observer.start()

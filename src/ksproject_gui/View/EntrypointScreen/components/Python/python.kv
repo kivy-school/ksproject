@@ -1,4 +1,24 @@
+#: import datamodel libs.datamodel.datamodel
+
 <Python>:
 
     CStackLayout:
         padding: dp(16)
+        spacing: dp(16)
+
+        ScrollView:
+            do_scroll_x: False
+
+            CBoxLayout:
+                orientation: "vertical"
+                adaptive: [False, True]
+                padding: [0, dp(16)]
+
+                CodeSnippetLayout:
+                    size_hint_x: 0.5
+
+                    CodeSnippet:
+                        text: datamodel.pyproject_toml
+                        style_name: "monokai"
+
+                    CodeSnippetCopyButton:
