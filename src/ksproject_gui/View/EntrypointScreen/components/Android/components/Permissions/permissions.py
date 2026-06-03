@@ -16,7 +16,7 @@ class Permission(CBoxLayout):
 class Permissions(CTab):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.modal = PermissionsModal(in_use_perms=datamodel.android_permissions)
+        self.modal = PermissionsModal()
         Clock.schedule_once(self._setup_bindings)
 
     def _setup_bindings(self, dt=None):
@@ -33,8 +33,6 @@ class Permissions(CTab):
         Clears the layout and repopulates it based on the datamodel list.
         """
         layout = self.ids.PermLayout
-
-        layout.clear_widgets()
 
         for perm in (permissions_list or []):
             layout.add_widget(Permission(name=perm))

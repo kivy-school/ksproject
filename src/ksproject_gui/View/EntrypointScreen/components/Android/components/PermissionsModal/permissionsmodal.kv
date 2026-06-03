@@ -1,3 +1,5 @@
+#: import datamodel libs.datamodel.datamodel
+
 <PermissionsModal>:
     size_hint_y: 0.95
     width: dp(576)
@@ -31,6 +33,7 @@
                 CTextInputLayout:
                     bg_color: app.layer_02
                     CTextInput:
+                        id: filter_input
                         hint_text: "INTERNET"
                         on_text:
                             root.filter_perms(self.text)
@@ -46,9 +49,9 @@
                         text: "e.g. INTERNET, POST_NOTIFICATIONS"
 
             RecycleView:
+                id: rcv
                 do_scroll_x: False
-                size_hint: 1, None
-                height: dp(208)
+                size_hint: 1, 0.8
                 viewclass: "NewPermission"
                 # key_viewclass: "NewPermission"
                 data: root.available_perms
@@ -95,6 +98,9 @@
                     icon: "chevron--right"
                     role: "Extra Large"
                     size_hint_x: 1
+                    on_press:
+                        datamodel.save()
+                        root.dismiss()
 
     CModalCloseButton:
 
@@ -110,6 +116,7 @@
     bg_color: app.layer_01
     adaptive: [True, True]
     spacing: dp(16)
+    cstate: "disabled" if self.name in datamodel.android_permissions else "normal"
 
     CLabelNeutral:
         text: root.name

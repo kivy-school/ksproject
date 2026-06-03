@@ -19,7 +19,7 @@ from carbonkivy.app import CarbonApp
 from carbonkivy.devtools import LiveApp
 from carbonkivy.uix.screen import CScreen
 from carbonkivy.uix.screenmanager import CScreenManager
-from carbonkivy.uix.notification  import CNotificationToast
+from carbonkivy.uix.notification import CNotificationToast
 from kivy.clock import Clock, mainthread
 from kivy.core.window import Window
 from kivy.logger import Logger
@@ -28,7 +28,6 @@ from kivy.utils import platform
 
 from View.base_screen import LoadingLayout
 from Model.application_layer_model import ApplicationLayerModel
-
 
 Clock.max_iteration = 60
 
@@ -102,7 +101,6 @@ class KsprojectApp(LiveApp, CarbonApp):
 
         self.loading_state(False)
 
-
     def referrer(self, destination: str = None) -> None:
         if self.manager_screens.current != destination:
             self.manager_screens.current = destination
@@ -120,7 +118,7 @@ class KsprojectApp(LiveApp, CarbonApp):
         subtitle: str = "",
         status: str = "Info",
         time_caption_enabled: bool = True,
-        *args
+        *args,
     ) -> None:
         self.notification.title = title
         self.notification.subtitle = subtitle
@@ -134,7 +132,6 @@ class KsprojectApp(LiveApp, CarbonApp):
     def web_open(self, url: str) -> None:
         webbrowser.open_new_tab(url)
 
-
     @mainthread
     def loading_state(
         self, state: bool = False, master: object = Window, *args
@@ -147,11 +144,12 @@ class KsprojectApp(LiveApp, CarbonApp):
                 _layout_ref = weakref.ref(master.loading_layout)
                 master.add_widget(master.loading_layout)
                 _layout_ref = None
+                print("Loading")
             else:
                 master.remove_widget(master.loading_layout)
                 master.loading_layout = None
         except Exception as e:
-            Logger.error(f"Awfer: Loading State Error {e}")
+            Logger.error(f"Loading State Error {e}")
             return None
 
 
@@ -159,5 +157,6 @@ def main(*args) -> None:
     app = KsprojectApp()
     app.run()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()
