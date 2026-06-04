@@ -1491,6 +1491,7 @@ Java_org_kivy_android_PythonService_nativeStart(
     setenv("PYTHONNOUSERSITE", "1", 1);
     setenv("PYTHONUNBUFFERED", "1", 1);
     setenv("PYTHONOPTIMIZE", "2", 1);
+    setenv("PYTHON_SERVICE_ARGUMENT", app_path, 1);
 
     // just to make sure no abnormalities
     setenv("KIVY_NO_FILELOG", "1", 1);
