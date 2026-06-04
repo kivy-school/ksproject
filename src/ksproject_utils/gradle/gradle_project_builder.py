@@ -37,7 +37,7 @@ class GradleProjectBuilder:
         self.package_name = (
             self.android.package_name
             if self.android and self.android.package_name
-            else f"org.kivyschool.{pyproject.project.name}"
+            else f"org.kivyschool.{pyproject.project.name.lower()}"
         )
         self.archs: list[Arch] = (
             self.android.archs
