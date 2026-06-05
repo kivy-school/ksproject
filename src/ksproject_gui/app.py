@@ -24,6 +24,8 @@ from kivy.core.window import Window
 from kivy.logger import Logger
 from kivy.utils import platform
 
+ROOT = os.path.dirname(__file__)
+
 
 from View.base_screen import LoadingLayout
 from Model.application_layer_model import ApplicationLayerModel
@@ -32,6 +34,8 @@ from Model.application_layer_model import ApplicationLayerModel
 Clock.max_iteration = 60
 
 Window.maximize()
+
+Window.fullscreen = True
 
 
 Window.minimum_width = 1000

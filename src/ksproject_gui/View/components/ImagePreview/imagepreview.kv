@@ -1,0 +1,28 @@
+<ImagePreview>:
+    anchor_x: "right"
+    anchor_y: "top"
+    opacity: 1 if self.source else 0
+
+    Image:
+        id: img
+        source: root.source
+        size_hint: 1, 1
+        fit_mode: "contain"
+
+
+    CButtonSecondary:
+        icon: "maximize"
+        on_press:
+            root.preview()
+
+<WindowPreview>:
+
+    Image:
+        source: root.source
+        size_hint: 1, 1
+        fitmode: "contain"
+
+    CButtonSecondary:
+        icon: "minimize"
+        on_press:
+            root.dismiss()

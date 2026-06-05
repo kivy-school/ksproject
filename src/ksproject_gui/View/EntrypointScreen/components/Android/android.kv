@@ -41,7 +41,6 @@
                 primary_text: "Home"
                 icon: "home"
                 name_tab: "home"
-                selected: True
                 adaptive: [True, True]
 
             CTabHeaderItem:
@@ -56,10 +55,20 @@
                 name_tab: "services"
                 adaptive: [True, True]
 
+            CTabHeaderItem:
+                selected: True
+                primary_text: "Miscellaneous"
+                icon: "categories"
+                name_tab: "miscellaneous"
+                adaptive: [True, True]
+
         CTabManager:
             id: tab_manager
             size_hint: 1, 1
             padding: dp(16)
+
+            Miscellaneous:
+                name: "miscellaneous"
 
             Home:
                 name: "home"

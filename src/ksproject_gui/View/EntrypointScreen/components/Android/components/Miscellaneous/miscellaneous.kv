@@ -1,0 +1,74 @@
+#: import datamodel libs.datamodel.datamodel
+
+<Miscellaneous>:
+
+    CStackLayout:
+        size_hint: 1, 1
+        padding: dp(16)
+
+        CGridLayout:
+            cols: 3
+            spacing: dp(16)
+
+            ScrollView:
+                do_scroll_x: False
+
+                MiscellaneousLayout:
+
+            CDivider:
+                orientation: "vertical"
+
+            ScrollView:
+                do_scroll_x: False
+
+                BoxLayout:
+                    size_hint: 1, None
+                    height: self.minimum_height
+                    padding: dp(16)
+                    orientation: "vertical"
+
+                    PreviewPane:
+                        size_hint: None, None
+                        height: dp(512)
+                        width: dp(288)
+                        bg_source: "assets/androidwall.jpg"
+                        bg_color: app.transparent
+
+
+<MiscellaneousLayout@CBoxLayout>
+    adaptive: [False, True]
+    orientation: "vertical"
+    spacing: dp(16)
+    padding: [dp(8), dp(16), dp(16), dp(128)]
+
+    RoundedBoxLayout:
+        orientation: "vertical"
+        bg_color: app.layer_01
+        adaptive: [False, True]
+        spacing: dp(16)
+        padding: dp(32)
+
+        CLabel:
+            text: "Android app icon"
+            style: "heading_02"
+            -color: app.text_primary
+            padding: [0, dp(8)]
+
+        FileUploader:
+
+    RoundedBoxLayout:
+        orientation: "vertical"
+        bg_color: app.layer_01
+        adaptive: [False, True]
+        spacing: dp(16)
+        padding: dp(32)
+
+        CLabel:
+            text: "Android presplash"
+            style: "heading_02"
+            -color: app.text_primary
+            padding: [0, dp(8)]
+
+        FileUploader:
+
+    # FileUploader:
