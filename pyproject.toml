@@ -13,6 +13,7 @@ dependencies = [
     #"kivy-reloader[desktop]",
     "toml>=0.10.2",
     "pyyaml>=6.0",
+    
 ]
 
 [project.scripts]
@@ -22,6 +23,9 @@ ksproject-gui = "ksproject_gui:main"
 [project.optional-dependencies]
 gui = [
     "carbonkivy",
+    "kaki",
+    "thorvg-cython",
+    "pyobjc",
 ]
 
 [tool.uv.sources]
