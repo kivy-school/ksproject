@@ -30,6 +30,8 @@ ROOT = os.path.dirname(__file__)
 from View.base_screen import LoadingLayout
 from Model.application_layer_model import ApplicationLayerModel
 
+from thorvg_cython import Engine
+
 
 Clock.max_iteration = 60
 
@@ -72,6 +74,8 @@ class KsprojectApp(CarbonApp):
         self.manager_screens = UI()
         self.view_model = ApplicationLayerModel()
         self._running = False
+        self.engine = Engine()
+        self.engine.init()
 
     def build(self) -> UI:
         self.main_screen = MainScreen(name="main screen")

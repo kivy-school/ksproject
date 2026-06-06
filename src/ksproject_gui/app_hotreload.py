@@ -29,6 +29,9 @@ from kivy.utils import platform
 from View.base_screen import LoadingLayout
 from Model.application_layer_model import ApplicationLayerModel
 
+
+from thorvg_cython import Engine
+
 Clock.max_iteration = 60
 
 Window.maximize()
@@ -67,6 +70,9 @@ class KsprojectApp(LiveApp, CarbonApp):
         self.notification = CNotificationToast()
         self.view_model = ApplicationLayerModel()
         self._running = False
+        self.engine = Engine()
+        self.engine.init()
+
 
     def build_app(self) -> UI:
         self.manager_screens = UI()

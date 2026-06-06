@@ -1,1 +1,0 @@
-from .svgwidget import SvgWidget
