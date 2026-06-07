@@ -84,8 +84,14 @@ class ADB:
         package: str,
         activity: str = ".MainActivity",
     ) -> None:
-        component = f"{package}/{activity}"
-        self.shell(serial, "am", "start", "-n", component)
+        """Launches the default main activity for the given package."""
+        self.shell(
+            serial, 
+            "monkey", 
+            "-p", package, 
+            "-c", "android.intent.category.LAUNCHER", 
+            "1"
+        )
 
     def wait_for_device(self, serial: str, timeout: float = 60.0) -> None:
         deadline = time.monotonic() + timeout
