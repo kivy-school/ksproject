@@ -33,7 +33,19 @@
                     PresplashPane:
 
 <AndroidPane>:
+    canvas:
+        Color:
+            rgba: app.gray_100
+        SmoothEllipse:
+            size: dp(16), dp(16)
+            pos: self.x + dp(16), self.top - dp(32)
 
+        Color:
+            rgba: [0, 0, 0, 0.5]
+        SmoothRoundedRectangle:
+            size: dp(100), dp(4)
+            pos: self.center_x - dp(50), self.y + dp(12)
+            radius: [dp(2)]
     canvas.after:
         Color:
             rgba: [1, 1, 1, 1]
@@ -140,6 +152,19 @@
                         pos: self.x +  dp(10), self.y + dp(10)
 
 <PresplashPane@PreviewPane>:
+    canvas:
+        Color:
+            rgba: app.gray_100
+        SmoothEllipse:
+            size: dp(16), dp(16)
+            pos: self.x + dp(16), self.top - dp(32)
+
+        Color:
+            rgba: [0, 0, 0, 0.5]
+        SmoothRoundedRectangle:
+            size: dp(100), dp(4)
+            pos: self.center_x - dp(50), self.y + dp(12)
+            radius: [dp(2)]
     canvas.after:
         Color:
             rgba: [1, 1, 1, 1]
