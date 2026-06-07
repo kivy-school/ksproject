@@ -1,6 +1,5 @@
 #: import datamodel libs.datamodel.datamodel
 #: import datetime datetime.datetime
-#: import color_picker libs.color_picker.color_picker
 
 <Miscellaneous>:
 
@@ -37,7 +36,7 @@
 
     canvas.after:
         Color:
-            rgba: app.gray_10
+            rgba: [1, 1, 1, 1]
         SvgInstruction:
             svg_path: "assets/appbar.svg"
             size: [dp(80), dp(16)]
@@ -143,7 +142,7 @@
 <PresplashPane@PreviewPane>:
     canvas.after:
         Color:
-            rgba: app.gray_10
+            rgba: [1, 1, 1, 1]
         SvgInstruction:
             svg_path: "assets/appbar.svg"
             size: [dp(80), dp(16)]
@@ -155,9 +154,10 @@
 
     AsyncImage:
         source: datamodel.android_presplash
+        opacity: 1 if self.texture else 0
 
 
-<MiscellaneousLayout@CBoxLayout>
+<MiscellaneousLayout>:
     adaptive: [False, True]
     orientation: "vertical"
     spacing: dp(16)
@@ -229,7 +229,7 @@
                     CTextInputTrailingIconButton:
                         icon: "checkmark"
                         on_press:
-                            datamodel.android_presplash_color = presplash_color_input.text
+                            datamodel.android_presplash_color = root.parse_hex_lenient(presplash_color_input.text)
 
                 CButtonCircular:
                     bg_color: datamodel.android_presplash_color

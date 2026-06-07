@@ -27,7 +27,6 @@
 
                         CTextInputLayout:
                             CTextInput:
-                                # Two-way binding for strings
                                 text: datamodel.android_package_name or ""
                                 on_text: datamodel.android_package_name = self.text
                             CTextInputLabel:
@@ -116,6 +115,19 @@
                                 weight_style: "SemiBold"
                             CTextInputHelperText:
                                 text: "recommended: =minapi=24"
+
+                    RoundedBoxLayout:
+                        bg_color: app.layer_01
+                        adaptive: [False, True]
+                        padding: [dp(16), dp(32), dp(16), dp(32)]
+
+                        CTextInputLayout:
+                            CTextInput:
+                                text: str(f"\n".join(datamodel.android_gradle_dependencies))
+                            CTextInputLabel:
+                                text: "Gradle dependencies"
+                                -color: app.text_primary
+                                weight_style: "SemiBold"
 
             CDivider:
                 orientation: "vertical"

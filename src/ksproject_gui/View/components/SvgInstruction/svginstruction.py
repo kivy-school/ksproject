@@ -2,6 +2,7 @@ import os
 from kivy.graphics import Rectangle
 from kivy.graphics.texture import Texture
 from kivy.resources import resource_find
+from kivy.metrics import Metrics
 from thorvg_cython import Engine, SwCanvas, Picture, Colorspace, Scene, Shape
 
 class SvgInstruction(Rectangle):
@@ -61,15 +62,18 @@ class SvgInstruction(Rectangle):
         if w <= 0 or h <= 0:
             w, h = 300, 300
 
-        tvg_canvas = SwCanvas(w, h, int(Colorspace.ABGR8888))
+        density = Metrics.density
+        pw, ph = int(w * density), int(h * density)
+
+        tvg_canvas = SwCanvas(pw, ph, int(Colorspace.ABGR8888))
 
         pic = Picture()
         pic.load(self._svg_path)
 
-        draw_w = w * self._svg_scale
-        draw_h = h * self._svg_scale
-        offset_x = (w - draw_w) / 2.0
-        offset_y = (h - draw_h) / 2.0
+        draw_w = pw * self._svg_scale
+        draw_h = ph * self._svg_scale
+        offset_x = (pw - draw_w) / 2.0
+        offset_y = (ph - draw_h) / 2.0
 
         pic.set_size(draw_w, draw_h)
         pic.translate(offset_x, offset_y)
@@ -85,14 +89,15 @@ class SvgInstruction(Rectangle):
 
         if self._svg_radius > 0:
             clip_shape = Shape()
-            clip_shape.append_rect(0, 0, w, h, self._svg_radius, self._svg_radius)
+            pr = self._svg_radius * density
+            clip_shape.append_rect(0, 0, pw, ph, pr, pr)
             scene.set_clip(clip_shape)
 
         tvg_canvas.add(scene)
         tvg_canvas.draw()
         tvg_canvas.sync()
 
-        tex = Texture.create(size=(w, h), colorfmt="rgba", bufferfmt="ubyte")
+        tex = Texture.create(size=(pw, ph), colorfmt="rgba", bufferfmt="ubyte")
         tex.flip_vertical()
 
         raw_buffer = bytes(tvg_canvas)
