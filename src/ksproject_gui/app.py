@@ -37,8 +37,6 @@ Clock.max_iteration = 60
 
 Window.maximize()
 
-Window.fullscreen = True
-
 
 Window.minimum_width = 1000
 Window.minimum_height = 500
