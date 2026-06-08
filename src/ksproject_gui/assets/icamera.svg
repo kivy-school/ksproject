@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" id="apple-camera" x="0" y="0" version="1.1" viewBox="0 0 100 100">
+  <linearGradient id="Background_13_" x1="-539.017" x2="-539.017" y1="626.266" y2="624.767" gradientTransform="matrix(60 0 0 -60 32391 37581)" gradientUnits="userSpaceOnUse">
+    <stop offset="0" stop-color="#EAEAEA"></stop>
+    <stop offset="1" stop-color="#BABEC3"></stop>
+  </linearGradient>
+  <path id="Background_12_" d="M63.6 5c9 0 13.5 0 18.4 1.5 5.3 1.9 9.5 6.1 11.4 11.4C95 22.8 95 27.4 95 36.4v27.2c0 9 0 13.5-1.5 18.4-1.9 5.3-6.1 9.5-11.4 11.4-5 1.6-9.5 1.6-18.5 1.6H36.4c-9 0-13.5 0-18.4-1.5-5.4-2-9.5-6.1-11.5-11.5C5 77.2 5 72.7 5 63.6V36.4c0-9 0-13.5 1.5-18.4 2-5.3 6.1-9.5 11.5-11.4C22.8 5 27.3 5 36.4 5h27.2z" style="fill:url(#Background_13_)"></path>
+  <g id="Symbols_13_">
+    <g id="Graphics-_x2F_-Custom-Icons-_x2F_-iMessage-_x2F_-Camera">
+      <path id="Camera-Icon" d="M41 24.5h18c1.2 0 2.9.8 3.6 1.8l5 7.3c.5.7 1.3 1.1 2.1 1.1h10.7c2.5 0 4.5 2 4.5 4.5v33c0 2.5-2 4.5-4.5 4.5H19.6c-2.5 0-4.5-2-4.5-4.5v-33c0-2.5 2-4.5 4.5-4.5h10.7c.8 0 1.6-.4 2.1-1.1l5-7.3c.7-1 2.3-1.8 3.6-1.8zm25.9 16c0 1.3 1 2.3 2.3 2.3 1.2 0 2.3-1 2.3-2.3s-1-2.3-2.3-2.3c-1.3 0-2.3 1-2.3 2.3zM34.2 55.3c0 8.8 7.1 15.9 15.8 15.9s15.8-7.1 15.8-15.9S58.7 39.4 50 39.4s-15.8 7.1-15.8 15.9zM21.8 26.8h4.5c1.2 0 2.2 1 2.2 2.3v2.3h-9v-2.3c.1-1.3 1.1-2.3 2.3-2.3zm15.8 28.5c0-6.9 5.5-12.5 12.4-12.5s12.4 5.6 12.4 12.5S56.9 67.8 50 67.8s-12.4-5.6-12.4-12.5z" style="fill:#353535"></path>
+    </g>
+  </g>
+  <linearGradient id="SVGID_1_" x1="66.858" x2="71.361" y1="40.461" y2="40.461" gradientUnits="userSpaceOnUse">
+    <stop offset="0" stop-color="#FFDB4C"></stop>
+    <stop offset="1" stop-color="#FFCD02"></stop>
+  </linearGradient>
+  <path d="M66.9 40.5c0 1.3 1 2.3 2.3 2.3 1.2 0 2.3-1 2.3-2.3s-1-2.3-2.3-2.3c-1.3 0-2.3 1-2.3 2.3z" style="fill:url(#SVGID_1_)"></path>
+</svg>

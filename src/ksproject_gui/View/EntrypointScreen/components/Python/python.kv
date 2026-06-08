@@ -1,0 +1,66 @@
+#: import datamodel libs.datamodel.datamodel
+
+<Python>:
+
+    CStackLayout:
+        padding: dp(16)
+        spacing: dp(16)
+
+    CBoxLayout:
+        size_hint: 1, 1
+        orientation: "vertical"
+        padding: dp(16)
+        spacing: dp(16)
+
+        CBoxLayout:
+            adaptive: [False, True]
+            padding: [dp(16)]
+
+            CLabel:
+                text: "Python"
+                style: "heading_05"
+                typeface: "IBM Plex Mono"
+
+            CAnchorLayout:
+                anchor_x: "right"
+                CBoxLayout:
+                    adaptive: [True, True]
+                    ActiveButton:
+                        icon: "build--run"
+                        bg_color: app.support_success
+                        text_color: app.text_inverse
+                        text_color_focus: app.text_inverse
+                        text_color_hover: app.text_inverse
+                        active_color: app.support_success_inverse
+                        hover_color: app.support_success_inverse
+                        role: "Large Productive"
+
+        CDivider:
+
+        ScrollView:
+            do_scroll_x: False
+
+            CGridLayout:
+                responsive: True
+                padding: [dp(2), 0]
+                min_cols: 2
+                cols: 2
+                max_cols: 2
+                adaptive: [False, True]
+                spacing: dp(16)
+
+                RoundedBoxLayout:
+                    bg_color: app.layer_01
+                    adaptive: [False, True]
+                    padding: [dp(16), dp(32), dp(16), dp(32)]
+
+                    CTextInputLayout:
+                        CTextInput:
+                            text: datamodel.app_name or ""
+                            on_text: datamodel.app_name = self.text
+                        CTextInputLabel:
+                            text: "App name"
+                            -color: app.text_primary
+                            weight_style: "SemiBold"
+                        CTextInputHelperText:
+                            text: "e.g. My App"

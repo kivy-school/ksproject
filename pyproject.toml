@@ -6,20 +6,30 @@ readme = "README.md"
 authors = [
     { name = "kivyschool" }
 ]
-urls = { "Homepage" = "https://kivyschool.com" }
+urls = { "Homepage" = "https://kivy-school.github.io/ksproject" }
 requires-python = ">=3.13"
 dependencies = [
     "kivy",
     #"kivy-reloader[desktop]",
     "toml>=0.10.2",
     "pyyaml>=6.0",
+    
 ]
 
 [project.scripts]
 ksproject = "ksproject:main"
 ksproject-gui = "ksproject_gui:main"
 
+[project.optional-dependencies]
+gui = [
+    "carbonkivy",
+    "kaki",
+    "thorvg-cython",
+    "pyobjc",
+]
+
 [tool.uv.sources]
+carbonkivy = { git = "https://github.com/CarbonKivy/CarbonKivy", rev = "master" }
 
 [tool.uv.build-backend]
 module-name = ["ksproject", "ksproject_gui", "ksproject_utils"]

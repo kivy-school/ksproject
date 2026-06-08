@@ -109,7 +109,7 @@ class KivySchoolData:
             self.global_tools_path = Path(data["global_tools_path"]) if data.get("global_tools_path") else None
             self.icon = data.get("icon")
             self.presplash = data.get("presplash")
-            self.presplash_color = data.get("presplash_color")
+            self.presplash_color = data.get("presplash_color") if data.get("presplash_color") else "#FFFFFF"
             self.presplash_lottie = data.get("presplash_lottie")
             self.permissions = data.get("permissions", [])
             self.meta_data = data.get("meta_data", {})

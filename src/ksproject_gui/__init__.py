@@ -1,2 +1,9 @@
+import os
+import sys
+
+sys.path.append(os.path.dirname(__file__))
+
 def main() -> None:
-    print("Hello from ksproject!")
+    from .app import main
+    main()
+

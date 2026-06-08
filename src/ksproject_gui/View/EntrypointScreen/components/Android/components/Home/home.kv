@@ -1,0 +1,328 @@
+#: import datamodel libs.datamodel.datamodel
+
+<Home>:
+    CStackLayout:
+        size_hint: [1, 1]
+
+        CBoxLayout:
+            adaptive: [False, False]
+            spacing: dp(16)
+
+            ScrollView:
+                always_overscroll: False
+
+                CGridLayout:
+                    responsive: True
+                    padding: [dp(2), 0]
+                    min_cols: 2
+                    cols: 2
+                    max_cols: 2
+                    adaptive: [False, True]
+                    spacing: dp(16)
+
+                    RoundedBoxLayout:
+                        bg_color: app.layer_01
+                        adaptive: [False, True]
+                        padding: [dp(16), dp(32), dp(16), dp(32)]
+
+                        CTextInputLayout:
+                            CTextInput:
+                                text: datamodel.android_package_name or ""
+                                on_text: datamodel.android_package_name = self.text
+                            CTextInputLabel:
+                                text: "Package name"
+                                -color: app.text_primary
+                                weight_style: "SemiBold"
+                            CTextInputHelperText:
+                                text: "e.g. com.kivyschool.yourapp"
+
+                    RoundedBoxLayout:
+                        bg_color: app.layer_01
+                        adaptive: [False, True]
+                        padding: [dp(16), dp(32), dp(16), dp(32)]
+
+                        CTextInputLayout:
+                            CTextInput:
+                                text: str(datamodel.android_min_api or "")
+                                on_text: datamodel.android_min_api = int(self.text) if self.text.isdigit() else None
+                            CTextInputLabel:
+                                text: "Minimum api version"
+                                -color: app.text_primary
+                                weight_style: "SemiBold"
+                            CTextInputHelperText:
+                                text: "recommended: 24"
+
+                    RoundedBoxLayout:
+                        bg_color: app.layer_01
+                        adaptive: [False, True]
+                        padding: [dp(16), dp(32), dp(16), dp(32)]
+
+                        CTextInputLayout:
+                            CTextInput:
+                                text: str(datamodel.android_api or "")
+                                on_text: datamodel.android_api = int(self.text) if self.text.isdigit() else None
+                            CTextInputLabel:
+                                text: "Maximum api version"
+                                -color: app.text_primary
+                                weight_style: "SemiBold"
+                            CTextInputHelperText:
+                                text: "recommended: 36"
+
+                    RoundedBoxLayout:
+                        bg_color: app.layer_01
+                        adaptive: [False, True]
+                        padding: [dp(16), dp(32), dp(16), dp(32)]
+
+                        CTextInputLayout:
+                            CTextInput:
+                                text: datamodel.android_sdk or ""
+                                on_text: datamodel.android_sdk = self.text
+                            CTextInputLabel:
+                                text: "Android sdk version"
+                                -color: app.text_primary
+                                weight_style: "SemiBold"
+                            CTextInputHelperText:
+                                text: "recommended: 36"
+
+                    RoundedBoxLayout:
+                        bg_color: app.layer_01
+                        adaptive: [False, True]
+                        padding: [dp(16), dp(32), dp(16), dp(32)]
+
+                        CTextInputLayout:
+                            CTextInput:
+                                text: datamodel.android_ndk or ""
+                                on_text: datamodel.android_ndk = self.text
+                            CTextInputLabel:
+                                text: "Android ndk version"
+                                -color: app.text_primary
+                                weight_style: "SemiBold"
+                            CTextInputHelperText:
+                                text: "recommended: 28c"
+
+                    RoundedBoxLayout:
+                        bg_color: app.layer_01
+                        adaptive: [False, True]
+                        padding: [dp(16), dp(32), dp(16), dp(32)]
+
+                        CTextInputLayout:
+                            CTextInput:
+                                text: str(datamodel.android_ndk_api or "")
+                                on_text: datamodel.android_ndk_api = int(self.text) if self.text.isdigit() else None
+                            CTextInputLabel:
+                                text: "Android ndk api version"
+                                -color: app.text_primary
+                                weight_style: "SemiBold"
+                            CTextInputHelperText:
+                                text: "recommended: =minapi=24"
+
+                    RoundedBoxLayout:
+                        bg_color: app.layer_01
+                        adaptive: [False, True]
+                        padding: [dp(16), dp(32), dp(16), dp(32)]
+
+                        CTextInputLayout:
+                            CTextInput:
+                                text: str(f"\n".join(datamodel.android_gradle_dependencies))
+                            CTextInputLabel:
+                                text: "Gradle dependencies"
+                                -color: app.text_primary
+                                weight_style: "SemiBold"
+
+            CDivider:
+                orientation: "vertical"
+
+            ScrollView:
+                always_overscroll: False
+
+                RightLayout:
+
+<RightLayout@CBoxLayout>:
+    adaptive: [False, True]
+    orientation: "vertical"
+    padding: [dp(2), dp(16), dp(16), dp(128)]
+    spacing: dp(16)
+
+    CBoxLayout:
+        adaptive: [True, True]
+        padding: [0, dp(32)]
+
+        CRadioGroupLayout:
+
+            CRadioGroupLabel:
+                text: "Android aarchs"
+                style: "heading_02"
+                -color: app.text_primary
+                padding: [0, dp(8)]
+
+            CRadioGroupHelperText:
+                text: "Select x86_64 for emulator."
+
+            CRadioGroup:
+                id: group_master
+                pos_hint: {"center_x": 0.5, "center_y": 0.5}
+                size_hint_x: None
+                width: dp(256)
+                spacing: dp(8)
+
+                CRadioItem:
+                    CCheckbox:
+                        pos_hint: {"center_y": 0.5}
+                        active: "arm64-v8a" in [a.value for a in datamodel.android_archs] if datamodel.android_archs else False
+                    CRadioButtonLabel:
+                        text: "arm64-v8a"
+                        pos_hint: {"center_y": 0.5}
+
+                CRadioItem:
+                    CCheckbox:
+                        pos_hint: {"center_y": 0.5}
+                        active: "x86_64" in [a.value for a in datamodel.android_archs] if datamodel.android_archs else False
+                    CRadioButtonLabel:
+                        text: "x86_64"
+                        pos_hint: {"center_y": 0.5}
+
+    CDivider:
+
+    CGridLayout:
+        responsive: True
+        min_cols: 1
+        cols: 1
+        max_cols: 2
+        scale_width: dp(356)
+        spacing: dp(32)
+        adaptive: [False, True]
+
+        CBoxLayout:
+            adaptive: [False, True]
+            orientation: "vertical"
+            spacing: dp(16)
+
+            CBoxLayout:
+                adaptive: [False, True]
+                spacing: dp(16)
+
+                CLabelNeutral:
+                    text: "Global tools"
+                    style: "label_02"
+                    size_hint_y: 1
+
+                CToggle:
+                    id: global_tools
+                    role: "Small"
+                    active: True if datamodel.android_global_tools else False
+
+            RoundedBoxLayout:
+                bg_color: app.layer_01
+                adaptive: [False, True]
+                padding: [dp(16), dp(32)]
+                width: dp(288)
+
+                CTextInputLayout:
+                    cstate: "normal" if global_tools.active else "disabled"
+                    CTextInput:
+                        hint_text: str(datamodel.android_global_tools_path) if datamodel.android_global_tools_path else "~/.kivyschool"
+                        on_text: datamodel.android_global_tools_path = self.text
+                    CTextInputLabel:
+                        text: "Android sdk path"
+                        -color: app.text_primary
+                        weight_style: "SemiBold"
+
+        CBoxLayout:
+            adaptive: [False, True]
+            orientation: "vertical"
+            spacing: dp(16)
+
+            CBoxLayout:
+                adaptive: [False, True]
+                spacing: dp(16)
+
+                CLabelNeutral:
+                    text: "Android sdk path"
+                    style: "label_02"
+
+                CToggle:
+                    id: sdk_toggle
+                    role: "Small"
+                    active: True if datamodel.android_sdk_path != None else False
+
+            RoundedBoxLayout:
+                bg_color: app.layer_01
+                adaptive: [False, True]
+                padding: [dp(16), dp(32)]
+
+                CTextInputLayout:
+                    cstate: "normal" if sdk_toggle.active else "disabled"
+                    CTextInput:
+                        text: str(datamodel.android_sdk_path)
+                        hint_text: "Enter your android sdk path here"
+                        on_text: datamodel.android_sdk_path = self.text
+                    CTextInputLabel:
+                        text: "Android sdk path"
+                        -color: app.text_primary
+                        weight_style: "SemiBold"
+
+        CBoxLayout:
+            adaptive: [False, True]
+            orientation: "vertical"
+            spacing: dp(16)
+
+            CBoxLayout:
+                adaptive: [False, True]
+                spacing: dp(16)
+
+                CLabelNeutral:
+                    text: "Android ndk path"
+                    style: "label_02"
+
+                CToggle:
+                    id: ndk_toggle
+                    role: "Small"
+                    active: True if datamodel.android_ndk_path != None else False
+
+            RoundedBoxLayout:
+                bg_color: app.layer_01
+                adaptive: [False, True]
+                padding: [dp(16), dp(32)]
+
+                CTextInputLayout:
+                    cstate: "normal" if ndk_toggle.active else "disabled"
+                    CTextInput:
+                        hint_text: "Enter your android ndk path here"
+                        on_text: datamodel.android_ndk_path = self.text
+                    CTextInputLabel:
+                        text: "Android sdk path"
+                        -color: app.text_primary
+                        weight_style: "SemiBold"
+
+        CBoxLayout:
+            adaptive: [False, True]
+            orientation: "vertical"
+            spacing: dp(16)
+
+            CBoxLayout:
+                adaptive: [False, True]
+                spacing: dp(16)
+
+                CLabelNeutral:
+                    text: "Java path"
+                    style: "label_02"
+
+                CToggle:
+                    id: jdk_toggle
+                    role: "Small"
+                    active: True if datamodel.android_java_path != None else False
+
+            RoundedBoxLayout:
+                bg_color: app.layer_01
+                adaptive: [False, True]
+                padding: [dp(16), dp(32)]
+
+                CTextInputLayout:
+                    cstate: "normal" if jdk_toggle.active else "disabled"
+                    CTextInput:
+                        hint_text: "Enter your jdk path here"
+                        on_text: datamodel.android_java_path = self.text
+                    CTextInputLabel:
+                        text: "Java path"
+                        -color: app.text_primary
+                        weight_style: "SemiBold"

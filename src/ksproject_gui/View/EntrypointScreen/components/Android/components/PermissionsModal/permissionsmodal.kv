@@ -1,0 +1,127 @@
+#: import datamodel libs.datamodel.datamodel
+
+<PermissionsModal>:
+    size_hint_y: 0.95
+    width: dp(576)
+
+    CModalLayout:
+        id: modal_layout
+        size_hint_y: 1
+
+        CModalHeader:
+            id: header
+
+            CModalHeaderTitle:
+                text: "Android Permissions"
+
+        CModalBody:
+            id: body
+            size_hint: 1, 0.8
+            padding: dp(16)
+            spacing: dp(16)
+
+            CModalBodyContent:
+                id: content
+                text: "This is the permissions modal. You can add your permissions here."
+
+            CBoxLayout:
+                adaptive: [False, True]
+                padding: [0, dp(32)]
+                spacing: dp(64)
+                orientation: "vertical"
+
+                CTextInputLayout:
+                    bg_color: app.layer_02
+                    CTextInput:
+                        id: filter_input
+                        hint_text: "INTERNET"
+                        on_text:
+                            root.filter_perms(self.text)
+                    CTextInputLabel:
+                        text: "Permission name"
+                        -color: app.text_primary
+                        weight_style: "SemiBold"
+                    CTextInputTrailingIconButton:
+                        icon: "search"
+                        on_press:
+                            root.fetch()
+                    CTextInputHelperText:
+                        text: "e.g. INTERNET, POST_NOTIFICATIONS"
+
+            RecycleView:
+                id: rcv
+                do_scroll_x: False
+                size_hint: 1, 0.8
+                viewclass: "NewPermission"
+                # key_viewclass: "NewPermission"
+                data: root.available_perms
+                scroll_type: ['bars', 'content']
+                bar_width: dp(32)
+                bar_color: app.interactive
+
+                RecycleGridLayout:
+                    id: RecycleBoxLayout
+                    size_hint: 1, None
+                    height: dp(self.minimum_height)
+                    default_size: None, dp(48)
+                    default_size_hint: 1, None
+                    cols: 1
+                    spacing: dp(16)
+
+            CDivider:
+
+            ScrollView:
+                do_scroll_x: False
+
+                CStackLayout:
+                    size_hint_x: 1
+                    adaptive: [False, True]
+                    spacing: dp(16)
+
+        CModalFooter:
+            id: footer
+
+            CGridLayout:
+                cols: 2
+                adaptive: [False, True]
+                spacing: dp(1)
+
+                CButtonSecondary:
+                    text: "Cancel"
+                    role: "Extra Large"
+                    size_hint_x: 1
+                    on_press:
+                        root.dismiss()
+
+                CButtonPrimary:
+                    text: "Continue"
+                    icon: "chevron--right"
+                    role: "Extra Large"
+                    size_hint_x: 1
+                    on_press:
+                        datamodel.save()
+                        root.dismiss()
+
+    CModalCloseButton:
+
+<NewPermission>:
+    canvas.after:
+        Color:
+            rgba: app.interactive if root.cstate == "normal" else app.support_success
+        Line:
+            width: dp(2)
+            cap: "square"
+            points: [self.x, self.y + dp(2), self.x, self.top - dp(2)]
+    padding: [dp(16), dp(4), dp(4), dp(4)]
+    bg_color: app.layer_01
+    adaptive: [True, True]
+    spacing: dp(16)
+    cstate: "disabled" if self.name in datamodel.android_permissions else "normal"
+
+    CLabelNeutral:
+        text: root.name
+        size_hint_y: 1
+
+    UIShellButton:
+        icon: "add"
+        disabled_color: app.transparent

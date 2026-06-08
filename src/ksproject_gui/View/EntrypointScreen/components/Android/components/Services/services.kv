@@ -1,0 +1,119 @@
+<Services>:
+
+    CStackLayout:
+        padding: [dp(16), 0]
+        spacing: dp(16)
+
+        CButtonPrimary:
+            text: "Add services"
+            icon: "add--large"
+            on_press:
+                root.launch_modal()
+
+        ScrollView:
+            always_overscroll: False
+
+            CGridLayout:
+                id: ServiceLayout
+                responsive: True
+                min_cols: 2
+                cols: 4
+                max_cols: 4
+                scale_width: dp(320)
+                adaptive: [False, True]
+                spacing: dp(16)
+                padding: [dp(2), dp(32), dp(2), dp(128)]
+
+<Service>:
+    adaptive: [False, True]
+    size_hint_x: None
+    width: dp(304)
+    padding: dp(16)
+    spacing: dp(24)
+    bg_color: app.layer_01
+    hover_color: app.layer_hover_01
+
+    CBoxLayout:
+        adaptive: [False, True]
+        orientation: "vertical"
+        spacing: dp(16)
+
+        CLabel:
+            text: root.name
+            style: "heading_02"
+
+        CBoxLayout:
+            adaptive: [False, True]
+            spacing: dp(16)
+
+            CLabelNeutral:
+                text: "Foreground"
+                style: "label_02"
+                size_hint_y: 1
+
+            CToggle:
+                role: "Small"
+                active: root.foreground
+                readonly: True
+
+        CLabel:
+            markup: True
+            radius: self.height/2
+            text: f"[font=ibmplexsans]Foreground Service Type:[/font] {root.foreground_service_type}"
+            style: "label_01"
+            weight_style: "SemiBold"
+
+        CLabelNeutralCircular:
+            padding: dp(8)
+            radius: self.height/2
+            text: root.start_type
+            -color: app.text_inverse
+            style: "label_01"
+            bg_color: app.support_success
+
+        CLabel:
+            markup: True
+            radius: self.height/2
+            text: f"[font=ibmplexsans]Entrypoint:[/font] {root.entrypoint}"
+            style: "label_01"
+            weight_style: "SemiBold"
+
+        # CLabel:
+        #     text: root.name
+        #     style: "heading_03"
+
+        # CLabel:
+        #     text: root.name
+        #     style: "heading_03"
+
+        # CLabel:
+        #     text: root.name
+        #     style: "heading_03"
+
+    CGridLayout:
+        cols: 1
+        adaptive: [True, True]
+        spacing: dp(16)
+        pos_hint: {"top": 1.0}
+
+        ActiveButton:
+            icon: "close"
+            bg_color: app.layer_selected_01
+            text_color: app.text_primary
+            text_color_hover: app.text_primary
+            text_color_focus: app.text_primary
+            hover_color: app.layer_selected_hover_01
+            active_color: app.layer_selected_hover_01
+            line_color_focus: app.text_primary
+            pos_hint: {"top": 1.0}
+
+        ActiveButton:
+            icon: "edit"
+            bg_color: app.layer_selected_01
+            text_color: app.text_primary
+            text_color_hover: app.text_primary
+            text_color_focus: app.text_primary
+            hover_color: app.layer_selected_hover_01
+            active_color: app.layer_selected_hover_01
+            line_color_focus: app.text_primary
+            pos_hint: {"top": 1.0}

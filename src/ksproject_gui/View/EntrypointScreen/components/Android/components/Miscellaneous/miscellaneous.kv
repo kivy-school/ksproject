@@ -1,0 +1,271 @@
+#: import datamodel libs.datamodel.datamodel
+#: import datetime datetime.datetime
+
+<Miscellaneous>:
+
+    CStackLayout:
+        size_hint: 1, 1
+        padding: dp(16)
+
+        CGridLayout:
+            cols: 3
+            spacing: dp(16)
+
+            ScrollView:
+                do_scroll_x: False
+
+                MiscellaneousLayout:
+
+            CDivider:
+                orientation: "vertical"
+
+            ScrollView:
+                do_scroll_x: False
+
+                BoxLayout:
+                    size_hint: 1, None
+                    height: self.minimum_height
+                    padding: dp(16)
+                    spacing: dp(16)
+
+                    AndroidPane:
+
+                    PresplashPane:
+
+<AndroidPane>:
+    canvas:
+        Color:
+            rgba: app.gray_100
+        SmoothEllipse:
+            size: dp(16), dp(16)
+            pos: self.x + dp(16), self.top - dp(32)
+
+        Color:
+            rgba: [0, 0, 0, 0.5]
+        SmoothRoundedRectangle:
+            size: dp(100), dp(4)
+            pos: self.center_x - dp(50), self.y + dp(12)
+            radius: [dp(2)]
+    canvas.after:
+        Color:
+            rgba: [1, 1, 1, 1]
+        SvgInstruction:
+            svg_path: "assets/appbar.svg"
+            size: [dp(80), dp(16)]
+            pos: [self.right - dp(96), self.top - dp(32)]
+    size_hint: None, None
+    height: dp(560)
+    width: dp(288)
+    bg_source: "assets/androidwall2.jpg"
+    bg_color: app.transparent
+
+    CRelativeLayout:
+        size_hint: 1, 1
+
+        CLabel:
+            text: root.time
+            pos: root.x, root.top - dp(64) - self.height
+            style: "heading_07"
+            typeface: "IBM Plex Mono"
+            -color: app.gray_10
+
+        CGridLayout:
+            cols: 4
+            rows: 1
+            adaptive: [False, True]
+            pos: root.x + dp(16), base_grid.top + dp(48)
+            spacing: dp(16)
+
+            RoundedBoxLayout:
+                canvas:
+                    Color:
+                        rgba: [1, 1, 1, 1]
+                    SvgInstruction:
+                        svg_path: datamodel.android_icon
+                        svg_color: app.gray_10
+                        size: self.size
+                        pos: self.pos
+                        svg_radius: dp(16)
+                bg_color: app.gray_10
+                radius: dp(16)
+                size_hint: None, None
+                size: dp(48), dp(48)
+
+        CGridLayout:
+            id: base_grid
+            cols: 4
+            rows: 1
+            adaptive: [False, True]
+            pos: root.x + dp(16), root.y + dp(24)
+            spacing: dp(16)
+
+            CIconCircular:
+                bg_color: app.gray_10
+                radius: dp(16)
+                font_size: dp(28)
+                size: dp(48), dp(48)
+                canvas.after:
+                    Color:
+                        rgba: app.gray_10
+                    SvgInstruction:
+                        svg_path: "assets/contacts.svg"
+                        size: self.font_size, self.font_size
+                        pos: self.x +  dp(10), self.y + dp(10)
+
+            CIconCircular:
+                bg_color: app.gray_10
+                radius: dp(16)
+                font_size: dp(28)
+                size: dp(48), dp(48)
+                canvas.after:
+                    Color:
+                        rgba: app.gray_10
+                    SvgInstruction:
+                        svg_path: "assets/messages.svg"
+                        size: self.font_size, self.font_size
+                        pos: self.x +  dp(10), self.y + dp(10)
+
+            CIconCircular:
+                bg_color: app.gray_10
+                radius: dp(16)
+                font_size: dp(28)
+                size: dp(48), dp(48)
+                canvas.after:
+                    Color:
+                        rgba: app.gray_10
+                    SvgInstruction:
+                        svg_path: "assets/camera.svg"
+                        size: self.font_size, self.font_size
+                        pos: self.x +  dp(10), self.y + dp(10)
+
+            CIconCircular:
+                bg_color: app.gray_10
+                radius: dp(16)
+                font_size: dp(28)
+                size: dp(48), dp(48)
+                canvas.after:
+                    Color:
+                        rgba: app.gray_10
+                    SvgInstruction:
+                        svg_path: "assets/photos.svg"
+                        size: self.font_size, self.font_size
+                        pos: self.x +  dp(10), self.y + dp(10)
+
+<PresplashPane@PreviewPane>:
+    canvas:
+        Color:
+            rgba: app.gray_100
+        SmoothEllipse:
+            size: dp(16), dp(16)
+            pos: self.x + dp(16), self.top - dp(32)
+
+        Color:
+            rgba: [0, 0, 0, 0.5]
+        SmoothRoundedRectangle:
+            size: dp(100), dp(4)
+            pos: self.center_x - dp(50), self.y + dp(12)
+            radius: [dp(2)]
+    canvas.after:
+        Color:
+            rgba: [1, 1, 1, 1]
+        SvgInstruction:
+            svg_path: "assets/appbar.svg"
+            size: [dp(80), dp(16)]
+            pos: [self.right - dp(96), self.top - dp(32)]
+    size_hint: None, None
+    height: dp(560)
+    width: dp(288)
+    bg_color: datamodel.android_presplash_color
+
+    AsyncImage:
+        source: datamodel.android_presplash
+        opacity: 1 if self.texture else 0
+
+
+<MiscellaneousLayout>:
+    adaptive: [False, True]
+    orientation: "vertical"
+    spacing: dp(16)
+    padding: [dp(8), dp(16), dp(16), dp(128)]
+
+    RoundedBoxLayout:
+        bg_color: app.layer_01
+        adaptive: [False, True]
+        spacing: dp(16)
+        padding: dp(32)
+
+        CBoxLayout:
+            adaptive: [False, True]
+            orientation: "vertical"
+
+            CLabel:
+                text: "Android app icon"
+                style: "heading_02"
+                -color: app.text_primary
+                padding: [0, dp(8)]
+
+            FileUploader:
+                id: icon_uploader
+                data_source: datamodel.android_icon
+
+        ImagePreview:
+            id: image_preview
+            source: icon_uploader.data_source
+            on_source:
+                datamodel.android_icon = self.source
+            size_hint: None, None
+            pos_hint: {"top": 1.0}
+            size: [dp(128), dp(128)] if icon_uploader.data_source else [0, 0]
+
+    RoundedBoxLayout:
+        bg_color: app.layer_01
+        adaptive: [False, True]
+        spacing: dp(16)
+        padding: dp(32)
+
+        CBoxLayout:
+            adaptive: [False, True]
+            orientation: "vertical"
+            spacing: dp(16)
+
+            CLabel:
+                text: "Android presplash"
+                style: "heading_02"
+                -color: app.text_primary
+                padding: [0, dp(8)]
+
+            FileUploader:
+                id: presplash_uploader
+                data_source: datamodel.android_presplash
+
+            CBoxLayout:
+                adaptive: [False, True]
+                spacing: dp(16)
+                padding: [0, dp(32)]
+
+                CTextInputLayout:
+                    size_hint_x: None
+                    width: dp(288)
+                    CTextInput:
+                        id: presplash_color_input
+                        text: datamodel.android_presplash_color
+                    CTextInputLabel:
+                        text: "Presplash color"
+                    CTextInputTrailingIconButton:
+                        icon: "checkmark"
+                        on_press:
+                            datamodel.android_presplash_color = root.parse_hex_lenient(presplash_color_input.text)
+
+                CButtonCircular:
+                    bg_color: datamodel.android_presplash_color
+                    radius: self.height/2
+                    font_size: dp(48)
+
+        ImagePreview:
+            id: image_preview
+            source: presplash_uploader.data_source
+            on_source:
+                datamodel.android_presplash = self.source
+            size_hint: None, None
+            pos_hint: {"top": 1.0}
+            size: [dp(196), dp(196)] if icon_uploader.data_source else [0, 0]
