@@ -26,24 +26,24 @@
 
                     SelectionItem:
                         source: "assets/android64.png"
-                        default: True
                         on_press:
                             manager_screens.current = "android"
 
                     SelectionItem:
                         source: "assets/apple64.png"
+                        default: True
                         on_press:
                             manager_screens.current = "ios"
 
             UI:
                 id: manager_screens
 
+                IOS:
+                    name: "ios"
                 Android:
                     name: "android"
                 Python:
                     name: "python"
-                iOS:
-                    name: "ios"
 
 
     UIShell:
@@ -63,6 +63,7 @@
             UIShellHeaderName:
                 markup: True
                 text: "[font=ibmplexsans]KSProject[/font] Studio"
+                font_size: plex_20
 
             CAnchorLayout:
                 anchor_x: "right"

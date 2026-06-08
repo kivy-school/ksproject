@@ -62,7 +62,7 @@ class MainScreen(CScreen):
 class KsprojectApp(LiveApp, CarbonApp):
 
     def __init__(self, *args, **kwargs):
-        self.theme = "Gray100"
+        # self.theme = "Gray100"
         self.DEBUG = True
         super(KsprojectApp, self).__init__(*args, **kwargs)
         # self.load_all_kv_files(os.path.join(self.directory, "View"))

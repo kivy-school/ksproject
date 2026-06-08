@@ -1,1 +1,1 @@
-from .ios import iOS
+from .ios import IOS

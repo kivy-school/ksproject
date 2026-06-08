@@ -67,3 +67,83 @@ class AndroidPermissionAPI:
             raise RuntimeError(
                 f"Failed to fetch or parse Android permissions: {str(e)}"
             )
+
+
+class IOSPermissionAPI:
+    """
+    A standalone API to fetch and cache iOS permissions (Info.plist Usage Descriptions).
+    
+    Note: Because Apple's iOS is closed-source, there is no official raw XML file 
+    like Android's AOSP manifest. This API relies on a known compilation of 
+    standard Apple NSUsageDescription keys.
+    """
+
+    # A comprehensive list of iOS protected resource keys.
+    IOS_USAGE_KEYS = [
+        "NSAppleMusicUsageDescription",
+        "NSBluetoothAlwaysUsageDescription",
+        "NSBluetoothPeripheralUsageDescription",
+        "NSCalendarsUsageDescription",
+        "NSCameraUsageDescription",
+        "NSContactsUsageDescription",
+        "NSFaceIDUsageDescription",
+        "NSHealthClinicalHealthRecordsShareUsageDescription",
+        "NSHealthShareUsageDescription",
+        "NSHealthUpdateUsageDescription",
+        "NSHomeKitUsageDescription",
+        "NSLocalNetworkUsageDescription",
+        "NSLocationAlwaysAndWhenInUseUsageDescription",
+        "NSLocationAlwaysUsageDescription",
+        "NSLocationWhenInUseUsageDescription",
+        "NSLocationUsageDescription",
+        "NSMicrophoneUsageDescription",
+        "NSMotionUsageDescription",
+        "NSNFCReaderUsageDescription",
+        "NSPhotoLibraryAddUsageDescription",
+        "NSPhotoLibraryUsageDescription",
+        "NSRemindersUsageDescription",
+        "NSSiriUsageDescription",
+        "NSSpeechRecognitionUsageDescription",
+        "NSUserTrackingUsageDescription"
+    ]
+
+    def __init__(self, cache_filename=os.path.join(tempfile.gettempdir(), "ios_permissions_cache.json")):
+        self.cache_file = cache_filename
+
+    def get_permissions(self, force_refresh=False):
+        """
+        Retrieves the list of iOS Info.plist permission keys.
+        Returns cached data if available.
+
+        :param force_refresh: If True, ignores the cache and generates fresh data.
+        :return: A sorted list of permission strings.
+        """
+        if not force_refresh and os.path.exists(self.cache_file):
+            try:
+                with open(self.cache_file, "r") as f:
+                    permissions = json.load(f)
+                if permissions:
+                    return permissions
+            except (json.JSONDecodeError, IOError):
+                pass
+
+        return self._generate_and_cache()
+
+    def _generate_and_cache(self):
+        """Internal method to generate the list and cache it to disk."""
+        try:
+            # In a scenario where a stable community-maintained JSON API exists, 
+            # you could drop a requests.get() call here. For exact reliability 
+            # without a first-party Apple endpoint, we use the internal list.
+            all_permissions = sorted(self.IOS_USAGE_KEYS)
+
+            if all_permissions:
+                with open(self.cache_file, "w") as f:
+                    json.dump(all_permissions, f)
+
+            return all_permissions
+
+        except Exception as e:
+            raise RuntimeError(
+                f"Failed to generate or cache iOS permissions: {str(e)}"
+            )

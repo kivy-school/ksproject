@@ -1,1 +1,72 @@
-<iOS>:
+<IOS>:
+
+    CBoxLayout:
+        size_hint: 1, 1
+        orientation: "vertical"
+        padding: dp(16)
+        spacing: dp(16)
+
+        CBoxLayout:
+            adaptive: [False, True]
+            padding: [dp(16)]
+
+            CLabel:
+                text: "iOS"
+                style: "heading_05"
+                typeface: "IBM Plex Mono"
+
+            CAnchorLayout:
+                anchor_x: "right"
+                CBoxLayout:
+                    adaptive: [True, True]
+                    ActiveButton:
+                        icon: "build--run"
+                        bg_color: app.support_success
+                        text_color: app.text_inverse
+                        text_color_focus: app.text_inverse
+                        text_color_hover: app.text_inverse
+                        active_color: app.support_success_inverse
+                        hover_color: app.support_success_inverse
+                        role: "Large Productive"
+
+        CDivider:
+
+        CTabHeader:
+            id: tab_header
+            tab_manager: tab_manager
+            adaptive: [True, True]
+            padding: dp(8)
+
+            CTabHeaderItem:
+                primary_text: "Home"
+                icon: "home"
+                name_tab: "ihome"
+                adaptive: [True, True]
+
+            CTabHeaderItem:
+                primary_text: "Permissions"
+                icon: "security"
+                name_tab: "ipermissions"
+                adaptive: [True, True]
+
+            CTabHeaderItem:
+                selected: True
+                primary_text: "Miscellaneous"
+                icon: "categories"
+                name_tab: "imiscellaneous"
+                adaptive: [True, True]
+
+        CTabManager:
+            id: tab_manager
+            size_hint: 1, 1
+            padding: dp(16)
+
+            IMiscellaneous:
+                name: "imiscellaneous"
+
+            IHome:
+                name: "ihome"
+
+            IPermissions:
+                name: "ipermissions"
+
