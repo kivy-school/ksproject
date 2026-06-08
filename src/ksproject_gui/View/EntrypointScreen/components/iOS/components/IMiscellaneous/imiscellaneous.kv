@@ -48,10 +48,10 @@
             pos: self.center_x + dp(28), self.top - dp(26)
 
         Color:
-            rgba: [0, 0, 0, 0.5]
+            rgba: [0, 0, 0, 0.7]
         SmoothRoundedRectangle:
             size: dp(100), dp(4)
-            pos: self.center_x - dp(50), self.y + dp(12)
+            pos: self.center_x - dp(50), self.y + dp(8)
             radius: [dp(2)]
 
     canvas.after:
@@ -156,6 +156,12 @@
         SmoothEllipse:
             size: dp(12), dp(12)
             pos: self.center_x + dp(28), self.top - dp(26)
+        Color:
+            rgba: [0, 0, 0, 0.7]
+        SmoothRoundedRectangle:
+            size: dp(100), dp(4)
+            pos: self.center_x - dp(50), self.y + dp(8)
+            radius: [dp(2)]
 
     canvas.after:
         Color:
