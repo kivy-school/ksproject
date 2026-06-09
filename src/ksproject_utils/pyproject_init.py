@@ -33,6 +33,9 @@ archs = [
 gradle_dependencies = [
     # "com.onesignal:OneSignal:[5.6.1, 5.9.99]" # Example of adding OneSignal for push notifications; adjust version as needed
 ]
+gradle_plugins = [
+    # 'id("com.google.gms.google-services") version "4.4.2" apply false'
+]
 permissions = [
     # "POST_NOTIFICATIONS", "INTERNET", "ACCESS_NETWORK_STATE", "WAKE_LOCK" # Example permissions; add as needed
 ]

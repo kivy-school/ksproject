@@ -94,10 +94,13 @@ class GradleProjectBuilder:
         dist_dir = self.working_dir / "project_dist" / "gradle"
         dist_dir.mkdir(parents=True, exist_ok=True)
 
-        # Merge gradle_dependencies and permissions from pyproject.toml with
+        # Merge gradle dependencies and permissions from pyproject.toml with
         # those collected from site-packages .gradle/*.json files (ksp-builder).
         base_deps = self.android.gradle_dependencies if self.android else []
         base_perms = self.android.permissions if self.android else []
+        base_plugins = (
+            getattr(self.android, "gradle_plugins", []) if self.android else []
+        )
 
         merged_deps = _merge_unique(base_deps, extra_gradle_dependencies or [])
         merged_perms = _merge_unique(base_perms, extra_permissions or [])
@@ -110,7 +113,7 @@ class GradleProjectBuilder:
         toolchain = AndroidToolchain.resolve(self.android, self.working_dir)
 
         # Root Gradle files
-        GradleBuildFiles.write_root_build_gradle(dist_dir)
+        GradleBuildFiles.write_root_build_gradle(dist_dir, base_plugins)
         GradleBuildFiles.write_settings_gradle(dist_dir, self.app_name)
         GradleBuildFiles.write_gradle_properties(dist_dir)
         GradleBuildFiles.write_local_properties(dist_dir, toolchain.sdk_path)
@@ -119,7 +122,8 @@ class GradleProjectBuilder:
         app_dir = dist_dir / "app"
         app_dir.mkdir(parents=True, exist_ok=True)
         GradleBuildFiles.write_app_build_gradle(
-            app_dir,
+            project_dir=self.working_dir,
+            app_dir=app_dir,
             package_name=self.package_name,
             archs=self.archs,
             compile_sdk=(

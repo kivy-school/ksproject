@@ -14,7 +14,7 @@ class GradleProjectInit:
 
     def execute(self) -> None:
         self._ensure_android_manifest()
-
+        self._ensure_build_gradle_template()
         self._ensure_base_dirs()
 
     ########################################################################
@@ -56,8 +56,77 @@ class GradleProjectInit:
 </manifest>
 """
 
+    def _ensure_build_gradle_template(self) -> None:
+        tmpl_path = self.root / "build.tmpl.gradle.kts"
+        if not tmpl_path.exists():
+            tmpl_path.write_text(self.default_build_gradle_template(), encoding="utf-8")
+
+    def default_build_gradle_template(self) -> str:
+        return """\
+plugins {
+    id("{{ plugin_id }}")
+}
+
+android {
+    namespace = "{{ package_name }}"
+    compileSdk = {{ compile_sdk }}
+{{ ndk_line }}    ndkPath = "{{ ndk_path }}"
+
+    defaultConfig {
+{{ app_id_lines }}        minSdk = {{ min_sdk }}
+        targetSdk = {{ target_sdk }}
+
+        ndk {
+            abiFilters += setOf({{ abi_filters }})
+        }
+
+        externalNativeBuild {
+            cmake {
+                arguments += listOf("-DANDROID_STL=c++_static")
+            }
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+    }
+
+    // CPython stdlib and packages contain underscore-prefixed directories
+    // (e.g. zipfile/_path) that AGP's default aapt ignore pattern strips.
+    // Override to keep them.
+    androidResources {
+        ignoreAssetsPatterns.clear()
+        ignoreAssetsPatterns.addAll(listOf(
+            "!.svn", "!.git", "!.ds_store", "!*.scc",
+            "!CVS", "!thumbs.db", "!picasa.ini", "!*~"
+        ))
+    }
+}
+
+dependencies {
+    implementation(fileTree("libs") { include("*.aar", "*.jar") })
+{{ extra_deps }}}
+
+{{ site_packages_tasks }}
+"""
+
     def _ensure_base_dirs(self) -> None:
         (self.root / ".java").mkdir(exist_ok=True)
         services_dir = self.root / "src" / self.module_name / "services"
+        services_dir.parent.mkdir(parents=True, exist_ok=True)
         services_dir.mkdir(exist_ok=True)
         (services_dir / "__init__.py").touch()
