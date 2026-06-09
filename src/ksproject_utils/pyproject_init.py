@@ -52,6 +52,16 @@ global_tools = true # Set to <false> to use project-local SDK/NDK (./.kivyschool
 # sdk_path = "/path/to/android-sdk"
 # ndk_path = "/path/to/android-ndk"
 # java_path = "/path/to/jdk"
+
+# # Format 1: Flat list (Destination, Source 1, Source 2)
+# include_files = [
+#     ["gradle/app", "./google-services.json", "./some-other-config.xml"]
+# ]
+
+# # Format 2: Nested list (Destination, [Source 1, Source 2])
+# include_files = [
+#     ["gradle/app", ["./google-services.json", "./some-other-config.xml"]]
+# ]
 """
 
 

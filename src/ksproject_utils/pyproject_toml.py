@@ -92,6 +92,7 @@ class KivySchoolData:
         services: list["KivySchoolData.ServiceData"]
         version_code: int
         version_name: str
+        include_files: list[tuple[str, list[str]]]
 
         def __init__(self, data: dict):
             self.package_name = data["package_name"]
@@ -124,8 +125,16 @@ class KivySchoolData:
             self.meta_data = data.get("meta_data", {})
             self.gradle_dependencies = data.get("gradle_dependencies", [])
             self.gradle_plugins = data.get("gradle_plugins", [])
-
-            # Parse the list of services
+            raw_includes = data.get("include_files", [])
+            self.include_files = []
+            for item in raw_includes:
+                if isinstance(item, (list, tuple)) and len(item) >= 2:
+                    dest = str(item[0])
+                    if len(item) == 2 and isinstance(item[1], (list, tuple)):
+                        sources = [str(x) for x in item[1]]
+                    else:
+                        sources = [str(x) for x in item[1:]]
+                    self.include_files.append((dest, sources))
             self.services = [
                 KivySchoolData.ServiceData(s) for s in data.get("services", [])
             ]
