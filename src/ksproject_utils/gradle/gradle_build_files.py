@@ -316,6 +316,13 @@ tasks.named("preBuild") {{
     dependsOn("copySitePackagesJava")
     dependsOn("copySitePackagesKotlin")
 }}
+
+// Ensure C++ build tasks wait for the native libraries to be copied!
+tasks.configureEach {{
+    if (name.startsWith("buildCMake") || name.startsWith("configureCMake") || name.startsWith("generateJsonModel")) {{
+        copySitePackagesNativeLibsTasks.forEach {{ dependsOn(it) }}
+    }}
+}}
 // ─────────────────────────────────────────────────────────────────────────────"""
 
     # -------------------------------------------------------------------------
