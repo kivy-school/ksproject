@@ -37,9 +37,17 @@ class GradleCommands:
             action="store_true",
             help="Build an AAB (Android App Bundle) instead of an APK",
         )
+
+        p_build.add_argument(
+            "--clean",
+            action="store_true",
+            help="Perform a clean build",
+        )
         p_build.set_defaults(func=self.build)
 
-        p_get_path = asub.add_parser("get-path", help="Print the resolved path for a tool")
+        p_get_path = asub.add_parser(
+            "get-path", help="Print the resolved path for a tool"
+        )
         p_get_path.add_argument("tool", choices=["sdk", "ndk", "emulator"])
         p_get_path.set_defaults(func=self.get_path)
 
@@ -59,7 +67,9 @@ class GradleCommands:
 
     def get_path(self, args: argparse.Namespace) -> int:
         pyproject = PyProjectToml(str(Path.cwd() / "pyproject.toml"))
-        android = pyproject.tool.kivy_school.android if pyproject.tool.kivy_school else None
+        android = (
+            pyproject.tool.kivy_school.android if pyproject.tool.kivy_school else None
+        )
 
         if args.tool == "sdk":
             path = AndroidToolchain.find_sdk_path(android, Path.cwd())
@@ -83,7 +93,9 @@ class GradleCommands:
     def build(self, args: argparse.Namespace) -> int:
         project = GradleProject(Path.cwd())
 
-        output = project.build(args.variant, aar=args.aar, bundle=args.bundle)
+        output = project.build(
+            args.variant, aar=args.aar, bundle=args.bundle, clean=args.clean
+        )
 
         if args.aar:
             label = "AAR"

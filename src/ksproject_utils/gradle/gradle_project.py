@@ -20,7 +20,11 @@ from ..platforms import (
 from ..pyproject_toml import KivySchoolData, PyProjectToml
 from .adb import ADB
 from .android_emulator import AndroidEmulator
-from .android_toolchain import DEFAULT_API_VERSION, DEFAULT_SDK_VERSION, AndroidToolchain
+from .android_toolchain import (
+    DEFAULT_API_VERSION,
+    DEFAULT_SDK_VERSION,
+    AndroidToolchain,
+)
 from .collect_gradle_configs import MergedGradleConfig, collect_and_merge
 from .gradle_project_builder import GradleProjectBuilder
 
@@ -68,7 +72,11 @@ class GradleProject:
         # Prefer android.api, fall back to android.sdk, then the toolchain default.
         android_data = self.builder.android
         sdk_version = (
-            (android_data.sdk or str(android_data.api) if android_data.api else DEFAULT_SDK_VERSION)
+            (
+                android_data.sdk or str(android_data.api)
+                if android_data.api
+                else DEFAULT_SDK_VERSION
+            )
             if android_data
             else DEFAULT_SDK_VERSION
         )
@@ -96,14 +104,16 @@ class GradleProject:
             if self.adb is None:
                 android_data = self.builder.android
                 sdk_version = (
-                    (android_data.sdk or str(android_data.api) if android_data.api else DEFAULT_SDK_VERSION)
+                    (
+                        android_data.sdk or str(android_data.api)
+                        if android_data.api
+                        else DEFAULT_SDK_VERSION
+                    )
                     if android_data
                     else DEFAULT_SDK_VERSION
                 )
                 self.adb = ADB(self._toolchain.sdk_path)
-                self.emulator = AndroidEmulator(
-                    self._toolchain.sdk_path, sdk_version
-                )
+                self.emulator = AndroidEmulator(self._toolchain.sdk_path, sdk_version)
         return self._toolchain
 
     # ------------------------------------------------------------------
@@ -142,7 +152,11 @@ class GradleProject:
             )
 
     def gradle_assemble(
-        self, variant: str = "debug", aar: bool = False, bundle: bool = False
+        self,
+        variant: str = "debug",
+        aar: bool = False,
+        bundle: bool = False,
+        clean: bool = False,
     ) -> Path:
         if variant not in ("debug", "release"):
             raise GradleProjectError(
@@ -171,17 +185,26 @@ class GradleProject:
                 f"Gradle project not generated yet: {gradlew} missing."
             )
 
-        result = subprocess.run(
-            [str(gradlew), task], cwd=self.gradle_dir, env=env, shell=use_shell
-        )
+        args = [str(gradlew)]
+        if clean:
+            args.append("clean")
+        args.append(task)
+
+        result = subprocess.run(args, cwd=self.gradle_dir, env=env, shell=use_shell)
         if result.returncode != 0:
+            cmd_str = " ".join(args[1:])
             raise GradleProjectError(
-                f"./gradlew {task} exited with code {result.returncode}"
+                f"./gradlew {cmd_str} exited with code {result.returncode}"
             )
 
         if aar:
             output = (
-                self.gradle_dir / "app" / "build" / "outputs" / "aar" / f"app-{variant}.aar"
+                self.gradle_dir
+                / "app"
+                / "build"
+                / "outputs"
+                / "aar"
+                / f"app-{variant}.aar"
             )
         elif bundle:
             output = (
@@ -209,7 +232,13 @@ class GradleProject:
 
         return output
 
-    def build(self, variant: str = "debug", aar: bool = False, bundle: bool = False) -> Path:
+    def build(
+        self,
+        variant: str = "debug",
+        aar: bool = False,
+        bundle: bool = False,
+        clean: bool = False,
+    ) -> Path:
         """Run full pipeline: pip install → collect .gradle configs → generate → gradlew assemble/bundle."""
         self.install_site_packages()
         merged = self._collect_site_gradle_configs()
@@ -218,7 +247,7 @@ class GradleProject:
             extra_gradle_dependencies=merged.gradle_dependencies,
             extra_permissions=merged.permissions,
         )
-        return self.gradle_assemble(variant, aar=aar, bundle=bundle)
+        return self.gradle_assemble(variant, aar=aar, bundle=bundle, clean=clean)
 
     def _collect_site_gradle_configs(self) -> MergedGradleConfig:
         """Scan all per-arch site_packages dirs for .gradle/*.json and merge."""
