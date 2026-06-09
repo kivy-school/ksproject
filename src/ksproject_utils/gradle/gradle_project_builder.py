@@ -297,28 +297,45 @@ class GradleProjectBuilder:
             _copy_pure_python(stdlib_src, stdlib_dst)
 
         # ------------------------------------------------------------------
-        # Process include_files (e.g. google-services.json, other assets)
+        # Process include_files (e.g. google-services.json, *.json)
         # ------------------------------------------------------------------
         if self.android and self.android.include_files:
             for dest_str, sources in self.android.include_files:
+                # Resolve destination relative to the project_dist folder
                 dest_base = self.working_dir / "project_dist"
                 target_dir = dest_base / dest_str
                 target_dir.mkdir(parents=True, exist_ok=True)
 
                 for src_str in sources:
-                    src_path = Path(src_str)
-                    if not src_path.is_absolute():
-                        src_path = self.working_dir / src_path
-
-                    if not src_path.exists():
-                        print(f"[ksproject] Warning: include_file source not found: {src_path}")
-                        continue
-
-                    if src_path.is_dir():
-                        shutil.copytree(src_path, target_dir / src_path.name, dirs_exist_ok=True)
+                    # Check if the source string contains wildcard characters
+                    if "*" in src_str or "?" in src_str:
+                        if Path(src_str).is_absolute():
+                            import glob
+                            paths_to_copy = [Path(p) for p in glob.glob(src_str)]
+                        else:
+                            paths_to_copy = list(self.working_dir.glob(src_str))
+                        
+                        if not paths_to_copy:
+                            print(f"[ksproject] Warning: No files matched include_file pattern: {src_str}")
+                            continue
                     else:
-                        shutil.copy2(src_path, target_dir / src_path.name)
-                    print(f"[ksproject] Copied include_file: {src_path.name} -> {target_dir}")
+                        src_path = Path(src_str)
+                        if not src_path.is_absolute():
+                            src_path = self.working_dir / src_path
+                        
+                        if not src_path.exists():
+                            print(f"[ksproject] Warning: include_file source not found: {src_path}")
+                            continue
+                        paths_to_copy = [src_path]
+
+                    # Copy all resolved paths (whether 1 explicit file or multiple glob matches)
+                    for path in paths_to_copy:
+                        if path.is_dir():
+                            shutil.copytree(path, target_dir / path.name, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(path, target_dir / path.name)
+                        print(f"[ksproject] Copied include_file: {path.name} -> {target_dir}")
+
 
         print(f"Gradle project generated at: {dist_dir}")
         print(f"  app/src/main/jniLibs/<abi> — libpython + extension .so per ABI")
