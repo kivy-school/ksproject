@@ -48,7 +48,7 @@ def test_android_defaults(tmp_project: Path) -> None:
 
 def test_kivyschool_root_local(tmp_project: Path) -> None:
     pp = PyProjectToml(str(tmp_project / "pyproject.toml"))
-    a = pp.tool.kivy_school.android
+    a = KivySchoolData.AndroidData({"package_name": "x", "global_tools": False})
     assert a is not None
     assert a.kivyschool_root(tmp_project) == tmp_project / ".kivyschool"
 
