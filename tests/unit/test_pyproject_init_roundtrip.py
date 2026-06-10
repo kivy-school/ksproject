@@ -50,4 +50,4 @@ def test_default_android_uses_documented_versions(tmp_path: Path) -> None:
     assert a.ndk == "28c"
     assert a.min_api == 24
     assert a.ndk_api == 24
-    assert a.global_tools is False
+    assert a.global_tools is True

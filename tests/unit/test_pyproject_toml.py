@@ -40,7 +40,7 @@ def test_android_defaults(tmp_project: Path) -> None:
     a = pp.tool.kivy_school.android
     assert a is not None
     assert a.package_name == "org.example.minimal_app"
-    assert a.global_tools is False
+    assert a.global_tools is True
     assert a.global_tools_path is None
     archs = [arch.value for arch in a.archs]
     assert "arm64-v8a" in archs
