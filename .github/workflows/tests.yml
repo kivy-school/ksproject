@@ -1,10 +1,10 @@
 name: tests
 
 on:
-  push:
-    branches: [master, test_suite_1]
-#   pull_request:
-#     branches: [master]
+  # push:
+  #   branches: [test_suite_1]
+  pull_request:
+    branches: [master]
   workflow_dispatch:
 
 concurrency:

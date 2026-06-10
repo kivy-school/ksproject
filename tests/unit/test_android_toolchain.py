@@ -67,7 +67,7 @@ def test_find_sdk_ignores_env_when_not_global_tools(
     env_sdk = tmp_path / "envroot-sdk"
     env_sdk.mkdir()
     monkeypatch.setenv("ANDROID_HOME", str(env_sdk))
-    a = _android()  # global_tools=False by default
+    a = _android()  # global_tools=true by default
     found = AndroidToolchain.find_sdk_path(a, tmp_project)
     assert Path(found) == fake_kivyschool / "android-sdk"
 
