@@ -682,7 +682,7 @@ public class Hardware {{
     def write_kivy_python_activity(main_dir: Path, package_name: str) -> None:
         """Minimal org.kivy.android.PythonActivity that exposes mActivity to
         Kivy's fontscale lookup via pyjnius, combining native p4a lifecycle safety
-        with dynamic Lottie/GIF/Image loading screens."""
+        with dynamic Lottie/GIF/Image loading screens and ActivityResult hooks."""
         java_dir = main_dir / "java" / "org" / "kivy" / "android"
         java_dir.mkdir(parents=True, exist_ok=True)
 
@@ -702,6 +702,9 @@ import android.widget.ImageView;
 import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
+import android.content.Intent;
+import java.util.ArrayList;
+import java.util.List;
 
 public class PythonActivity extends SDLActivity {{
     public static PythonActivity mActivity;
@@ -848,6 +851,44 @@ public class PythonActivity extends SDLActivity {{
                 }}
             }}
         }});
+    }}
+
+    /**
+     * Used by external Python/Java modules to intercept Activity Results
+     */
+    public interface ActivityResultListener {{
+        void onActivityResult(int requestCode, int resultCode, Intent data);
+    }}
+
+    private List<ActivityResultListener> activityResultListeners = new ArrayList<ActivityResultListener>();
+
+    public void addActivityResultListener(ActivityResultListener listener) {{
+        synchronized (activityResultListeners) {{
+            activityResultListeners.add(listener);
+        }}
+        Log.v(TAG, "addActivityResultListener(): Added listener");
+    }}
+
+    public void removeActivityResultListener(ActivityResultListener listener) {{
+        synchronized (activityResultListeners) {{
+            activityResultListeners.remove(listener);
+        }}
+        Log.v(TAG, "removeActivityResultListener(): Removed listener");
+    }}
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent intent) {{
+        Log.v(TAG, "onActivityResult()");
+        List<ActivityResultListener> listenersCopy;
+        
+        synchronized (activityResultListeners) {{
+            listenersCopy = new ArrayList<>(activityResultListeners);
+        }}
+        
+        for (ActivityResultListener listener : listenersCopy) {{
+            listener.onActivityResult(requestCode, resultCode, intent);
+        }}
+        super.onActivityResult(requestCode, resultCode, intent);
     }}
 
     /**
