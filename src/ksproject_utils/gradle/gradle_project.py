@@ -226,6 +226,11 @@ class GradleProject:
                 / variant
                 / f"app-{variant}.apk"
             )
+            
+            if variant == "release" and not output.exists():
+                unsigned_output = output.with_name(f"app-{variant}-unsigned.apk")
+                if unsigned_output.exists():
+                    output = unsigned_output
 
         if not output.exists():
             raise GradleProjectError(f"Expected build artifact not found at {output}")
@@ -290,6 +295,12 @@ class GradleProject:
             / variant
             / f"app-{variant}.apk"
         )
+        
+        if variant == "release" and not apk.exists():
+            unsigned_apk = apk.with_name(f"app-{variant}-unsigned.apk")
+            if unsigned_apk.exists():
+                apk = unsigned_apk
+
         if not apk.exists():
             raise GradleProjectError(
                 f"No APK found at {apk}. Run 'ksproject android build' first."
