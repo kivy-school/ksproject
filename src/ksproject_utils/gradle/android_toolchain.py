@@ -180,14 +180,19 @@ class AndroidToolchain:
         sdk_path = _resolve_sdk(
             android, sdk_version, ndk_version, java_path, project_dir
         )
+        
+        # Resolve NDK path using the corrected user-first priority flow
         ndk_path = _resolve_ndk(android, sdk_path, ndk_version, java_path)
         _ensure_emulator(sdk_path, sdk_version, java_path)
+
+        # Read the absolute ground-truth version directly from the installation's source.properties
+        resolved_ndk_version = _get_actual_ndk_version(ndk_path, ndk_version)
 
         return cls(
             sdk_path=sdk_path,
             ndk_path=ndk_path,
             java_path=java_path,
-            ndk_version=ndk_version,
+            ndk_version=resolved_ndk_version,
         )
 
 
@@ -271,33 +276,70 @@ def _resolve_sdk(
         _sdkmanager_install(managed, java_path, [f"cmake;{DEFAULT_CMAKE_VERSION}"])
     return str(managed)
 
-
 def _resolve_ndk(
     android: KivySchoolData.AndroidData | None,
     sdk_path: str,
     ndk_version: str,
     java_path: str,
 ) -> str:
+    """Locate or install the NDK path, prioritizing explicit user choices over env vars."""
+    
+    # 1. Absolute highest priority: User set an explicit file system path
+    if android and android.ndk_path and Path(android.ndk_path).is_dir():
+        return str(android.ndk_path)
+
+    # 2. Second highest priority: User defined a specific version string (e.g., android.ndk = "27")
+    # We MUST check if this specific version is installed or install it, bypassing env variables.
+    ndk_user = android.ndk if android else None
+    ndk_in_sdk = Path(sdk_path) / "ndk" / ndk_version
+
+    if ndk_user:
+        if not ndk_in_sdk.is_dir():
+            print(f"[ksproject] User-requested NDK {ndk_version} is missing. Installing...")
+            _sdkmanager_install(Path(sdk_path), java_path, [f"ndk;{ndk_version}"])
+        
+        if ndk_in_sdk.is_dir():
+            return str(ndk_in_sdk)
+        raise AndroidToolchainError(f"Failed to install user-requested NDK version: {ndk_version}")
+
+    # 3. Third priority: System environment variables (only evaluated if user didn't lock down a version)
     global_tools = android.global_tools if android is not None else False
     if global_tools:
         env = os.environ.get("ANDROID_NDK_ROOT")
-        if env:
+        if env and Path(env).is_dir():
             return env
 
-    if android and android.ndk_path:
-        return str(android.ndk_path)
+    # 4. Lowest priority: Fallback to the default managed toolchain NDK version
+    if not ndk_in_sdk.is_dir():
+        print(f"[ksproject] Default NDK {ndk_version} is missing. Installing...")
+        _sdkmanager_install(Path(sdk_path), java_path, [f"ndk;{ndk_version}"])
 
-    ndk_in_sdk = Path(sdk_path) / "ndk" / ndk_version
-    if ndk_in_sdk.exists():
-        return str(ndk_in_sdk)
-
-    _sdkmanager_install(Path(sdk_path), java_path, [f"ndk;{ndk_version}"])
-    if not ndk_in_sdk.exists():
+    if not ndk_in_sdk.is_dir():
         raise AndroidToolchainError(
             f"Android NDK {ndk_version} install appeared to succeed but "
             f"{ndk_in_sdk} still not found."
         )
     return str(ndk_in_sdk)
+
+
+def _get_actual_ndk_version(ndk_path: str, fallback: str) -> str:
+    """Parse the true NDK version from its source.properties file."""
+    props_path = Path(ndk_path) / "source.properties"
+    if props_path.is_file():
+        try:
+            content = props_path.read_text(encoding="utf-8")
+            match = re.search(r"Pkg\.Revision\s*=\s*([\d\.]+)", content)
+            if match:
+                return match.group(1).strip()
+        except Exception:
+            pass
+            
+    # Fallback: check if the parent directory name is already a clean version number
+    folder_name = Path(ndk_path).name
+    if re.match(r"^[\d\.]+$", folder_name):
+        return folder_name
+        
+    return fallback
 
 
 def _install_sdk(
