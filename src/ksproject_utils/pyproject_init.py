@@ -33,6 +33,9 @@ archs = [
 gradle_dependencies = [
     # "com.onesignal:OneSignal:[5.6.1, 5.9.99]" # Example of adding OneSignal for push notifications; adjust version as needed
 ]
+gradle_plugins = [
+    # 'id("com.google.gms.google-services") version "4.4.2" apply false'
+]
 permissions = [
     # "POST_NOTIFICATIONS", "INTERNET", "ACCESS_NETWORK_STATE", "WAKE_LOCK" # Example permissions; add as needed
 ]
@@ -43,12 +46,22 @@ sdk = "{DEFAULT_SDK_VERSION}"
 ndk = "28c"
 ndk_api = 24
 
-global_tools = false # Set to <false> to use project-local SDK/NDK (./.kivyschool); set to <true> to use shared/global versions (~/.kivyschool or global_tools_path)
+global_tools = true # Set to <false> to use project-local SDK/NDK (./.kivyschool); set to <true> to use shared/global versions (~/.kivyschool or global_tools_path)
 #global_tools_path = "~/.kivyschool" # Override root path when global_tools = true; ignored when global_tools = false
 
 # sdk_path = "/path/to/android-sdk"
 # ndk_path = "/path/to/android-ndk"
 # java_path = "/path/to/jdk"
+
+# # Format 1: Flat list (Destination, Source 1, Source 2)
+# include_files = [
+#     ["gradle/app", "./google-services.json", "./some-other-config.xml"]
+# ]
+
+# # Format 2: Nested list (Destination, [Source 1, Source 2])
+# include_files = [
+#     ["gradle/app", ["./google-services.json", "./some-other-config.xml"]]
+# ]
 """
 
 

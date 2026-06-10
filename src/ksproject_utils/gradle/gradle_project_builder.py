@@ -94,10 +94,13 @@ class GradleProjectBuilder:
         dist_dir = self.working_dir / "project_dist" / "gradle"
         dist_dir.mkdir(parents=True, exist_ok=True)
 
-        # Merge gradle_dependencies and permissions from pyproject.toml with
+        # Merge gradle dependencies and permissions from pyproject.toml with
         # those collected from site-packages .gradle/*.json files (ksp-builder).
         base_deps = self.android.gradle_dependencies if self.android else []
         base_perms = self.android.permissions if self.android else []
+        base_plugins = (
+            getattr(self.android, "gradle_plugins", []) if self.android else []
+        )
 
         merged_deps = _merge_unique(base_deps, extra_gradle_dependencies or [])
         merged_perms = _merge_unique(base_perms, extra_permissions or [])
@@ -110,7 +113,7 @@ class GradleProjectBuilder:
         toolchain = AndroidToolchain.resolve(self.android, self.working_dir)
 
         # Root Gradle files
-        GradleBuildFiles.write_root_build_gradle(dist_dir)
+        GradleBuildFiles.write_root_build_gradle(dist_dir, base_plugins)
         GradleBuildFiles.write_settings_gradle(dist_dir, self.app_name)
         GradleBuildFiles.write_gradle_properties(dist_dir)
         GradleBuildFiles.write_local_properties(dist_dir, toolchain.sdk_path)
@@ -119,7 +122,8 @@ class GradleProjectBuilder:
         app_dir = dist_dir / "app"
         app_dir.mkdir(parents=True, exist_ok=True)
         GradleBuildFiles.write_app_build_gradle(
-            app_dir,
+            project_dir=self.working_dir,
+            app_dir=app_dir,
             package_name=self.package_name,
             archs=self.archs,
             compile_sdk=(
@@ -291,6 +295,47 @@ class GradleProjectBuilder:
         stdlib_dst = assets_dir / f"python{PY_VERSION}"
         if not stdlib_dst.exists() and stdlib_src.exists():
             _copy_pure_python(stdlib_src, stdlib_dst)
+
+        # ------------------------------------------------------------------
+        # Process include_files (e.g. google-services.json, *.json)
+        # ------------------------------------------------------------------
+        if self.android and self.android.include_files:
+            for dest_str, sources in self.android.include_files:
+                # Resolve destination relative to the project_dist folder
+                dest_base = self.working_dir / "project_dist"
+                target_dir = dest_base / dest_str
+                target_dir.mkdir(parents=True, exist_ok=True)
+
+                for src_str in sources:
+                    # Check if the source string contains wildcard characters
+                    if "*" in src_str or "?" in src_str:
+                        if Path(src_str).is_absolute():
+                            import glob
+                            paths_to_copy = [Path(p) for p in glob.glob(src_str)]
+                        else:
+                            paths_to_copy = list(self.working_dir.glob(src_str))
+                        
+                        if not paths_to_copy:
+                            print(f"[ksproject] Warning: No files matched include_file pattern: {src_str}")
+                            continue
+                    else:
+                        src_path = Path(src_str)
+                        if not src_path.is_absolute():
+                            src_path = self.working_dir / src_path
+                        
+                        if not src_path.exists():
+                            print(f"[ksproject] Warning: include_file source not found: {src_path}")
+                            continue
+                        paths_to_copy = [src_path]
+
+                    # Copy all resolved paths (whether 1 explicit file or multiple glob matches)
+                    for path in paths_to_copy:
+                        if path.is_dir():
+                            shutil.copytree(path, target_dir / path.name, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(path, target_dir / path.name)
+                        print(f"[ksproject] Copied include_file: {path.name} -> {target_dir}")
+
 
         print(f"Gradle project generated at: {dist_dir}")
         print(f"  app/src/main/jniLibs/<abi> — libpython + extension .so per ABI")

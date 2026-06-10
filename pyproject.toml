@@ -23,9 +23,17 @@ ksproject-gui = "ksproject_gui:main"
 [project.optional-dependencies]
 gui = [
     "carbonkivy",
-    "kaki",
     "thorvg-cython",
-    "pyobjc",
+    "watchdog",
+    "pyobjc; sys_platform == 'darwin'",
+]
+
+full = [
+    "carbonkivy",
+    "thorvg-cython",
+    "kaki",
+    "watchdog",
+    "pyobjc; sys_platform == 'darwin'",
 ]
 
 [tool.uv.sources]

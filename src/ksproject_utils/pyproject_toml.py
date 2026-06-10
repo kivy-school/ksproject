@@ -88,9 +88,11 @@ class KivySchoolData:
         permissions: list[str]
         meta_data: dict[str, str]
         gradle_dependencies: list[str]
+        gradle_plugins: list[str]
         services: list["KivySchoolData.ServiceData"]
         version_code: int
         version_name: str
+        include_files: list[tuple[str, list[str]]]
 
         def __init__(self, data: dict):
             self.package_name = data["package_name"]
@@ -106,16 +108,33 @@ class KivySchoolData:
             self.ndk_path = Path(data["ndk_path"]) if data.get("ndk_path") else None
             self.java_path = Path(data["java_path"]) if data.get("java_path") else None
             self.global_tools = bool(data.get("global_tools", False))
-            self.global_tools_path = Path(data["global_tools_path"]) if data.get("global_tools_path") else None
+            self.global_tools_path = (
+                Path(data["global_tools_path"])
+                if data.get("global_tools_path")
+                else None
+            )
             self.icon = data.get("icon")
             self.presplash = data.get("presplash")
-            self.presplash_color = data.get("presplash_color") if data.get("presplash_color") else "#FFFFFF"
+            self.presplash_color = (
+                data.get("presplash_color")
+                if data.get("presplash_color")
+                else "#FFFFFF"
+            )
             self.presplash_lottie = data.get("presplash_lottie")
             self.permissions = data.get("permissions", [])
             self.meta_data = data.get("meta_data", {})
             self.gradle_dependencies = data.get("gradle_dependencies", [])
-
-            # Parse the list of services
+            self.gradle_plugins = data.get("gradle_plugins", [])
+            raw_includes = data.get("include_files", [])
+            self.include_files = []
+            for item in raw_includes:
+                if isinstance(item, (list, tuple)) and len(item) >= 2:
+                    dest = str(item[0])
+                    if len(item) == 2 and isinstance(item[1], (list, tuple)):
+                        sources = [str(x) for x in item[1]]
+                    else:
+                        sources = [str(x) for x in item[1:]]
+                    self.include_files.append((dest, sources))
             self.services = [
                 KivySchoolData.ServiceData(s) for s in data.get("services", [])
             ]
@@ -126,7 +145,7 @@ class KivySchoolData:
             """Root for kivy-school managed tools/caches.
 
             ``global_tools = False`` (default) → ``<working_dir>/.kivyschool`` (project-local).
-            ``global_tools = True``             → ``global_tools_path`` if set, else ``~/.kivyschool``.
+            ``global_tools = True``            → ``global_tools_path`` if set, else ``~/.kivyschool``.
             """
             if not self.global_tools:
                 return working_dir / ".kivyschool"
