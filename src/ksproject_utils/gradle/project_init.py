@@ -85,6 +85,10 @@ android {
                 arguments += listOf("-DANDROID_STL=c++_static")
             }
         }
+
+        // ONESIGNAL_APP_ID setup for pyonesignal (reads from env and creates a string resource)
+        // val oneSignalId = System.getenv("ONESIGNAL_APP_ID") ?: ""
+        // resValue("string", "onesignal_app_id", oneSignalId)
     }
 
     externalNativeBuild {
