@@ -682,7 +682,7 @@ public class Hardware {{
     def write_kivy_python_activity(main_dir: Path, package_name: str) -> None:
         """Minimal org.kivy.android.PythonActivity that exposes mActivity to
         Kivy's fontscale lookup via pyjnius, combining native p4a lifecycle safety
-        with dynamic Lottie/GIF/Image loading screens and ActivityResult hooks."""
+        with dynamic Lottie/GIF/Image loading screens, ActivityResult hooks, and NewIntent hooks."""
         java_dir = main_dir / "java" / "org" / "kivy" / "android"
         java_dir.mkdir(parents=True, exist_ok=True)
 
@@ -889,6 +889,93 @@ public class PythonActivity extends SDLActivity {{
             listener.onActivityResult(requestCode, resultCode, intent);
         }}
         super.onActivityResult(requestCode, resultCode, intent);
+    }}
+
+    /**
+     * Used by external Python/Java modules to intercept New Intents (e.g., Deep Links)
+     */
+    public interface NewIntentListener {{
+        void onNewIntent(Intent intent);
+    }}
+
+    private List<NewIntentListener> newIntentListeners = new ArrayList<NewIntentListener>();
+
+    public void registerNewIntentListener(NewIntentListener listener) {{
+        synchronized (newIntentListeners) {{
+            newIntentListeners.add(listener);
+        }}
+        Log.v(TAG, "registerNewIntentListener(): Added listener");
+    }}
+
+    public void unregisterNewIntentListener(NewIntentListener listener) {{
+        synchronized (newIntentListeners) {{
+            newIntentListeners.remove(listener);
+        }}
+        Log.v(TAG, "unregisterNewIntentListener(): Removed listener");
+    }}
+
+    @Override
+    protected void onNewIntent(Intent intent) {{
+        Log.v(TAG, "onNewIntent()");
+        List<NewIntentListener> listenersCopy;
+        
+        synchronized (newIntentListeners) {{
+            listenersCopy = new ArrayList<>(newIntentListeners);
+        }}
+        
+        for (NewIntentListener listener : listenersCopy) {{
+            listener.onNewIntent(intent);
+        }}
+        super.onNewIntent(intent);
+    }}
+
+    /**
+     * Used by external Python/Java modules to intercept Dark Mode / Night Mode shifts
+     */
+    public interface DarkModeListener {{
+        void onDarkModeChanged(boolean isDarkMode);
+    }}
+
+    private List<DarkModeListener> darkModeListeners = new ArrayList<DarkModeListener>();
+
+    public void registerDarkModeListener(DarkModeListener listener) {{
+        synchronized (darkModeListeners) {{
+            darkModeListeners.add(listener);
+        }}
+        Log.v(TAG, "registerDarkModeListener(): Added listener");
+    }}
+
+    public void unregisterDarkModeListener(DarkModeListener listener) {{
+        synchronized (darkModeListeners) {{
+            darkModeListeners.remove(listener);
+        }}
+        Log.v(TAG, "unregisterDarkModeListener(): Removed listener");
+    }}
+
+    /**
+     * Direct synchronous check helper for Kivy on startup initialization
+     */
+    public boolean isDarkMode() {{
+        int nightModeFlags = getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
+        return nightModeFlags == Configuration.UI_MODE_NIGHT_YES;
+    }}
+
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {{
+        super.onConfigurationChanged(newConfig);
+        Log.v(TAG, "onConfigurationChanged()");
+
+        int nightModeFlags = newConfig.uiMode & Configuration.UI_MODE_NIGHT_MASK;
+        boolean isDarkModeActive = (nightModeFlags == Configuration.UI_MODE_NIGHT_YES);
+
+        List<DarkModeListener> listenersCopy;
+        synchronized (darkModeListeners) {{
+            listenersCopy = new ArrayList<>(darkModeListeners);
+        }}
+        
+        for (DarkModeListener listener : listenersCopy) {{
+            listener.onDarkModeChanged(isDarkModeActive);
+        }}
     }}
 
     /**
