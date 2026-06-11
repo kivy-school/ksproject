@@ -862,18 +862,18 @@ public class PythonActivity extends SDLActivity {{
 
     private List<ActivityResultListener> activityResultListeners = new ArrayList<ActivityResultListener>();
 
-    public void addActivityResultListener(ActivityResultListener listener) {{
+    public void registerActivityResultListener(ActivityResultListener listener) {{
         synchronized (activityResultListeners) {{
             activityResultListeners.add(listener);
         }}
-        Log.v(TAG, "addActivityResultListener(): Added listener");
+        Log.v(TAG, "registerActivityResultListener(): Added listener");
     }}
 
-    public void removeActivityResultListener(ActivityResultListener listener) {{
+    public void unregisterActivityResultListener(ActivityResultListener listener) {{
         synchronized (activityResultListeners) {{
             activityResultListeners.remove(listener);
         }}
-        Log.v(TAG, "removeActivityResultListener(): Removed listener");
+        Log.v(TAG, "unregisterActivityResultListener(): Removed listener");
     }}
 
     @Override
