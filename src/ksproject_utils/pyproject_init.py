@@ -93,9 +93,10 @@ class PyProjectInitKeys:
     app_name: str
 
     EXTRA_INDEX_URLS = [
-        # "https://pypi.anaconda.org/beeware/simple",
-        "https://pypi.anaconda.org/pyswift/simple",
+        "https://pypi-index.psychowaspx.workers.dev/simple",
         "https://pypi.anaconda.org/kivyschool/simple",
+        # "https://pypi.anaconda.org/pyswift/simple",
+        # "https://pypi.anaconda.org/beeware/simple",
     ]
 
     def __init__(self, project_name: str):
