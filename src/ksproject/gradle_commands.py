@@ -17,6 +17,7 @@ class GradleCommands:
         android = sub.add_parser("android", help="Android / Gradle commands")
         asub = android.add_subparsers(dest="command", required=True)
 
+        # --- BUILD ---
         p_build = asub.add_parser("build", help="Build an APK, AAR, or AAB")
         p_build.add_argument(
             "variant",
@@ -45,15 +46,86 @@ class GradleCommands:
         )
         p_build.set_defaults(func=self.build)
 
+        # --- SIGN ---
+        p_sign = asub.add_parser(
+            "sign", help="Sign automatically discovered project artifacts"
+        )
+        p_sign.add_argument(
+            "--keystore", type=Path, required=True, help="Path to keystore file"
+        )
+        p_sign.add_argument(
+            "--storepass", type=str, required=True, help="Keystore password"
+        )
+        p_sign.add_argument(
+            "--keyalias", type=str, required=True, help="Key alias identifier"
+        )
+        p_sign.add_argument(
+            "--keypass", type=str, help="Alias key password (if different)"
+        )
+        p_sign.add_argument(
+            "--variant",
+            default="release",
+            choices=["debug", "release"],
+            help="Target variant directory to look inside (defaults to release)",
+        )
+
+        sign_target = p_sign.add_mutually_exclusive_group()
+        sign_target.add_argument(
+            "--bundle",
+            action="store_true",
+            help="Look for and sign the App Bundle (.aab)",
+        )
+        sign_target.add_argument(
+            "--apk",
+            action="store_true",
+            default=True,
+            help="Look for and sign the APK (Default)",
+        )
+
+        p_sign.set_defaults(func=self.sign)
+
+        # --- GENKEY ---
+        p_genkey = asub.add_parser(
+            "genkey", help="Generate a new release keystore signature file"
+        )
+        p_genkey.add_argument(
+            "--out",
+            type=Path,
+            required=True,
+            help="Output destination path for the keystore",
+        )
+        p_genkey.add_argument(
+            "--storepass",
+            type=str,
+            required=True,
+            help="Keystore storage access password",
+        )
+        p_genkey.add_argument(
+            "--keyalias", type=str, required=True, help="Alias profile handle string"
+        )
+        p_genkey.add_argument(
+            "--keypass", type=str, help="Alias key password (defaults to storepass)"
+        )
+        p_genkey.add_argument(
+            "--dname",
+            type=str,
+            help="Distinguished Name string (e.g., 'CN=App, O=Org')",
+        )
+
+        p_genkey.set_defaults(func=self.genkey)
+
+        # --- GET-PATH ---
         p_get_path = asub.add_parser(
             "get-path", help="Print the resolved path for a tool"
         )
         p_get_path.add_argument("tool", choices=["sdk", "ndk", "emulator"])
         p_get_path.set_defaults(func=self.get_path)
 
+        # --- DEVICES ---
         p_devices = asub.add_parser("devices", help="List devices and AVDs")
         p_devices.set_defaults(func=self.devices)
 
+        # --- RUN ---
         p_run = asub.add_parser("run", help="Build, install, and launch")
         target = p_run.add_mutually_exclusive_group(required=True)
         target.add_argument("--uuid", help="adb serial of a device or running emulator")
@@ -105,6 +177,36 @@ class GradleCommands:
             label = "APK"
 
         print(f"{label}: {output}")
+        return 0
+
+    def sign(self, args: argparse.Namespace) -> int:
+        project = GradleProject(Path.cwd())
+
+        output = project.sign_project_artifact(
+            keystore=args.keystore,
+            storepass=args.storepass,
+            keyalias=args.keyalias,
+            keypass=args.keypass,
+            variant=args.variant,
+            bundle=args.bundle,
+        )
+
+        label = "AAB" if args.bundle else "APK"
+        print(f"Signed {label}: {output}")
+        return 0
+
+    def genkey(self, args: argparse.Namespace) -> int:
+        project = GradleProject(Path.cwd())
+
+        output = project.genkey(
+            keystore_path=args.out,
+            storepass=args.storepass,
+            keyalias=args.keyalias,
+            keypass=args.keypass,
+            dname=args.dname,
+        )
+
+        print(f"Keystore generated: {output}")
         return 0
 
     def devices(self, args: argparse.Namespace) -> int:
