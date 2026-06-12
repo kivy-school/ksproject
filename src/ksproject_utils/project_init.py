@@ -351,7 +351,11 @@ google-services.json
 """
 
         env_content = """\
-ONESIGNAL_APP_ID=""
+# ONESIGNAL_APP_ID=""
+# KEYSTORE=""
+# KEYALIAS=""
+# STOREPASS=""
+# KEYPASS="defaults_to_storepass"
 """
 
         # --- File Assignment Map ---
