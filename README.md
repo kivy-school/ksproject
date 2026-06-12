@@ -173,10 +173,10 @@ Create a .env file and add your variables like this:
 # .env
 
 # App Signing Credentials
-KSPROJECT_KEYSTORE="my-release-key.jks"
-KSPROJECT_KEYALIAS="myapp"
-KSPROJECT_STOREPASS="SecretPass123"
-# KSPROJECT_KEYPASS="defaults_to_storepass"
+KEYSTORE="my-release-key.jks"
+KEYALIAS="myapp"
+STOREPASS="SecretPass123"
+#KEYPASS="defaults_to_storepass"
 ```
 
 ### 1. Generate a Release Keystore
