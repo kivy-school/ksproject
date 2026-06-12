@@ -647,30 +647,274 @@ public class MainActivity extends PythonActivity {{
         dest.write_text(content, encoding="utf-8")
 
     # -------------------------------------------------------------------------
-    # Hardware.java — org.renpy.android.Hardware shim for Kivy SDL2 metrics
+    # Hardware.java — org.renpy.android.Hardware shim for p4a compatibility
     # -------------------------------------------------------------------------
 
     @staticmethod
     def write_renpy_hardware(main_dir: Path, package_name: str) -> None:
-        """Minimal org.renpy.android.Hardware that Kivy 2.3 (SDL2) calls into
-        for DPI / display metrics. Delegates to MainActivity.mActivity."""
+        """
+        Comprehensive org.renpy.android.Hardware shim matching older p4a behavior.
+        Updated for modern Android API compliance while maintaining strict 
+        backward compatibility with Pyjnius calls from Kivy/Plyer.
+        """
         java_dir = main_dir / "java" / "org" / "renpy" / "android"
         java_dir.mkdir(parents=True, exist_ok=True)
-        content = f"""\
+        
+        content = """\
 package org.renpy.android;
 
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
+import android.net.NetworkInfo;
+import android.net.wifi.ScanResult;
+import android.net.wifi.WifiManager;
+import android.os.Build;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
 import android.util.DisplayMetrics;
-import {package_name}.MainActivity;
+import android.view.View;
+import android.view.inputmethod.InputMethodManager;
+import java.util.List;
+import org.kivy.android.PythonActivity;
 
-public class Hardware {{
+public class Hardware {
+
+    public static Context context;
+    public static View view;
+    public static final float defaultRv[] = {0f, 0f, 0f};
+
+    private static Context getContext() {
+        if (context != null) return context;
+        return PythonActivity.mActivity;
+    }
+
+    private static View getView() {
+        if (view != null) return view;
+        if (PythonActivity.mActivity != null) {
+            return PythonActivity.mActivity.getWindow().getDecorView();
+        }
+        return null;
+    }
+
+    /** Vibrate for s seconds. Modernized for API 26+ */
+    public static void vibrate(double s) {
+        if (getContext() != null) {
+            Vibrator v = (Vibrator) getContext().getSystemService(Context.VIBRATOR_SERVICE);
+            if (v != null) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    v.vibrate(VibrationEffect.createOneShot((long) (1000 * s), VibrationEffect.DEFAULT_AMPLITUDE));
+                } else {
+                    v.vibrate((long) (1000 * s));
+                }
+            }
+        }
+    }
+
+    /** Get an Overview of all Hardware Sensors */
+    public static String getHardwareSensors() {
+        if (getContext() == null) return "";
+        SensorManager sm = (SensorManager) getContext().getSystemService(Context.SENSOR_SERVICE);
+        List<Sensor> allSensors = sm.getSensorList(Sensor.TYPE_ALL);
+
+        if (allSensors != null) {
+            StringBuilder resultString = new StringBuilder();
+            for (Sensor s : allSensors) {
+                resultString.append(String.format("Name=%s,Vendor=%s,Version=%d,MaximumRange=%f,Power=%f,Type=%d\\n",
+                        s.getName(), s.getVendor(), s.getVersion(), s.getMaximumRange(), s.getPower(), s.getType()));
+            }
+            return resultString.toString();
+        }
+        return "";
+    }
+
+    public static class generic3AxisSensor implements SensorEventListener {
+        private final SensorManager sSensorManager;
+        private final Sensor sSensor;
+        private final int sSensorType;
+        SensorEvent sSensorEvent;
+
+        public generic3AxisSensor(int sensorType) {
+            sSensorType = sensorType;
+            sSensorManager = (SensorManager) getContext().getSystemService(Context.SENSOR_SERVICE);
+            sSensor = sSensorManager.getDefaultSensor(sSensorType);
+        }
+
+        public void onAccuracyChanged(Sensor sensor, int accuracy) {}
+
+        public void onSensorChanged(SensorEvent event) {
+            sSensorEvent = event;
+        }
+
+        public void changeStatus(boolean enable) {
+            if (sSensor == null) return;
+            if (enable) {
+                sSensorManager.registerListener(this, sSensor, SensorManager.SENSOR_DELAY_NORMAL);
+            } else {
+                sSensorManager.unregisterListener(this, sSensor);
+            }
+        }
+
+        public float[] readSensor() {
+            if (sSensorEvent != null) {
+                return sSensorEvent.values;
+            } else {
+                return defaultRv;
+            }
+        }
+    }
+
+    public static generic3AxisSensor accelerometerSensor = null;
+    public static generic3AxisSensor orientationSensor = null;
+    public static generic3AxisSensor magneticFieldSensor = null;
+
+    public static void accelerometerEnable(boolean enable) {
+        if (accelerometerSensor == null) accelerometerSensor = new generic3AxisSensor(Sensor.TYPE_ACCELEROMETER);
+        accelerometerSensor.changeStatus(enable);
+    }
+
+    public static float[] accelerometerReading() {
+        if (accelerometerSensor == null) return defaultRv;
+        return accelerometerSensor.readSensor();
+    }
+
+    public static void orientationSensorEnable(boolean enable) {
+        if (orientationSensor == null) orientationSensor = new generic3AxisSensor(Sensor.TYPE_ORIENTATION);
+        orientationSensor.changeStatus(enable);
+    }
+
+    public static float[] orientationSensorReading() {
+        if (orientationSensor == null) return defaultRv;
+        return orientationSensor.readSensor();
+    }
+
+    public static void magneticFieldSensorEnable(boolean enable) {
+        if (magneticFieldSensor == null) magneticFieldSensor = new generic3AxisSensor(Sensor.TYPE_MAGNETIC_FIELD);
+        magneticFieldSensor.changeStatus(enable);
+    }
+
+    public static float[] magneticFieldSensorReading() {
+        if (magneticFieldSensor == null) return defaultRv;
+        return magneticFieldSensor.readSensor();
+    }
+
     public static DisplayMetrics metrics = new DisplayMetrics();
 
-    public static int getDPI() {{
-        MainActivity.mActivity.getWindowManager()
-            .getDefaultDisplay().getMetrics(metrics);
-        return metrics.densityDpi;
-    }}
-}}
+    public static int getDPI() {
+        if (PythonActivity.mActivity != null) {
+            PythonActivity.mActivity.getWindowManager().getDefaultDisplay().getMetrics(metrics);
+            return metrics.densityDpi;
+        }
+        return 160;
+    }
+
+    public static void hideKeyboard() {
+        if (getContext() != null && getView() != null) {
+            InputMethodManager imm = (InputMethodManager) getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (imm != null) {
+                imm.hideSoftInputFromWindow(getView().getWindowToken(), 0);
+            }
+        }
+    }
+
+    static List<ScanResult> latestResult;
+
+    public static void enableWifiScanner() {
+        if (getContext() == null) return;
+        IntentFilter i = new IntentFilter();
+        i.addAction(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION);
+
+        getContext().registerReceiver(new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context c, Intent i) {
+                try {
+                    WifiManager w = (WifiManager) c.getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+                    if (w != null) {
+                        latestResult = w.getScanResults(); 
+                    }
+                } catch (SecurityException e) {
+                    // Modern Android requires ACCESS_FINE_LOCATION to scan WiFi
+                }
+            }
+        }, i);
+    }
+
+    public static String scanWifi() {
+        if (latestResult != null) {
+            StringBuilder latestResultString = new StringBuilder();
+            for (ScanResult result : latestResult) {
+                latestResultString.append(String.format("%s\\t%s\\t%d\\n", result.SSID, result.BSSID, result.level));
+            }
+            return latestResultString.toString();
+        }
+        return "";
+    }
+
+    public static boolean network_state = false;
+
+    /**
+     * Modernized Network check using NetworkCapabilities for API >= 23, 
+     * falling back to activeNetworkInfo for older devices.
+     */
+    public static boolean checkNetwork() {
+        if (getContext() == null) return false;
+        ConnectivityManager conMgr = (ConnectivityManager) getContext().getSystemService(Context.CONNECTIVITY_SERVICE);
+        if (conMgr == null) return false;
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            Network network = conMgr.getActiveNetwork();
+            if (network == null) return false;
+            NetworkCapabilities capabilities = conMgr.getNetworkCapabilities(network);
+            return capabilities != null && (
+                    capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+                    capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
+                    capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET));
+        } else {
+            NetworkInfo activeNetwork = conMgr.getActiveNetworkInfo();
+            return activeNetwork != null && activeNetwork.isConnected();
+        }
+    }
+
+    /** * Modernized Network listener using NetworkCallback for API >= 24, 
+     * falling back to CONNECTIVITY_ACTION BroadcastReceiver for older devices.
+     */
+    public static void registerNetworkCheck() {
+        if (getContext() == null) return;
+        network_state = checkNetwork();
+        
+        ConnectivityManager conMgr = (ConnectivityManager) getContext().getSystemService(Context.CONNECTIVITY_SERVICE);
+        if (conMgr == null) return;
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            conMgr.registerDefaultNetworkCallback(new ConnectivityManager.NetworkCallback() {
+                @Override
+                public void onAvailable(Network network) {
+                    network_state = true;
+                }
+                @Override
+                public void onLost(Network network) {
+                    network_state = false;
+                }
+            });
+        } else {
+            IntentFilter i = new IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION);
+            getContext().registerReceiver(new BroadcastReceiver() {
+                @Override
+                public void onReceive(Context c, Intent i) {
+                    network_state = checkNetwork();
+                }
+            }, i);
+        }
+    }
+}
 """
         (java_dir / "Hardware.java").write_text(content, encoding="utf-8")
 
@@ -682,7 +926,8 @@ public class Hardware {{
     def write_kivy_python_activity(main_dir: Path, package_name: str) -> None:
         """Minimal org.kivy.android.PythonActivity that exposes mActivity to
         Kivy's fontscale lookup via pyjnius, combining native p4a lifecycle safety
-        with dynamic Lottie/GIF/Image loading screens, ActivityResult hooks, and NewIntent hooks."""
+        with dynamic Lottie/GIF/Image loading screens, ActivityResult hooks, and NewIntent hooks.
+        """
         java_dir = main_dir / "java" / "org" / "kivy" / "android"
         java_dir.mkdir(parents=True, exist_ok=True)
 
@@ -1366,6 +1611,62 @@ public class {service_name} extends PythonService {{
 }}
 """
         (java_dir / f"{service_name}.java").write_text(content, encoding="utf-8")
+
+    # -------------------------------------------------------------------------
+    # GenericBroadcastReceiver.java + GenericBroadcastReceiverCallback.java
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def write_generic_broadcast_receiver(main_dir: Path) -> None:
+        """Writes the BroadcastReceiver that delegates to the Pyjnius callback."""
+        java_dir = main_dir / "java" / "org" / "kivy" / "android"
+        java_dir.mkdir(parents=True, exist_ok=True)
+
+        content = """\
+package org.kivy.android;
+
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+
+public class GenericBroadcastReceiver extends BroadcastReceiver {
+
+    private GenericBroadcastReceiverCallback callback;
+
+    public GenericBroadcastReceiver(GenericBroadcastReceiverCallback callback) {
+        this.callback = callback;
+    }
+
+    @Override
+    public void onReceive(Context context, Intent intent) {
+        if (this.callback != null) {
+            this.callback.onReceive(context, intent);
+        }
+    }
+}
+"""
+        (java_dir / "GenericBroadcastReceiver.java").write_text(
+            content, encoding="utf-8"
+        )
+
+    @staticmethod
+    def write_generic_broadcast_receiver_callback(main_dir: Path) -> None:
+        """Writes the standalone callback interface required by Pyjnius/Plyer."""
+        java_dir = main_dir / "java" / "org" / "kivy" / "android"
+        java_dir.mkdir(parents=True, exist_ok=True)
+
+        content = """\
+package org.kivy.android;
+
+import android.content.Context;
+import android.content.Intent;
+
+public interface GenericBroadcastReceiverCallback {
+    void onReceive(Context context, Intent intent);
+}
+"""
+        (java_dir / "GenericBroadcastReceiverCallback.java").write_text(
+            content, encoding="utf-8"
+        )
 
     # -------------------------------------------------------------------------
     # Native bootstrap — libmain.so (provides SDL_main → CPython)
