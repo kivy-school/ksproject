@@ -22,7 +22,7 @@ Everything else (Android SDK, NDK, JDK, Gradle wrapper) is downloaded automatica
 ```bash
 uv init --package hello-world --python 3.13
 cd hello-world
-uv add git+https://github.com/kivy-school/ksproject --dev
+uv add git+https://github.com/kivy-school/ksproject@master --dev
 uv run ksproject init
 
 ```
