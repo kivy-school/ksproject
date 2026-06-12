@@ -8,7 +8,12 @@ def which(name: str) -> str | None:
     )
     if result.returncode != 0:
         return None
-    return result.stdout.strip() or None
+
+    output = result.stdout.strip()
+    if not output:
+        return None
+
+    return output.splitlines()[0].strip()
 
 
 def get_uv() -> str | None:
