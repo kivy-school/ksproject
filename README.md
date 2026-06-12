@@ -46,6 +46,9 @@ uv add kivy
 
 `pyjnius` is only meaningful on Android. Mark it with a PEP 508 marker so `uv` won't try to install it on macOS, Linux, or Windows:
 
+> [!NOTE]
+> These are already present by default!!
+
 ```bash
 uv add "pyjnius ; sys_platform == 'android'"
 
@@ -168,6 +171,7 @@ uv run ksproject android run --uuid R3CN30XXXXX
 uv run ksproject android genkey --out my-release-key.jks --storepass SecretPass123 --keyalias myapp
 
 ```
+This is required to be done only when your key is outdated or you need to generate a new key.
 
 **2. Sign a Built Artifact:**
 The orchestrator automatically detects your built release binary and signs it.
@@ -180,6 +184,9 @@ uv run ksproject android sign --keystore my-release-key.jks --storepass SecretPa
 uv run ksproject android sign --bundle --keystore my-release-key.jks --storepass SecretPass123 --keyalias myapp
 
 ```
+
+> [!NOTE]
+> By default, `ksproject android sign` targets the `release` directory. You can optionally pass `--variant debug` to sign a debug artifact, or pass `--keypass <password>` if your security profile requires an alias password distinct from your core keystore storage password. Similarly, you can append `--variant release` to the `run` pipeline to run production builds.
 
 ---
 
@@ -295,6 +302,3 @@ frameworks = []
 | `ksproject android devices` | List connected active `adb` serial devices and available AVD profiles |
 | `ksproject android run --name <AVD>` | Build, install, and launch the target application on a simulated emulator |
 | `ksproject android run --uuid <serial>` | Build, install, and launch the target application on a physical USB device |
-
-
-> **Note:** By default, `ksproject android sign` targets the `release` directory. You can optionally pass `--variant debug` to sign a debug artifact, or pass `--keypass <password>` if your security profile requires an alias password distinct from your core keystore storage password. Similarly, you can append `--variant release` to the `run` pipeline to run production builds.
