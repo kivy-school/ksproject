@@ -694,6 +694,7 @@ import org.libsdl.app.SDLActivity;
 import android.content.pm.PackageManager;
 import android.util.Log;
 import android.content.Context;
+import android.content.res.Configuration;
 import android.view.inputmethod.InputMethodManager;
 import android.view.View;
 import android.view.ViewGroup;

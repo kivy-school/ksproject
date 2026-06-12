@@ -226,7 +226,7 @@ class GradleProject:
                 / variant
                 / f"app-{variant}.apk"
             )
-            
+
             if variant == "release" and not output.exists():
                 unsigned_output = output.with_name(f"app-{variant}-unsigned.apk")
                 if unsigned_output.exists():
@@ -286,26 +286,57 @@ class GradleProject:
 
     def find_apk(self, variant: str = "debug") -> Path:
         """Locate an existing APK for the given variant without rebuilding."""
-        apk = (
+        base_dir = (
             self.gradle_dir
             / "app"
             / "build"
             / "outputs"
             / "apk"
             / variant
-            / f"app-{variant}.apk"
         )
         
-        if variant == "release" and not apk.exists():
-            unsigned_apk = apk.with_name(f"app-{variant}-unsigned.apk")
+        if variant == "release":
+            # Priority 1: Explicitly signed artifact (from our sign command)
+            signed_apk = base_dir / f"app-{variant}-signed.apk"
+            if signed_apk.exists():
+                return signed_apk
+                
+            # Priority 2: Standard release artifact
+            standard_apk = base_dir / f"app-{variant}.apk"
+            if standard_apk.exists():
+                return standard_apk
+                
+            # Priority 3: Explicitly unsigned artifact (default AGP output before signing)
+            unsigned_apk = base_dir / f"app-{variant}-unsigned.apk"
             if unsigned_apk.exists():
-                apk = unsigned_apk
-
-        if not apk.exists():
+                return unsigned_apk
+                
             raise GradleProjectError(
-                f"No APK found at {apk}. Run 'ksproject android build' first."
+                f"No release APK found in {base_dir}. Run 'ksproject android build release' first."
             )
-        return apk
+        else:
+            # Debug variant behaves normally
+            apk = base_dir / f"app-{variant}.apk"
+            if not apk.exists():
+                raise GradleProjectError(
+                    f"No APK found at {apk}. Run 'ksproject android build' first."
+                )
+            return apk
+
+    def find_bundle(self, variant: str = "release") -> Path:
+        """Locate an existing AAB for the given variant without rebuilding."""
+        bundle_path = (
+            self.gradle_dir
+            / "app"
+            / "build"
+            / "outputs"
+            / "bundle"
+            / variant
+            / f"app-{variant}.aab"
+        )
+        if not bundle_path.exists():
+            raise GradleProjectError(f"No App Bundle found at {bundle_path}.")
+        return bundle_path
 
     def run(
         self,
@@ -334,3 +365,216 @@ class GradleProject:
 
         self.adb.install(apk, serial)
         self.adb.start_app(serial, self.builder.package_name)
+
+    # ------------------------------------------------------------------
+    # Signing & Keystore Generation
+    # ------------------------------------------------------------------
+
+    def genkey(
+        self,
+        keystore_path: Path | str,
+        storepass: str,
+        keyalias: str,
+        keypass: str | None = None,
+        dname: str | None = None,
+        validity: int = 10000,
+    ) -> Path:
+        """Generate a new secure Java Keystore (JKS) using keytool."""
+        keystore_path = Path(keystore_path).resolve()
+        if keystore_path.exists():
+            raise GradleProjectError(
+                f"Keystore file already exists at: {keystore_path}"
+            )
+
+        keystore_path.parent.mkdir(parents=True, exist_ok=True)
+
+        java_home = Path(self.toolchain.java_path)
+        keytool = (
+            java_home
+            / "bin"
+            / ("keytool.exe" if sys.platform == "win32" else "keytool")
+        )
+
+        if not keytool.exists():
+            raise GradleProjectError(
+                f"keytool executable missing from JDK home at {keytool}"
+            )
+
+        if not dname:
+            dname = "CN=KivySchoolApp, O=KivySchool, C=US"
+
+        args = [
+            str(keytool),
+            "-genkeypair",
+            "-v",
+            "-keystore",
+            str(keystore_path),
+            "-alias",
+            keyalias,
+            "-keyalg",
+            "RSA",
+            "-keysize",
+            "2048",
+            "-validity",
+            str(validity),
+            "-storepass",
+            storepass,
+            "-dname",
+            dname,
+        ]
+
+        if keypass:
+            args.extend(["-keypass", keypass])
+        else:
+            args.extend(["-keypass", storepass])
+
+        env = os.environ.copy()
+        env["JAVA_HOME"] = self.toolchain.java_path
+        use_shell = sys.platform == "win32"
+
+        result = subprocess.run(
+            args, env=env, shell=use_shell, capture_output=True, text=True
+        )
+        if result.returncode != 0:
+            raise GradleProjectError(
+                f"keytool generation failed:\n{result.stderr or result.stdout}"
+            )
+
+        return keystore_path
+
+    def sign_project_artifact(
+        self,
+        keystore: Path | str,
+        storepass: str,
+        keyalias: str,
+        keypass: str | None = None,
+        variant: str = "release",
+        bundle: bool = False,
+    ) -> Path:
+        """Finds the compiled project artifact based on flags and signs it."""
+        artifact_path = self.find_bundle(variant) if bundle else self.find_apk(variant)
+
+        suffix = artifact_path.suffix.lower()
+        if suffix == ".apk":
+            return self._sign_apk(
+                artifact_path, Path(keystore), storepass, keyalias, keypass
+            )
+        elif suffix == ".aab":
+            return self._sign_aab(
+                artifact_path, Path(keystore), storepass, keyalias, keypass
+            )
+        else:
+            raise GradleProjectError(
+                f"Unsupported artifact extension for signing: {suffix}"
+            )
+
+    def _sign_apk(
+        self,
+        apk_path: Path,
+        keystore: Path,
+        storepass: str,
+        keyalias: str,
+        keypass: str | None = None,
+    ) -> Path:
+        sdk_path = Path(self.toolchain.sdk_path)
+        build_tools_dir = sdk_path / "build-tools"
+
+        if not build_tools_dir.is_dir():
+            raise GradleProjectError(
+                f"build-tools directory missing: {build_tools_dir}"
+            )
+
+        versions = sorted([d for d in build_tools_dir.iterdir() if d.is_dir()])
+        if not versions:
+            raise GradleProjectError(
+                "No build-tools versions found to locate apksigner."
+            )
+
+        apksigner = versions[-1] / (
+            "apksigner.bat" if sys.platform == "win32" else "apksigner"
+        )
+        if not apksigner.exists():
+            raise GradleProjectError(f"apksigner executable missing at {apksigner}")
+
+        signed_apk = apk_path.with_name(
+            apk_path.name.replace("-unsigned", "-signed")
+            if "-unsigned" in apk_path.name
+            else f"{apk_path.stem}-signed.apk"
+        )
+
+        args = [
+            str(apksigner),
+            "sign",
+            "--ks",
+            str(keystore),
+            "--ks-pass",
+            f"pass:{storepass}",
+            "--ks-key-alias",
+            keyalias,
+            "--out",
+            str(signed_apk),
+        ]
+        if keypass:
+            args.extend(["--key-pass", f"pass:{keypass}"])
+        args.append(str(apk_path))
+
+        self._run_signing_cmd(args)
+        return signed_apk
+
+    def _sign_aab(
+        self,
+        aab_path: Path,
+        keystore: Path,
+        storepass: str,
+        keyalias: str,
+        keypass: str | None = None,
+    ) -> Path:
+        java_home = Path(self.toolchain.java_path)
+        jarsigner = (
+            java_home
+            / "bin"
+            / ("jarsigner.exe" if sys.platform == "win32" else "jarsigner")
+        )
+
+        if not jarsigner.exists():
+            raise GradleProjectError(
+                f"jarsigner executable missing from JDK home at {jarsigner}"
+            )
+
+        signed_aab = aab_path.with_name(
+            aab_path.name.replace("-unsigned", "-signed")
+            if "-unsigned" in aab_path.name
+            else f"{aab_path.stem}-signed.aab"
+        )
+
+        import shutil
+
+        shutil.copy2(aab_path, signed_aab)
+
+        args = [
+            str(jarsigner),
+            "-keystore",
+            str(keystore),
+            "-storepass",
+            storepass,
+            str(signed_aab),
+            keyalias,
+        ]
+        if keypass:
+            args.extend(["-keypass", keypass])
+
+        self._run_signing_cmd(args)
+        return signed_aab
+
+    def _run_signing_cmd(self, args: list[str]) -> None:
+        env = os.environ.copy()
+        env["JAVA_HOME"] = self.toolchain.java_path
+        use_shell = sys.platform == "win32"
+
+        result = subprocess.run(
+            args, env=env, shell=use_shell, capture_output=True, text=True
+        )
+        if result.returncode != 0:
+            raise GradleProjectError(
+                f"Signing command failed:\n{result.stderr or result.stdout}"
+            )
