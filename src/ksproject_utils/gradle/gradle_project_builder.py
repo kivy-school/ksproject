@@ -229,6 +229,9 @@ class GradleProjectBuilder:
                     ),
                 )
 
+        GradleBuildFiles.write_generic_broadcast_receiver_callback(main_dir)
+        GradleBuildFiles.write_generic_broadcast_receiver(main_dir)
+
         _install_sdl2_java(main_dir, self.ks_root)
         _install_sdl2_headers(main_dir, self.ks_root)
 
@@ -311,31 +314,39 @@ class GradleProjectBuilder:
                     if "*" in src_str or "?" in src_str:
                         if Path(src_str).is_absolute():
                             import glob
+
                             paths_to_copy = [Path(p) for p in glob.glob(src_str)]
                         else:
                             paths_to_copy = list(self.working_dir.glob(src_str))
-                        
+
                         if not paths_to_copy:
-                            print(f"[ksproject] Warning: No files matched include_file pattern: {src_str}")
+                            print(
+                                f"[ksproject] Warning: No files matched include_file pattern: {src_str}"
+                            )
                             continue
                     else:
                         src_path = Path(src_str)
                         if not src_path.is_absolute():
                             src_path = self.working_dir / src_path
-                        
+
                         if not src_path.exists():
-                            print(f"[ksproject] Warning: include_file source not found: {src_path}")
+                            print(
+                                f"[ksproject] Warning: include_file source not found: {src_path}"
+                            )
                             continue
                         paths_to_copy = [src_path]
 
                     # Copy all resolved paths (whether 1 explicit file or multiple glob matches)
                     for path in paths_to_copy:
                         if path.is_dir():
-                            shutil.copytree(path, target_dir / path.name, dirs_exist_ok=True)
+                            shutil.copytree(
+                                path, target_dir / path.name, dirs_exist_ok=True
+                            )
                         else:
                             shutil.copy2(path, target_dir / path.name)
-                        print(f"[ksproject] Copied include_file: {path.name} -> {target_dir}")
-
+                        print(
+                            f"[ksproject] Copied include_file: {path.name} -> {target_dir}"
+                        )
 
         print(f"Gradle project generated at: {dist_dir}")
         print(f"  app/src/main/jniLibs/<abi> — libpython + extension .so per ABI")

@@ -7,9 +7,11 @@ import sys
 from pathlib import Path
 
 from ksproject_utils.project_init import ProjectInit
+from ksproject_utils.tools import load_dotenv
 
 from ksproject.apple_commands import AppleCommands
 from ksproject.gradle_commands import GradleCommands
+
 
 
 class KSProjectCLI:
@@ -24,6 +26,7 @@ class KSProjectCLI:
     # ------------------------------------------------------------------
 
     def _build_parser(self) -> argparse.ArgumentParser:
+        load_dotenv()
         parser = argparse.ArgumentParser(prog="ksproject")
         sub = parser.add_subparsers(dest="subsystem", required=True)
 
@@ -39,6 +42,7 @@ class KSProjectCLI:
 
         self._gradle.register(sub)
         self._apple.register(sub)
+
 
         return parser
 

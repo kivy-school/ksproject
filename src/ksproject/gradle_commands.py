@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -51,16 +52,28 @@ class GradleCommands:
             "sign", help="Sign automatically discovered project artifacts"
         )
         p_sign.add_argument(
-            "--keystore", type=Path, required=True, help="Path to keystore file"
+            "--keystore",
+            type=Path,
+            default=os.environ.get("KEYSTORE"),
+            help="Path to keystore file (Fallback: KEYSTORE env var)",
         )
         p_sign.add_argument(
-            "--storepass", type=str, required=True, help="Keystore password"
+            "--storepass",
+            type=str,
+            default=os.environ.get("STOREPASS"),
+            help="Keystore password (Fallback: STOREPASS env var)",
         )
         p_sign.add_argument(
-            "--keyalias", type=str, required=True, help="Key alias identifier"
+            "--keyalias",
+            type=str,
+            default=os.environ.get("KEYALIAS"),
+            help="Key alias identifier (Fallback: KEYALIAS env var)",
         )
         p_sign.add_argument(
-            "--keypass", type=str, help="Alias key password (if different)"
+            "--keypass",
+            type=str,
+            default=os.environ.get("KEYPASS"),
+            help="Alias key password (if different) (Fallback: KEYPASS env var)",
         )
         p_sign.add_argument(
             "--variant",
@@ -91,20 +104,26 @@ class GradleCommands:
         p_genkey.add_argument(
             "--out",
             type=Path,
-            required=True,
-            help="Output destination path for the keystore",
+            default=os.environ.get("KEYSTORE"),
+            help="Output destination path for the keystore (Fallback: KEYSTORE env var)",
         )
         p_genkey.add_argument(
             "--storepass",
             type=str,
-            required=True,
-            help="Keystore storage access password",
+            default=os.environ.get("STOREPASS"),
+            help="Keystore storage access password (Fallback: STOREPASS env var)",
         )
         p_genkey.add_argument(
-            "--keyalias", type=str, required=True, help="Alias profile handle string"
+            "--keyalias",
+            type=str,
+            default=os.environ.get("KEYALIAS"),
+            help="Alias profile handle string (Fallback: KEYALIAS env var)",
         )
         p_genkey.add_argument(
-            "--keypass", type=str, help="Alias key password (defaults to storepass)"
+            "--keypass",
+            type=str,
+            default=os.environ.get("KEYPASS"),
+            help="Alias key password (defaults to storepass/KEYPASS env var)",
         )
         p_genkey.add_argument(
             "--dname",
@@ -180,6 +199,15 @@ class GradleCommands:
         return 0
 
     def sign(self, args: argparse.Namespace) -> int:
+        # Validate that we have the required credentials from either args or env vars
+        if not args.keystore or not args.storepass or not args.keyalias:
+            print(
+                "Error: Missing credentials. Provide --keystore, --storepass, and --keyalias "
+                "or set their respective environment variables.",
+                file=sys.stderr,
+            )
+            return 1
+
         project = GradleProject(Path.cwd())
 
         output = project.sign_project_artifact(
@@ -196,6 +224,15 @@ class GradleCommands:
         return 0
 
     def genkey(self, args: argparse.Namespace) -> int:
+        # Validate that we have the required credentials from either args or env vars
+        if not args.out or not args.storepass or not args.keyalias:
+            print(
+                "Error: Missing credentials. Provide --out, --storepass, and --keyalias "
+                "or set their respective environment variables.",
+                file=sys.stderr,
+            )
+            return 1
+
         project = GradleProject(Path.cwd())
 
         output = project.genkey(
