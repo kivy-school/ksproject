@@ -286,26 +286,42 @@ class GradleProject:
 
     def find_apk(self, variant: str = "debug") -> Path:
         """Locate an existing APK for the given variant without rebuilding."""
-        apk = (
+        base_dir = (
             self.gradle_dir
             / "app"
             / "build"
             / "outputs"
             / "apk"
             / variant
-            / f"app-{variant}.apk"
         )
-
-        if variant == "release" and not apk.exists():
-            unsigned_apk = apk.with_name(f"app-{variant}-unsigned.apk")
+        
+        if variant == "release":
+            # Priority 1: Explicitly signed artifact (from our sign command)
+            signed_apk = base_dir / f"app-{variant}-signed.apk"
+            if signed_apk.exists():
+                return signed_apk
+                
+            # Priority 2: Standard release artifact
+            standard_apk = base_dir / f"app-{variant}.apk"
+            if standard_apk.exists():
+                return standard_apk
+                
+            # Priority 3: Explicitly unsigned artifact (default AGP output before signing)
+            unsigned_apk = base_dir / f"app-{variant}-unsigned.apk"
             if unsigned_apk.exists():
-                apk = unsigned_apk
-
-        if not apk.exists():
+                return unsigned_apk
+                
             raise GradleProjectError(
-                f"No APK found at {apk}. Run 'ksproject android build' first."
+                f"No release APK found in {base_dir}. Run 'ksproject android build release' first."
             )
-        return apk
+        else:
+            # Debug variant behaves normally
+            apk = base_dir / f"app-{variant}.apk"
+            if not apk.exists():
+                raise GradleProjectError(
+                    f"No APK found at {apk}. Run 'ksproject android build' first."
+                )
+            return apk
 
     def find_bundle(self, variant: str = "release") -> Path:
         """Locate an existing AAB for the given variant without rebuilding."""
