@@ -163,18 +163,41 @@ uv run ksproject android run --uuid R3CN30XXXXX
 
 ## 8. App Signing & Keystore Generation
 
-`ksproject` includes built-in tools for generating secure keystores and signing your production artifacts (`.apk` and `.aab`) using standard Android SDK/JDK tools.
+ksproject includes built-in tools for generating secure keystores and signing your production artifacts (.apk and .aab) using standard Android SDK/JDK tools.
 
-**1. Generate a Release Keystore:**
+### 💡 Pro-Tip: Streamline with a .env File
+To keep your passwords out of your terminal history and to make commands significantly shorter, save your credentials in a .env file at the root of your project. ksproject will automatically detect them.
+Create a .env file and add your variables like this:
 
+```env
+# .env
+
+# App Signing Credentials
+KSPROJECT_KEYSTORE="my-release-key.jks"
+KSPROJECT_KEYALIAS="myapp"
+KSPROJECT_STOREPASS="SecretPass123"
+# KSPROJECT_KEYPASS="defaults_to_storepass"
+```
+
+### 1. Generate a Release Keystore
+This is required only when your key is outdated or you need to generate a new key for the first time.
+
+**Using explicit flags:**
 ```bash
 uv run ksproject android genkey --out my-release-key.jks --storepass SecretPass123 --keyalias myapp
+```
+
+**Using your .env file:**
+```bash
+uv run ksproject android genkey --dname "CN=My App, O=My Org"
 
 ```
-This is required to be done only when your key is outdated or you need to generate a new key.
+> [!NOTE]
+> You can also append --dname "CN=My App, O=My Org" to either command if you need to provide a specific Distinguished Name string for the certificate.
 
-**2. Sign a Built Artifact:**
+### 2. Sign a Built Artifact
 The orchestrator automatically detects your built release binary and signs it.
+**Using explicit flags:**
 
 ```bash
 # Sign the APK
@@ -182,6 +205,15 @@ uv run ksproject android sign --keystore my-release-key.jks --storepass SecretPa
 
 # Sign an App Bundle (.aab)
 uv run ksproject android sign --bundle --keystore my-release-key.jks --storepass SecretPass123 --keyalias myapp
+```
+
+**Using your .env file:**
+```bash
+# Sign the APK
+uv run ksproject android sign
+
+# Sign an App Bundle (.aab)
+uv run ksproject android sign --bundle
 
 ```
 
