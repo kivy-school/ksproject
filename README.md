@@ -258,13 +258,13 @@ app_name = "Hello World"
 [tool.kivy-school.android]
 package_name = "org.example.hello_world"
 
-# version_name = "0.1"
-version_code = 1
+# version_name = "0.1" # change when you want to release a very new version
+version_code = 1 # keep increasing to make an update to existing version_name (bug fixes/security releases)
 
-#icon = ""
-#presplash
-#presplash_color = "#FFFFFF"
-#presplash_lottie = ""
+# icon = "relative to pyproject (png)"
+# presplash_color = "#FFFFFF"
+# presplash = "relative to pyproject (png,jpg,gif)"
+# presplash_lottie = "relative to pyproject (json)"
 
 archs = [
     "arm64-v8a", 
@@ -293,15 +293,15 @@ permissions = [
     # "POST_NOTIFICATIONS", "INTERNET", "ACCESS_NETWORK_STATE"
 ]
 
-# <meta-data> entries inside <application>
-# [tool.kivy-school.android.meta_data]
-# "com.google.android.gms.ads.APPLICATION_ID" = "ca-app-pub-xxxxxxxx~xxxxxxxx"
-
 # --- File Inclusions ---
 # Format: [Destination, Source(s)]
 # include_files = [
 #     ["gradle/app", ["./google-services.json", "./some-other-config.xml"]]
 # ]
+
+# <meta-data> entries inside <application>
+# [tool.kivy-school.android.meta_data]
+# "com.google.android.gms.ads.APPLICATION_ID" = "ca-app-pub-xxxxxxxx~xxxxxxxx"
 
 # --- Background Services ---
 # [[tool.kivy-school.android.services]]
