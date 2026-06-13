@@ -257,6 +257,15 @@ app_name = "Hello World"
 
 [tool.kivy-school.android]
 package_name = "org.example.hello_world"
+
+# version_name = "0.1"
+version_code = 1
+
+#icon = ""
+#presplash
+#presplash_color = "#FFFFFF"
+#presplash_lottie = ""
+
 archs = [
     "arm64-v8a", 
     # "x86_64" # Uncomment to support emulators (increases APK size)
@@ -323,14 +332,14 @@ frameworks = []
 | Command | What it does |
 | --- | --- |
 | `ksproject init` | Scaffold a new project, template files, and `pyproject.toml` configurations |
-| `ksproject android build [debug\release]` | Build an APK artifact |
-| `ksproject android build --aar [debug\release]` | Build an AAR library instead of an APK |
-| `ksproject android build --bundle [debug\release]` | Build an AAB (Android App Bundle) instead of an APK |
-| `ksproject android build [debug\release] --clean` | Perform a clean step before executing the build task |
+| `ksproject android build [debug\|release]` | Build an APK artifact |
+| `ksproject android build --aar [debug\|release]` | Build an AAR library instead of an APK |
+| `ksproject android build --bundle [debug\|release]` | Build an AAB (Android App Bundle) instead of an APK |
+| `ksproject android build [debug\|release] --clean` | Perform a clean step before executing the build task |
 | `ksproject android sign --keystore <file> --storepass <pass> --keyalias <alias>` | Sign the built APK inside the target directory using `apksigner` |
 | `ksproject android sign --bundle --keystore <file> --storepass <pass> --keyalias <alias>` | Sign the built App Bundle (.aab) inside the target directory using `jarsigner` |
 | `ksproject android genkey --out <file> --storepass <pass> --keyalias <alias>` | Generate a secure Java Keystore (`.jks`) using `keytool` |
-| `ksproject android get-path [sdk\ndk\emulator]` | Print the fully resolved local file system path for the specified tool |
+| `ksproject android get-path [sdk\|ndk\|emulator]` | Print the fully resolved local file system path for the specified tool |
 | `ksproject android devices` | List connected active `adb` serial devices and available AVD profiles |
 | `ksproject android run --name <AVD>` | Build, install, and launch the target application on a simulated emulator |
 | `ksproject android run --uuid <serial>` | Build, install, and launch the target application on a physical USB device |
