@@ -388,7 +388,7 @@ tasks.configureEach {{
         <activity
             android:name=".MainActivity"
             android:label="{{ app_name }}"
-            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:configChanges="mcc|mnc|locale|touchscreen|keyboard|keyboardHidden|navigation|orientation|screenLayout|fontScale|uiMode|screenSize|smallestScreenSize"
             android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
             android:exported="true">
             <intent-filter>
