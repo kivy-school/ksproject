@@ -190,10 +190,10 @@ class GradleProject:
             args.append("clean")
         args.append(task)
 
+        cmd_str = " ".join(args[1:])
         print(f"Build with: cd {self.gradle_dir} && {cmd_str}")
         result = subprocess.run(args, cwd=self.gradle_dir, env=env, shell=use_shell)
         if result.returncode != 0:
-            cmd_str = " ".join(args[1:])
             raise GradleProjectError(
                 f"./gradlew {cmd_str} exited with code {result.returncode}"
             )
