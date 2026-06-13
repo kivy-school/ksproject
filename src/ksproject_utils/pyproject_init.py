@@ -26,6 +26,15 @@ def _android_keys(module_name: str) -> str:
     return f"""\
 [tool.kivy-school.android]
 package_name = "org.example.{module_name}"
+
+# version_name = "0.1" # change when you want to release a very new version
+version_code = 1 # keep increasing to make an update to existing version_name (bug fixes/security releases)
+
+# icon = "relative to pyproject (png)"
+# presplash_color = "#FFFFFF"
+# presplash = "relative to pyproject (png,jpg,gif)"
+# presplash_lottie = "relative to pyproject (json)"
+
 archs = [
     "arm64-v8a", 
     # "x86_64" # Uncomment if you want to support x86_64 (emulators), but it will increase APK size
