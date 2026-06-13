@@ -71,6 +71,21 @@ global_tools = true # Set to <false> to use project-local SDK/NDK (./.kivyschool
 # include_files = [
 #     ["gradle/app", ["./google-services.json", "./some-other-config.xml"]]
 # ]
+
+# <meta-data> entries inside <application>
+# [tool.kivy-school.android.meta_data]
+# "com.google.android.gms.ads.APPLICATION_ID" = "ca-app-pub-xxxxxxxx~xxxxxxxx"
+
+# --- Services ---
+# [[tool.kivy-school.android.services]]
+# name = "MyService1"
+# start_type = "START_NOT_STICKY"
+# entrypoint = "hello_world.services.myservice1"
+# foreground = true
+# foreground_service_type = "location|dataSync"
+# notification_title = "MyService1 Running"
+# notification_text = "Service is managing background data."
+# notification_icon = "stat_notify_sync"
 """
 
 
