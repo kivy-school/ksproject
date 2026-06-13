@@ -190,6 +190,7 @@ class GradleProject:
             args.append("clean")
         args.append(task)
 
+        print(f"Build with: cd {self.gradle_dir} && {cmd_str}")
         result = subprocess.run(args, cwd=self.gradle_dir, env=env, shell=use_shell)
         if result.returncode != 0:
             cmd_str = " ".join(args[1:])
@@ -286,31 +287,24 @@ class GradleProject:
 
     def find_apk(self, variant: str = "debug") -> Path:
         """Locate an existing APK for the given variant without rebuilding."""
-        base_dir = (
-            self.gradle_dir
-            / "app"
-            / "build"
-            / "outputs"
-            / "apk"
-            / variant
-        )
-        
+        base_dir = self.gradle_dir / "app" / "build" / "outputs" / "apk" / variant
+
         if variant == "release":
             # Priority 1: Explicitly signed artifact (from our sign command)
             signed_apk = base_dir / f"app-{variant}-signed.apk"
             if signed_apk.exists():
                 return signed_apk
-                
+
             # Priority 2: Standard release artifact
             standard_apk = base_dir / f"app-{variant}.apk"
             if standard_apk.exists():
                 return standard_apk
-                
+
             # Priority 3: Explicitly unsigned artifact (default AGP output before signing)
             unsigned_apk = base_dir / f"app-{variant}-unsigned.apk"
             if unsigned_apk.exists():
                 return unsigned_apk
-                
+
             raise GradleProjectError(
                 f"No release APK found in {base_dir}. Run 'ksproject android build release' first."
             )

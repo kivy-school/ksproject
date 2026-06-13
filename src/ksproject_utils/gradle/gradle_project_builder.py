@@ -356,7 +356,6 @@ class GradleProjectBuilder:
             "copySitePackagesToAssets task"
         )
         print("")
-        print(f"Build with: cd {dist_dir} && ./gradlew assembleDebug")
 
 
 def _merge_unique(base: list[str], extra: list[str]) -> list[str]:
