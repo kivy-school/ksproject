@@ -221,12 +221,10 @@ class GradleProjectBuilder:
                     python_version=PY_VERSION,
                     entrypoint=svc.entrypoint,
                     foreground=svc.foreground,
-                    start_type=getattr(svc, "start_type", "START_NOT_STICKY"),
-                    notification_title=getattr(svc, "notification_title", None),
-                    notification_text=getattr(svc, "notification_text", None),
-                    notification_icon=getattr(
-                        svc, "notification_icon", "stat_notify_sync"
-                    ),
+                    start_type=svc.start_type,
+                    notification_title=svc.notification_title,
+                    notification_text=svc.notification_text,
+                    notification_icon=svc.notification_icon,
                 )
 
         GradleBuildFiles.write_generic_broadcast_receiver_callback(main_dir)
