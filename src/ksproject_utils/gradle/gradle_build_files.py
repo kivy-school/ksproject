@@ -654,12 +654,12 @@ public class MainActivity extends PythonActivity {{
     def write_renpy_hardware(main_dir: Path, package_name: str) -> None:
         """
         Comprehensive org.renpy.android.Hardware shim matching older p4a behavior.
-        Updated for modern Android API compliance while maintaining strict 
+        Updated for modern Android API compliance while maintaining strict
         backward compatibility with Pyjnius calls from Kivy/Plyer.
         """
         java_dir = main_dir / "java" / "org" / "renpy" / "android"
         java_dir.mkdir(parents=True, exist_ok=True)
-        
+
         content = """\
 package org.renpy.android;
 
@@ -1513,8 +1513,6 @@ public class PythonService extends Service implements Runnable {
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
-import android.os.Build;
-import android.content.Context;
 """
             foreground_logic = f"""
         String channelId = "{package_name}.{service_name}";
@@ -1564,6 +1562,7 @@ package {package_name};
 
 import android.content.Context;
 import android.content.Intent;
+import android.os.Build;
 import org.kivy.android.PythonService;
 import java.io.File;{foreground_imports}
 
@@ -1607,6 +1606,45 @@ public class {service_name} extends PythonService {{
         setAutoRestartService({is_sticky_bool_str});
         
         return super.onStartCommand(intent, flags, startId);
+    }}
+
+    // ====================================================================
+    // BACKWARD COMPATIBILITY: Legacy p4a bootstrap helpers for Pyjnius
+    // ====================================================================
+
+    /** * Handles old python calls like: service_class.start(mActivity, "")
+     */
+    public static void start(Context ctx, String pythonServiceArgument) {{
+        start(ctx, "{notification_icon}", "{title}", "{text}", pythonServiceArgument);
+    }}
+
+    /** * Handles old python calls like: service_class.start(mActivity, "icon", "logger", "Connecting", "")
+     */
+    public static void start(Context ctx, String smallIconName, String contentTitle, String contentText, String pythonServiceArgument) {{
+        Intent intent = new Intent(ctx, {service_name}.class);
+        intent.putExtra("androidPrivate", ctx.getFilesDir().getAbsolutePath());
+        intent.putExtra("serviceEntrypoint", "{entrypoint}");
+        intent.putExtra("pythonVersion", "{python_version}");
+        intent.putExtra("pythonName", "{service_name.lower()}");
+        intent.putExtra("serviceTitle", contentTitle);
+        intent.putExtra("serviceDescription", contentText);
+        intent.putExtra("smallIconName", smallIconName);
+        intent.putExtra("pythonServiceArgument", pythonServiceArgument);
+        intent.putExtra("serviceStartAsForeground", "{'true' if foreground else 'false'}");
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {{
+            ctx.startForegroundService(intent);
+        }} else {{
+            ctx.startService(intent);
+        }}
+    }}
+
+    /**
+     * Handles old python calls like: service_class.stop(mActivity)
+     */
+    public static void stop(Context ctx) {{
+        Intent intent = new Intent(ctx, {service_name}.class);
+        ctx.stopService(intent);
     }}
 }}
 """
