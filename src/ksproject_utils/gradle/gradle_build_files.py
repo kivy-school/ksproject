@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import shutil
 import urllib.request
+import zlib
 from pathlib import Path
 
 from ..pyproject_toml import KivySchoolData
@@ -1375,6 +1376,10 @@ public class PythonService extends Service implements Runnable {
     }
 
     protected int getServiceId() {
+        // Fallback: Generate a dynamic, stable ID based on the python name
+        if (pythonName != null && !pythonName.isEmpty()) {
+            return Math.abs(pythonName.hashCode()) % 10000 + 1;
+        }
         return 1;
     }
 
@@ -1508,6 +1513,11 @@ public class PythonService extends Service implements Runnable {
         title = notification_title or f"{service_name} is running"
         text = notification_text or "Background task active"
 
+        # Calculate a stable, unique integer for this specific service at generation time
+        unique_service_id = (
+            zlib.crc32(service_name.lower().encode("utf-8")) % 10000
+        ) + 1
+
         if foreground:
             foreground_imports = """
 import android.app.Notification;
@@ -1552,7 +1562,7 @@ import android.app.NotificationManager;
                 .build();
         }}
 
-        startForeground(1, notification);
+        startForeground({unique_service_id}, notification);
 
         intent.putExtra("serviceStartAsForeground", "false");
 """
@@ -1571,6 +1581,11 @@ public class {service_name} extends PythonService {{
     @Override
     public int startType() {{
         return {start_type_constant};
+    }}
+    
+    @Override
+    protected int getServiceId() {{
+        return {unique_service_id};
     }}
 
     @Override
