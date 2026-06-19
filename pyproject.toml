@@ -18,29 +18,24 @@ dependencies = [
 
 [project.scripts]
 ksproject = "ksproject:main"
-ksproject-gui = "ksproject_gui:main"
 
 [project.optional-dependencies]
-gui = [
-    "carbonkivy",
-    "thorvg-cython",
-    "watchdog",
-    "pyobjc; sys_platform == 'darwin'",
+studio = [
+    "ksproject@git+http://github.com/kivy-school/ksproject"
 ]
 
 full = [
-    "carbonkivy",
-    "thorvg-cython",
-    "kaki",
-    "watchdog",
-    "pyobjc; sys_platform == 'darwin'",
+
 ]
 
 [tool.uv.sources]
 carbonkivy = { git = "https://github.com/CarbonKivy/CarbonKivy", rev = "master" }
 
 [tool.uv.build-backend]
-module-name = ["ksproject", "ksproject_gui", "ksproject_utils"]
+module-name = [
+    "ksproject", 
+    "ksproject_utils"
+]
 
 [dependency-groups]
 dev = [

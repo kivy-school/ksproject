@@ -9,8 +9,10 @@ across projects, matching PSProject's ``Path.ps_support``).
 """
 from __future__ import annotations
 
+import plistlib
 import shutil
 import tarfile
+import tempfile
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -33,6 +35,12 @@ class AppleSupportError(Exception):
 
 def _support_root() -> Path:
     root = Path.home() / ".kivyschool" / "apple_support"
+    root.mkdir(parents=True, exist_ok=True)
+    return root
+
+
+def apple_python_cache_root() -> Path:
+    root = Path.home() / ".kivyschool" / "apple" / "python"
     root.mkdir(parents=True, exist_ok=True)
     return root
 
@@ -197,3 +205,180 @@ def copy_site_frameworks(workdir_support: Path, site_packages_root: Path) -> Non
                     shutil.rmtree(dst)
                 shutil.move(str(fw_path), dst)
         shutil.rmtree(fw_dir)
+
+class BeewarePythonVersion:
+    beeware: str
+    major: int
+    minor: int
+
+    def __init__(self, beeware: str, major: int, minor: int):
+        self.beeware = beeware
+        self.major = major
+        self.minor = minor
+
+    def url_for(self, platform: str) -> str:
+        b = self.beeware
+        major = self.major
+        return f"https://github.com/beeware/Python-Apple-support/releases/download/3.{major}-{b}/Python-3.{major}-{platform}-support.{b}.tar.gz"
+
+    @property
+    def macos_url(self) -> str:
+        return self.url_for("macOS")
+
+    @property
+    def ios_url(self) -> str:
+        return self.url_for("iOS")
+
+    @property
+    def url(self) -> str:
+        return self.macos_url
+
+apple_python_versions = [
+    BeewarePythonVersion(
+        "b13", 13, 11
+    ),
+    BeewarePythonVersion(
+        "b14", 13, 14
+    ),
+    BeewarePythonVersion(
+        "b9", 14, 2
+    ),
+    BeewarePythonVersion(
+        "b10", 14, 6
+    )
+]
+
+
+def get_beeware_version(major: int, minor: int) -> BeewarePythonVersion | None:
+    for fw in apple_python_versions:
+        if fw.major == major and fw.minor == minor: return fw
+    return None
+
+class ApplePythonFramework:
+
+    support_root: Path
+    version: str
+    major_version: int
+    minor_version: int
+
+    def __init__(self, support_root: Path, version: str = "3.13.11"):
+        self.support_root = support_root
+        self.version = version
+        main_ver, maj_ver, min_ver = [int(x) for x in version.split(".")]
+        self.major_version = maj_ver
+        self.minor_version = min_ver
+
+    @property
+    def framework(self) -> BeewarePythonVersion | None:
+        return get_beeware_version(self.major_version, self.minor_version)
+
+    @property
+    def xcframework_path(self) -> Path:
+        return self.support_root / self.version / "Python.xcframework"
+
+    def ensure_merged(self) -> Path:
+        fw = self.xcframework_path
+        if fw.exists():
+            return fw
+        return self.merge_frameworks()
+
+    def install_to(self, destination: Path) -> None:
+        dst = destination / "Python.xcframework"
+        if dst.exists():
+            return
+        shutil.copytree(self.ensure_merged(), dst)
+
+    def download(self, url: str, destination: Path) -> None:
+        tar_name = url.rsplit("/", 1)[-1]
+        tar_path = destination / tar_name
+        destination.mkdir(parents=True, exist_ok=True)
+        print(f"[ksproject] downloading {url}")
+        with urllib.request.urlopen(url) as resp, tar_path.open("wb") as f:
+            shutil.copyfileobj(resp, f)
+        print(f"[ksproject] extracting {tar_name}")
+        with tarfile.open(tar_path) as tf:
+            tf.extractall(destination)
+        tar_path.unlink()
+
+    def download_macos(self, destination: Path) -> None:
+        fw = self.framework
+        if not fw:
+            raise AppleSupportError(f"{self.version} has no beeware build")
+        self.download(fw.macos_url, destination)
+
+    def download_ios(self, destination: Path) -> None:
+        fw = self.framework
+        if not fw:
+            raise AppleSupportError(f"{self.version} has no beeware build")
+        self.download(fw.ios_url, destination)
+
+    def merge_frameworks(self) -> Path:
+        fw_dst = self.xcframework_path
+        fw_dst.mkdir(parents=True, exist_ok=True)
+
+        merged_libraries = []
+        base_plist: dict = {}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            self.download_macos(tmp_path / "macos")
+            self.download_ios(tmp_path / "ios")
+            for platform_tmp in (tmp_path / "macos", tmp_path / "ios"):
+                xcfw_src = platform_tmp / "Python.xcframework"
+                if not xcfw_src.is_dir():
+                    continue
+                plist_path = xcfw_src / "Info.plist"
+                if not plist_path.exists():
+                    continue
+                with plist_path.open("rb") as f:
+                    src_plist = plistlib.load(f)
+                merged_libraries.extend(src_plist.get("AvailableLibraries", []))
+                base_plist = src_plist
+                slice_names = {lib["LibraryIdentifier"] for lib in src_plist.get("AvailableLibraries", [])}
+                for lib in src_plist.get("AvailableLibraries", []):
+                    slice_name = lib["LibraryIdentifier"]
+                    src_slice = xcfw_src / slice_name
+                    if not src_slice.is_dir():
+                        continue
+                    dst_slice = fw_dst / slice_name
+                    if dst_slice.exists():
+                        shutil.rmtree(dst_slice)
+                    shutil.copytree(src_slice, dst_slice)
+                for entry in xcfw_src.iterdir():
+                    if entry.name in slice_names or entry.name == "Info.plist":
+                        continue
+                    dst_entry = fw_dst / entry.name
+                    if entry.is_dir():
+                        if not dst_entry.exists():
+                            shutil.copytree(entry, dst_entry)
+                    else:
+                        if not dst_entry.exists():
+                            shutil.copy2(entry, dst_entry)
+
+        base_plist["AvailableLibraries"] = merged_libraries
+        with (fw_dst / "Info.plist").open("wb") as f:
+            plistlib.dump(base_plist, f)
+
+        py_ver = f"3.{self.major_version}"
+        py_lib = fw_dst / "macos-arm64_x86_64/Python.framework/Versions" / py_ver / "lib"
+        for stale in (
+            py_lib / f"libpython{py_ver}.dylib",
+            py_lib / f"python{py_ver}/config-{py_ver}-darwin",
+        ):
+            if stale.is_symlink() or stale.is_file():
+                stale.unlink(missing_ok=True)
+            elif stale.is_dir():
+                shutil.rmtree(stale, ignore_errors=True)
+
+        for lib in merged_libraries:
+            slice_dir = fw_dst / lib["LibraryIdentifier"]
+            fw_bundle = slice_dir / lib["LibraryPath"]
+            modules_dir = fw_bundle / "Modules"
+            src_map = fw_bundle / "Headers" / "module.modulemap"
+            if src_map.exists():
+                modules_dir.mkdir(exist_ok=True)
+                dst_map = modules_dir / "module.modulemap"
+                content = src_map.read_text().replace("module Python {", "framework module Python {", 1)
+                dst_map.write_text(content)
+
+        return fw_dst

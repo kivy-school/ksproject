@@ -1,1 +1,0 @@
-from .svginstruction import SvgInstruction

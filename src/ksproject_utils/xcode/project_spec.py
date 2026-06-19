@@ -36,22 +36,26 @@ class ProjectSpec:
 
     def _packages(self) -> dict[str, dict[str, Any]]:
         return {
-            "CPython": {
-                "url": "https://github.com/py-swift/CPython",
-                "from": "313.0.0",
-            },
-            "PySwiftKit": {
-                "url": "https://github.com/py-swift/PySwiftKit",
-                "from": "313.0.0",
-            },
-            "KivyLauncher": {
-                "url": "https://github.com/kivy-school/KivyLauncher",
-                "branch": "master",
-            },
-            "Kivy_iOS_Module": {
-                "url": "https://github.com/kivy-school/Kivy_iOS_Module",
-                "branch": "master",
-            },
+            "PathKit": {
+                "url": "https://github.com/kylef/PathKit",
+                "from": "1.0.1"
+            }
+            # "CPython": {
+            #     "url": "https://github.com/py-swift/CPython",
+            #     "from": "313.0.0",
+            # },
+            # "PySwiftKit": {
+            #     "url": "https://github.com/py-swift/PySwiftKit",
+            #     "from": "313.0.0",
+            # },
+            # "KivyLauncher": {
+            #     "url": "https://github.com/kivy-school/KivyLauncher",
+            #     "branch": "master",
+            # },
+            # "Kivy_iOS_Module": {
+            #     "url": "https://github.com/kivy-school/Kivy_iOS_Module",
+            #     "branch": "master",
+            # },
         }
 
     def _options(self) -> dict[str, Any]:

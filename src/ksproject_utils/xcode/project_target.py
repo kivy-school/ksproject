@@ -41,18 +41,24 @@ fi
 _INSTALL_PY_IOS = r"""mkdir -p "$CODESIGNING_FOLDER_PATH/python/lib"
 if [ "$EFFECTIVE_PLATFORM_NAME" = "-iphonesimulator" ]; then
     echo "Installing Python modules for iOS Simulator"
-    rsync -au --delete "$PROJECT_DIR/Support/ios-arm64_x86_64-simulator/lib/" "$CODESIGNING_FOLDER_PATH/python/lib/"
-    rsync -au --delete "$PROJECT_DIR/site_packages/iphonesimulator/" "$CODESIGNING_FOLDER_PATH/site_packages"
+    SIM_ARCH=$(uname -m)
+    rsync -au --delete "$PROJECT_DIR/Frameworks/Python.xcframework/lib/python3.13/" "$CODESIGNING_FOLDER_PATH/python/lib/"
+    rsync -au --delete "$PROJECT_DIR/Frameworks/Python.xcframework/ios-arm64_x86_64-simulator/lib-${SIM_ARCH}/python3.13/lib-dynload" "$CODESIGNING_FOLDER_PATH/python/lib/"
+    rsync -au --delete "$PROJECT_DIR/site_packages/iphonesimulator/" "$CODESIGNING_FOLDER_PATH/python/site_packages"
 else
     echo "Installing Python modules for iOS Device"
-    rsync -au --delete "$PROJECT_DIR/Support/ios-arm64/lib/" "$CODESIGNING_FOLDER_PATH/python/lib"
-    rsync -au --delete "$PROJECT_DIR/site_packages/iphoneos/" "$CODESIGNING_FOLDER_PATH/site_packages"
+    rsync -au --delete "$PROJECT_DIR/Frameworks/Python.xcframework/lib/python3.13/" "$CODESIGNING_FOLDER_PATH/python/lib"
+    rsync -au --delete "$PROJECT_DIR/Frameworks/Python.xcframework/ios-arm64/lib-arm64/python3.13/lib-dynload" "$CODESIGNING_FOLDER_PATH/python/lib/"
+    rsync -au --delete "$PROJECT_DIR/site_packages/iphoneos/" "$CODESIGNING_FOLDER_PATH/python/site_packages"
 fi
-rsync -au --delete "$PROJECT_DIR/app/" "$CODESIGNING_FOLDER_PATH/app"
+rm -rf "$CODESIGNING_FOLDER_PATH/python/site_packages/bin"
+rm -rf "$CODESIGNING_FOLDER_PATH/python/site_packages/.java"
+rm "$CODESIGNING_FOLDER_PATH/python/site_packages/.lock"
+#rsync -au --delete "$PROJECT_DIR/app/" "$CODESIGNING_FOLDER_PATH/app"
 """
 
 
-_INSTALL_PY_MACOS = r"""rsync -au --delete "$PROJECT_DIR/Support/macos-arm64_x86_64/lib/" "$BUILT_PRODUCTS_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/python/lib"
+_INSTALL_PY_MACOS = r"""rsync -au --delete "$PROJECT_DIR/Frameworks/macos-arm64_x86_64/lib/" "$BUILT_PRODUCTS_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/python/lib"
 
 SITE_DST="$BUILT_PRODUCTS_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/site_packages"
 mkdir -p $SITE_DST
@@ -229,24 +235,27 @@ class ProjectTarget:
                 "group": "Resources",
                 "destinationFilters": ["iOS"],
             },
-            {"path": "Support/dylib-Info-template.plist", "group": "Support"},
+            {"path": "Frameworks/dylib-Info-template.plist", "group": "Support"},
         ]
 
     # ----- dependencies -----
 
     def _dependencies(self) -> list[dict[str, Any]]:
         deps: list[dict[str, Any]] = [
-            {"package": "PySwiftKit", "product": "PySwiftKitBase"},
-            {"package": "CPython", "product": "CPython"},
-            {"package": "KivyLauncher", "product": "KivyLauncher"},
-            {
-                "package": "Kivy_iOS_Module",
-                "product": "Kivy_iOS_Module",
-                "platformFilter": "iOS",
-            },
+            # {"package": "PySwiftKit", "product": "PySwiftKitBase"},
+            # {"package": "CPython", "product": "CPython"},
+            # {"package": "KivyLauncher", "product": "KivyLauncher"},
+            # {
+            #     "package": "Kivy_iOS_Module",
+            #     "product": "Kivy_iOS_Module",
+            #     "platformFilter": "iOS",
+            # },
+            {"package": "PathKit", "product": "PathKit"},
+            {"framework": "Frameworks/Python.xcframework"}
         ]
         for fw_name in self.site_xcframeworks:
-            deps.append({"framework": f"Support/{fw_name}", "platformFilter": "iOS"})
+            if fw_name == "Python.xcframework": continue
+            deps.append({"framework": f"Frameworks/{fw_name}", "platformFilter": "iOS"})
         return deps
 
     # ----- info / entitlements -----

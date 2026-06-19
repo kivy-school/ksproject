@@ -88,15 +88,25 @@ class XcodeProject:
 
         for cls in platform_classes:
             plat = cls(str(self.project_path))
+            site = plat.site_packages
             Path(plat.site_packages).mkdir(parents=True, exist_ok=True)
             PipInstaller.install(
                 uv_src=str(self.project_path),
                 platform=plat,
-                site_packages=plat.site_packages,
+                site_packages=site,
             )
 
+            if not isinstance(plat, MacOSPlatform):
+                ios_module = Path(site) / "ios.py"
+                if not ios_module.exists():
+                    ios_module.write_bytes(
+                        (Path(__file__).parent / "templates" / "ios.file").read_bytes()
+                    )
+
+
+
         copy_site_frameworks(
-            self.xcode_dir / "Support",
+            self.xcode_dir / "Frameworks",
             self.xcode_dir / "site_packages",
         )
 
@@ -157,7 +167,7 @@ class XcodeProject:
         if just_created:
             self.generate(platforms=platforms)
             self.open_in_xcode()
-        self.builder._install_frameworks(platforms)
+        self.builder._install_frameworks()
         self.install_site_packages(platforms=["iOS"], simulator=simulator)
         self.builder.sync_site_xcframeworks()
         dest = (
@@ -173,7 +183,7 @@ class XcodeProject:
         if just_created:
             self.generate(platforms=platforms)
             self.open_in_xcode()
-        self.builder._install_frameworks(platforms)
+        self.builder._install_frameworks()
         self.install_site_packages(platforms=["iOS", "macOS"])
         return self._xcodebuild("generic/platform=macOS", variant)
 
