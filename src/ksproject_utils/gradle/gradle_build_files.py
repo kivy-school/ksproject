@@ -1918,10 +1918,14 @@ int main(int argc, char *argv[]) {{
 """
         (cpp_dir / "main.c").write_text(content, encoding="utf-8")
 
+    # -------------------------------------------------------------------------
+    # Native bootstrap — libservicemain.so
+    # -------------------------------------------------------------------------
+
     @staticmethod
     def write_service_main_c(cpp_dir: Path, project_name: str) -> None:
         cpp_dir.mkdir(parents=True, exist_ok=True)
-        content = """\
+        content = f"""\
 #define PY_SSIZE_T_CLEAN
 #include <jni.h>
 #include <Python.h>
@@ -1934,25 +1938,25 @@ int main(int argc, char *argv[]) {{
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "ksproject-service", __VA_ARGS__)
 
 // Include the same AndroidEmbed implementation as main.c
-static PyObject *androidembed_log(PyObject *self, PyObject *args) {
+static PyObject *androidembed_log(PyObject *self, PyObject *args) {{
     const char *s;
     if (!PyArg_ParseTuple(args, "s", &s)) return NULL;
     __android_log_write(ANDROID_LOG_INFO, "python-service", s);
     Py_RETURN_NONE;
-}
+}}
 
-static PyMethodDef AndroidEmbedMethods[] = {
-    {"log", androidembed_log, METH_VARARGS, "log to android logcat"},
-    {NULL, NULL, 0, NULL}
-};
+static PyMethodDef AndroidEmbedMethods[] = {{
+    {{"log", androidembed_log, METH_VARARGS, "log to android logcat"}},
+    {{NULL, NULL, 0, NULL}}
+}};
 
-static struct PyModuleDef androidembed_mod = {
+static struct PyModuleDef androidembed_mod = {{
     PyModuleDef_HEAD_INIT, "androidembed", NULL, -1, AndroidEmbedMethods
-};
+}};
 
-PyMODINIT_FUNC PyInit_androidembed(void) {
+PyMODINIT_FUNC PyInit_androidembed(void) {{
     return PyModule_Create(&androidembed_mod);
-}
+}}
 
 static const char *REDIRECT_STDIO =
     "import sys, androidembed\\n"
@@ -1971,7 +1975,7 @@ static const char *REDIRECT_STDIO =
 
 JNIEXPORT jint JNICALL
 Java_org_kivy_android_PythonService_nativeStart(
-    JNIEnv *env, jobject thiz, jstring j_androidPrivate, jstring j_entrypoint, jstring j_pyVersion) {
+    JNIEnv *env, jobject thiz, jstring j_androidPrivate, jstring j_entrypoint, jstring j_pyVersion) {{
 
     const char *private_path = (*env)->GetStringUTFChars(env, j_androidPrivate, NULL);
     const char *entrypoint = (*env)->GetStringUTFChars(env, j_entrypoint, NULL);
@@ -1984,13 +1988,13 @@ Java_org_kivy_android_PythonService_nativeStart(
 
     char done_path[1024];
     snprintf(done_path, sizeof(done_path), "%s/.unpack_done", app_path);
-    while (access(done_path, F_OK) != 0) {
+    while (access(done_path, F_OK) != 0) {{
         usleep(50000); // Sleep for 50ms while presplash is displaying on the UI thread
-    }
+    }}
 
-    if (chdir(app_path) != 0) {
+    if (chdir(app_path) != 0) {{
         LOGE("chdir(%s) failed", app_path);
-    }
+    }}
 
     setenv("ANDROID_APP_PATH", app_path, 1);
     setenv("ANDROID_ENTRYPOINT", entrypoint, 1);
@@ -2023,9 +2027,9 @@ Java_org_kivy_android_PythonService_nativeStart(
     wchar_t w_stdlib[1024], w_dynload[1024], w_site[1024], w_project_site[1024], w_app[1024];
     swprintf(w_stdlib,  1024, L"%s/python%s", app_path, py_version);
     swprintf(w_dynload, 1024, L"%s/python%s/lib-dynload", app_path, py_version);
-    swprintf(w_project_site, 1024, L"%s/site-packages/{project_name}", app_path);
     swprintf(w_site,    1024, L"%s/site-packages", app_path);
 
+    swprintf(w_project_site, 1024, L"%s/site-packages/{project_name}", app_path);
     swprintf(w_app,     1024, L"%s", app_path);
 
     config.module_search_paths_set = 1;
@@ -2036,36 +2040,37 @@ Java_org_kivy_android_PythonService_nativeStart(
     PyWideStringList_Append(&config.module_search_paths, w_app);
 
     const char *native_lib_dir = getenv("ANDROID_NATIVE_LIB_DIR");
-    if (native_lib_dir) {
+    if (native_lib_dir) {{
         wchar_t w_native[1024];
         swprintf(w_native, 1024, L"%s", native_lib_dir);
         PyWideStringList_Append(&config.module_search_paths, w_native);
-    }
+    }}
 
     PyStatus status = Py_InitializeFromConfig(&config);
     PyConfig_Clear(&config);
-    if (PyStatus_Exception(status)) {
+    if (PyStatus_Exception(status)) {{
         LOGE("Service Py_Initialize failed");
         return 1;
-    }
+    }}
 
     PyRun_SimpleString(REDIRECT_STDIO);
 
     PyObject *runpy = PyImport_ImportModule("runpy");
     PyObject *func = PyObject_GetAttrString(runpy, "run_module");
     PyObject *args_tuple = PyTuple_Pack(1, PyUnicode_FromString(entrypoint));
-    PyObject *kwargs = Py_BuildValue("{s:s, s:i}", "run_name", "__main__", "alter_sys", 1);
+
+    PyObject *kwargs = Py_BuildValue("{{s:s, s:i}}", "run_name", "__main__", "alter_sys", 1);
 
     PyObject *result = PyObject_Call(func, args_tuple, kwargs);
 
     int ret = 0;
-    if (!result) {
+    if (!result) {{
         LOGE("python service entrypoint raised an exception");
         PyErr_Print();
         ret = 1;
-    } else {
+    }} else {{
         Py_DECREF(result);
-    }
+    }}
 
     Py_FinalizeEx();
 
@@ -2075,7 +2080,7 @@ Java_org_kivy_android_PythonService_nativeStart(
 
     LOGI("Service python thread exit");
     return ret;
-}
+}}
 """
         (cpp_dir / "service_main.c").write_text(content, encoding="utf-8")
 
