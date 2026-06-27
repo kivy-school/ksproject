@@ -62,6 +62,15 @@ class ProjectSpec:
         return {
             "bundleIdPrefix": self.bundle_id_prefix,
             "settingPresets": "none",
+            # Project-wide minimum deployment targets. XcodeGen emits the
+            # correct per-platform *_DEPLOYMENT_TARGET build settings from this.
+            # Needed because settingPresets is "none", so XcodeGen's bundled
+            # PLATFORM_* presets aren't applied. Values sourced from the Python
+            # preset mirror to keep a single source of truth.
+            "deploymentTarget": {
+                "iOS": sp.PLATFORM_IOS["IPHONEOS_DEPLOYMENT_TARGET"],
+                "macOS": sp.PLATFORM_MACOS["MACOSX_DEPLOYMENT_TARGET"],
+            },
         }
 
     def to_dict(self) -> dict[str, Any]:

@@ -124,7 +124,7 @@ def copy_python_xcframework(workdir_support: Path, platforms: list[str]) -> None
                 if src.exists() and not _slice_is_current(dst):
                     if dst.exists():
                         shutil.rmtree(dst)
-                    shutil.copytree(src, dst)
+                    shutil.copytree(src, dst, symlinks=True)
                     _mark_slice_version(dst)
         elif p == "macOS":
             slice_name = "macos-arm64_x86_64"
@@ -133,7 +133,7 @@ def copy_python_xcframework(workdir_support: Path, platforms: list[str]) -> None
             if src.exists() and not _slice_is_current(dst):
                 if dst.exists():
                     shutil.rmtree(dst)
-                shutil.copytree(src, dst)
+                shutil.copytree(src, dst, symlinks=True)
                 _mark_slice_version(dst)
             # PSProject also flattens lib/include from Python.framework/Versions/3.13
             # so build scripts can rsync from "$PROJECT_DIR/Support/macos-arm64_x86_64/lib/".
@@ -142,7 +142,7 @@ def copy_python_xcframework(workdir_support: Path, platforms: list[str]) -> None
                 src_sub = py_dir / sub
                 dst_sub = dst / sub
                 if src_sub.exists() and not dst_sub.exists():
-                    shutil.copytree(src_sub, dst_sub)
+                    shutil.copytree(src_sub, dst_sub, symlinks=True)
 
 
 def fetch_kivy_sdl2_xcframeworks(workdir_support: Path) -> None:
@@ -286,7 +286,7 @@ class ApplePythonFramework:
         dst = destination / "Python.xcframework"
         if dst.exists():
             return
-        shutil.copytree(self.ensure_merged(), dst)
+        shutil.copytree(self.ensure_merged(), dst, symlinks=True)
 
     def download(self, url: str, destination: Path) -> None:
         tar_name = url.rsplit("/", 1)[-1]
@@ -343,14 +343,14 @@ class ApplePythonFramework:
                     dst_slice = fw_dst / slice_name
                     if dst_slice.exists():
                         shutil.rmtree(dst_slice)
-                    shutil.copytree(src_slice, dst_slice)
+                    shutil.copytree(src_slice, dst_slice, symlinks=True)
                 for entry in xcfw_src.iterdir():
                     if entry.name in slice_names or entry.name == "Info.plist":
                         continue
                     dst_entry = fw_dst / entry.name
                     if entry.is_dir():
                         if not dst_entry.exists():
-                            shutil.copytree(entry, dst_entry)
+                            shutil.copytree(entry, dst_entry, symlinks=True)
                     else:
                         if not dst_entry.exists():
                             shutil.copy2(entry, dst_entry)

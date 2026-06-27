@@ -19,6 +19,7 @@ find-links = ["./wheelhouse"]
 
 [tool.kivy-school]
 app_name = "{app_name}"
+bootstrap = "kivy"
 """
 
 
@@ -71,6 +72,8 @@ global_tools = true # Set to <false> to use project-local SDK/NDK (./.kivyschool
 # include_files = [
 #     ["gradle/app", ["./google-services.json", "./some-other-config.xml"]]
 # ]
+# pre_build = "path/to/android_prebuild.py"
+# post_build = "path/to/android_prebuild.py"
 
 # <meta-data> entries inside <application>
 # [tool.kivy-school.android.meta_data]
@@ -93,11 +96,14 @@ def _ios_keys(module_name: str) -> str:
     return f"""\
 [tool.kivy-school.ios]
 bundle_id = "org.example.{module_name}"
+minimum_deployment = "15.6"
 info_plist = {{}}
 entitlements = {{}}
 permissions = []
 frameworks = []
 #developer_team = "ABC123XYZ" # Set to your Apple Developer Team ID (e.g. ABC123XYZ) to enable automatic code signing; leave as null for manual signing
+# pre_build = "path/to/ios_prebuild.py"
+# post_build = "path/to/ios_postbuild.py"
 """
 
 
@@ -105,9 +111,12 @@ def _macos_keys(module_name: str) -> str:
     return f"""\
 [tool.kivy-school.macos]
 bundle_id = "org.example.{module_name}"
+minimum_deployment = "11.5"
 info_plist = {{}}
 entitlements = {{}}
 #developer_team = "ABC123XYZ" # Set to your Apple Developer Team ID (e.g. ABC123XYZ) to enable automatic code signing; leave as null for manual signing
+# pre_build = "path/to/android_prebuild.py"
+# post_build = "path/to/android_postbuild.py"
 """
 
 

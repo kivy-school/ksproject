@@ -287,7 +287,16 @@ extension KivyLauncher {
             Py_ExitStatusException(status)
         }
         
-        path = "\(python_home)/site_packages"
+        #if arch(arm64)
+        let sitePackagesDir = "\(python_home)/site_packages/arm64"
+        #elseif arch(x86_64)
+        let sitePackagesDir = "\(python_home)/site_packages/x86_64"
+        #else
+        let sitePackagesDir = "\(python_home)/site_packages"
+        #endif
+        path = FileManager.default.fileExists(atPath: sitePackagesDir)
+            ? sitePackagesDir
+            : "\(python_home)/site_packages"
         app_packages_path_str = Py_DecodeLocale(path, nil)
         print("Adding app_packages as site directory: \(path)")
         

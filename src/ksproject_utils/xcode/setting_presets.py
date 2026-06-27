@@ -80,12 +80,14 @@ CONFIG_RELEASE: BuildSettings = {
 
 
 PLATFORM_IOS: BuildSettings = {
+    "IPHONEOS_DEPLOYMENT_TARGET": "15.6",
     "LD_RUNPATH_SEARCH_PATHS": ["$(inherited)", "@executable_path/Frameworks"],
     "SDKROOT": "iphoneos",
     "TARGETED_DEVICE_FAMILY": "1,2",
 }
 
 PLATFORM_MACOS: BuildSettings = {
+    "MACOSX_DEPLOYMENT_TARGET": "11.5",
     "LD_RUNPATH_SEARCH_PATHS": ["$(inherited)", "@executable_path/../Frameworks"],
     "SDKROOT": "macosx",
     "COMBINE_HIDPI_IMAGES": "YES",

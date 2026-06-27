@@ -9,9 +9,10 @@ import platform
 import plistlib
 import subprocess
 from pathlib import Path
+from os import environ
 
 from ..pip_install import PipInstaller
-from ..platforms import IOSArm64Platform, IOSSim_Arm64Platform, IOSSim_X86_64Platform, MacOSPlatform
+from ..platforms import IOSArm64Platform, IOSSim_Arm64Platform, IOSSim_X86_64Platform, MacOSPlatform, MacOSArm64Platform, MacOSX86_64Platform
 from ..pyproject_toml import PyProjectToml
 from .python_apple import copy_site_frameworks
 from .xcode_project_builder import XcodeProjectBuilder
@@ -84,7 +85,11 @@ class XcodeProject:
             else:
                 platform_classes.append(IOSArm64Platform)
         if "macOS" in platforms:
-            platform_classes += [MacOSPlatform]
+            arch = platform.machine()  # 'arm64' on Apple Silicon, 'x86_64' on Intel
+            if arch == "arm64":
+                platform_classes.append(MacOSArm64Platform)
+            else:
+                platform_classes.append(MacOSX86_64Platform)
 
         for cls in platform_classes:
             plat = cls(str(self.project_path))
@@ -168,6 +173,7 @@ class XcodeProject:
             self.generate(platforms=platforms)
             self.open_in_xcode()
         self.builder._install_frameworks()
+        self.platform_pre_build_script(self.pyproject.tool.kivy_school.ios)
         self.install_site_packages(platforms=["iOS"], simulator=simulator)
         self.builder.sync_site_xcframeworks()
         dest = (
@@ -184,8 +190,34 @@ class XcodeProject:
             self.generate(platforms=platforms)
             self.open_in_xcode()
         self.builder._install_frameworks()
+        
+        self.platform_pre_build_script(self.pyproject.tool.kivy_school.macos)
         self.install_site_packages(platforms=["iOS", "macOS"])
         return self._xcodebuild("generic/platform=macOS", variant)
+    
+    def platform_pre_build_script(self, data: object):
+        
+        if not hasattr(data, "pre_build"): return
+        
+        env = {**environ}
+
+        script: Path | None = getattr(data, "pre_build")
+        if script:
+            cur = Path.cwd()
+            env["WHEELHOUSE"] = f"{cur / "wheelhouse"}"
+            match script.suffix:
+                case ".py":
+                    subprocess.run(
+                        ["uv", "run", str(script.absolute())],
+                        check=True,
+                        env=env
+                    )
+                case _:
+                    subprocess.run(
+                        [str(script.absolute())],
+                        check=True,
+                        env=env
+                    )
 
     # ------------------------------------------------------------------
     # Devices (iOS only — simctl + devicectl)

@@ -10,7 +10,7 @@ from typing import Any
 
 from . import setting_presets as sp
 from .plist_templates import IOS_PROJECT_PLIST_KEYS
-
+from pathlib import Path
 
 PY_SUB_VERSION = 13
 
@@ -33,7 +33,8 @@ elif [ "$EFFECTIVE_PLATFORM_NAME" = "-iphoneos" ]; then
     $PIP3 install $APP_SRC $PIP_ARGS -t "$PROJECT_DIR/site_packages/iphoneos/"
 else
     echo "Installing App module for macOS"
-    $PIP3 install $APP_SRC $PIP_ARGS -t "$PROJECT_DIR/site_packages/macos/"
+    MACOS_ARCH=$(uname -m)
+    $PIP3 install $APP_SRC $PIP_ARGS -t "$PROJECT_DIR/site_packages/macos-${MACOS_ARCH}/"
 fi
 """
 
@@ -58,14 +59,17 @@ rm "$CODESIGNING_FOLDER_PATH/python/site_packages/.lock"
 """
 
 
-_INSTALL_PY_MACOS = r"""rsync -au --delete "$PROJECT_DIR/Frameworks/macos-arm64_x86_64/lib/" "$BUILT_PRODUCTS_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/python/lib"
+_INSTALL_PY_MACOS = r"""mkdir -p "$BUILT_PRODUCTS_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/python/lib"
+rsync -au --delete "$PROJECT_DIR/Frameworks/Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/" "$BUILT_PRODUCTS_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/python/lib/"
 
-SITE_DST="$BUILT_PRODUCTS_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/site_packages"
-mkdir -p $SITE_DST
-mkdir -p "$BUILT_PRODUCTS_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/app"
-echo "Installing Python modules for macOS Device"
-rsync -au --delete "$PROJECT_DIR/site_packages/macos/" $SITE_DST
-rsync -au --delete "$PROJECT_DIR/app/" "$BUILT_PRODUCTS_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/app"
+if [ -d "$PROJECT_DIR/site_packages/macos-arm64" ]; then
+    mkdir -p "$BUILT_PRODUCTS_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/python/site_packages/arm64"
+    rsync -au --delete "$PROJECT_DIR/site_packages/macos-arm64/" "$BUILT_PRODUCTS_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/python/site_packages/arm64/"
+fi
+if [ -d "$PROJECT_DIR/site_packages/macos-x86_64" ]; then
+    mkdir -p "$BUILT_PRODUCTS_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/python/site_packages/x86_64"
+    rsync -au --delete "$PROJECT_DIR/site_packages/macos-x86_64/" "$BUILT_PRODUCTS_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/python/site_packages/x86_64/"
+fi
 """
 
 
@@ -143,8 +147,9 @@ find "$CODESIGNING_FOLDER_PATH/Frameworks" -name "*.framework" -exec /usr/bin/co
 
 _SIGN_PY_MACOS_BODY = r"""echo "Signed as $EXPANDED_CODE_SIGN_IDENTITY_NAME ($EXPANDED_CODE_SIGN_IDENTITY)"
 
-find "$BUILT_PRODUCTS_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/site_packages" -name "*.so" -exec /usr/bin/codesign --force --sign "$EXPANDED_CODE_SIGN_IDENTITY" -o runtime --timestamp=none --preserve-metadata=identifier,entitlements,flags --generate-entitlement-der {} \;
-find "$BUILT_PRODUCTS_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/app" -name "*.so" -exec /usr/bin/codesign --force --sign "$EXPANDED_CODE_SIGN_IDENTITY" -o runtime --timestamp=none --preserve-metadata=identifier,entitlements,flags --generate-entitlement-der {} \;
+find "$BUILT_PRODUCTS_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/python" -name "*.so" -exec /usr/bin/codesign --force --sign "$EXPANDED_CODE_SIGN_IDENTITY" -o runtime --timestamp=none --preserve-metadata=identifier,entitlements,flags --generate-entitlement-der {} \;
+find "$BUILT_PRODUCTS_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/python/site_packages" -name "*.so" -exec /usr/bin/codesign --force --sign "$EXPANDED_CODE_SIGN_IDENTITY" -o runtime --timestamp=none --preserve-metadata=identifier,entitlements,flags --generate-entitlement-der {} \;
+#find "$BUILT_PRODUCTS_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/app" -name "*.so" -exec /usr/bin/codesign --force --sign "$EXPANDED_CODE_SIGN_IDENTITY" -o runtime --timestamp=none --preserve-metadata=identifier,entitlements,flags --generate-entitlement-der {} \;
 """
 
 
@@ -163,6 +168,19 @@ fi
 
 SIGN_PYTHON_BINARY_SCRIPT = _sign_python_binary_script(PY_SUB_VERSION)
 
+def create_post_build_pyscript(script: str) -> str:
+    return f"""export PATH="$HOME/.local/bin:$PATH"
+APP_SRC="$PROJECT_DIR/../../"
+
+uv run $APP_SRC/{script}
+"""
+
+def create_post_build_shscript(script: str) -> str:
+    return f"""export PATH="$HOME/.local/bin:$PATH"
+APP_SRC="$PROJECT_DIR/../../"
+
+$APP_SRC/{script}
+"""
 
 # --------------------------------------------------------------------------
 # Target builder
@@ -178,12 +196,14 @@ class ProjectTarget:
         entitlements: dict[str, Any] | None,
         site_xcframeworks: list[str] | None = None,
         developer_team: str | None = None,
+        post_build: Path | None = None
     ) -> None:
         self.name = name
         self.info_plist_extra = info_plist_extra
         self.entitlements = entitlements
         self.site_xcframeworks: list[str] = site_xcframeworks or []
         self.developer_team = developer_team
+        self.post_build = post_build
 
     # ----- settings -----
 
@@ -276,8 +296,17 @@ class ProjectTarget:
     # ----- scripts -----
 
     def _post_build_scripts(self) -> list[dict[str, Any]]:
+        post_text = ""
+        post_build = self.post_build
+        if post_build:
+            match post_build.suffix:
+                case ".py":
+                    post_text = create_post_build_pyscript(str(post_build.relative_to(".")))
+                case _:
+                    post_text = create_post_build_shscript(str(post_build.relative_to(".")))
         return [
             {"script": INSTALL_APP_MODULE_SCRIPT, "name": "Install App Module"},
+            {"script": post_text, "name": "ksproject post-build"},
             {
                 "script": INSTALL_PY_MODULES_SCRIPT,
                 "name": "Install target specific Python modules",
