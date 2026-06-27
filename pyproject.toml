@@ -21,15 +21,12 @@ ksproject = "ksproject:main"
 
 [project.optional-dependencies]
 studio = [
-    "ksproject@git+http://github.com/kivy-school/ksproject"
+    "ksproject@git+http://github.com/kivy-school/ksproject-studio"
 ]
 
 full = [
 
 ]
-
-[tool.uv.sources]
-carbonkivy = { git = "https://github.com/CarbonKivy/CarbonKivy", rev = "master" }
 
 [tool.uv.build-backend]
 module-name = [
