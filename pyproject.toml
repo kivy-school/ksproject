@@ -21,7 +21,7 @@ ksproject = "ksproject:main"
 
 [project.optional-dependencies]
 studio = [
-    "ksproject@git+http://github.com/kivy-school/ksproject-studio"
+    "ksproject-studio@git+http://github.com/kivy-school/ksproject-studio"
 ]
 
 full = [
