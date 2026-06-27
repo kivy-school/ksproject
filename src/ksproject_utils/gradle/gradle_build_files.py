@@ -1827,10 +1827,8 @@ int main(int argc, char *argv[]) {{
         setenv("KIVY_HOME", app_path, 1);
     }}
 
-    char project_site_path[1024];
-    snprintf(project_site_path, sizeof(project_site_path), "%s/site-packages/{project_name}", app_path);
-    if (chdir(project_site_path) != 0) {{
-        LOGE("chdir(%s) failed", project_site_path);
+    if (chdir(app_path) != 0) {{
+        LOGE("chdir(%s) failed", app_path);
     }}
 
     PyImport_AppendInittab("androidembed", PyInit_androidembed);
@@ -1994,10 +1992,8 @@ Java_org_kivy_android_PythonService_nativeStart(
         usleep(50000); // Sleep for 50ms while presplash is displaying on the UI thread
     }}
 
-    char project_site_path[1024];
-    snprintf(project_site_path, sizeof(project_site_path), "%s/site-packages/{project_name}", app_path);
-    if (chdir(project_site_path) != 0) {{
-        LOGE("chdir(%s) failed", project_site_path);
+    if (chdir(app_path) != 0) {{
+        LOGE("chdir(%s) failed", app_path);
     }}
 
     setenv("ANDROID_APP_PATH", app_path, 1);
