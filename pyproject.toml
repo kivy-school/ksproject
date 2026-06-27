@@ -10,7 +10,6 @@ urls = { "Homepage" = "https://kivy-school.github.io/ksproject" }
 requires-python = ">=3.13"
 dependencies = [
     "kivy",
-    #"kivy-reloader[desktop]",
     "toml>=0.10.2",
     "pyyaml>=6.0",
     
