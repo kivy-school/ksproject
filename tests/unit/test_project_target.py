@@ -70,7 +70,7 @@ def test_site_xcframeworks_added_as_ios_deps() -> None:
         site_xcframeworks=["Pillow_iOS.xcframework"],
     )
     deps = t.to_dict()["dependencies"]
-    fw_deps = [d for d in deps if d.get("framework") == "Support/Pillow_iOS.xcframework"]
+    fw_deps = [d for d in deps if d.get("framework") == "Frameworks/Pillow_iOS.xcframework"]
     assert len(fw_deps) == 1
     assert fw_deps[0]["platformFilter"] == "iOS"
 
