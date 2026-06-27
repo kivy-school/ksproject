@@ -10,6 +10,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from os import environ
 
 from ..pip_install import PipInstaller
 from ..platforms import (
@@ -137,6 +138,30 @@ class GradleProject:
             extra_permissions=extra_permissions or [],
         )
 
+    def platform_pre_build_script(self, data: object):
+        
+        if not hasattr(data, "pre_build"): return
+        
+        env = {**environ}
+
+        script: Path | None = getattr(data, "pre_build")
+        if script:
+            cur = Path.cwd()
+            env["WHEELHOUSE"] = f"{cur / "wheelhouse"}"
+            match script.suffix:
+                case ".py":
+                    subprocess.run(
+                        ["uv", "run", str(script.absolute())],
+                        check=True,
+                        env=env
+                    )
+                case _:
+                    subprocess.run(
+                        [str(script.absolute())],
+                        check=True,
+                        env=env
+                    )
+
     def install_site_packages(self) -> None:
         """Install the project (and its deps) into per-arch site_packages dirs."""
         for arch in self.builder.archs:
@@ -245,6 +270,7 @@ class GradleProject:
         bundle: bool = False,
         clean: bool = False,
     ) -> Path:
+        self.platform_pre_build_script(self.pyproject.tool.kivy_school.android)
         """Run full pipeline: pip install → collect .gradle configs → generate → gradlew assemble/bundle."""
         self.install_site_packages()
         merged = self._collect_site_gradle_configs()

@@ -116,6 +116,9 @@ class KivySchoolData:
         version_name: str
         include_files: list[tuple[str, list[str]]]
 
+        pre_build: Path | None
+        post_build: Path | None
+
         def __init__(self, data: dict):
             self.package_name = data["package_name"]
             self.archs = [
@@ -162,6 +165,9 @@ class KivySchoolData:
             ]
             self.version_code = data.get("version_code", 1)
             self.version_name = data.get("version_name", "1.0")
+
+            self.pre_build = Path(data.get("pre_build")) if "pre_build" in data else None
+            self.post_build = Path(data.get("post_build")) if "post_build" in data else None
 
         def kivyschool_root(self, working_dir: Path) -> Path:
             """Root for kivy-school managed tools/caches.
