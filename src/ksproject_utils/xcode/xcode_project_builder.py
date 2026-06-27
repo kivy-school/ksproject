@@ -14,7 +14,7 @@ from .main_files import render_main_swift
 from .plist_templates import STDLIB_PLIST_XML
 from .project_spec import ProjectSpec
 from .project_target import ProjectTarget
-from .python_apple import copy_python_xcframework, fetch_kivy_sdl2_xcframeworks
+from .python_apple import ApplePythonFramework, apple_python_cache_root
 from .static_templates import (
     APP_ICON_CONTENTS,
     APP_MAIN_PY_TEMPLATE,
@@ -22,7 +22,7 @@ from .static_templates import (
     LAUNCH_SCREEN_STORYBOARD,
 )
 from .xcodegen_runner import XcodeGenRunner
-
+from ksproject_utils.tools import resolve_module_name
 
 class XcodeProjectBuilderError(Exception):
     pass
@@ -42,8 +42,10 @@ class XcodeProjectBuilder:
             )
         self.kivy_school = kivy_school
         self.app_name = kivy_school.app_name or pyproject.project.name
-        self.module_name = self.app_name.replace("-", "_").replace(".", "_")
-
+        self.module_name = resolve_module_name(self.pyproject.project.name)
+        # project_name = (
+        #     self.pyproject.project.name.strip().replace("-", "_").replace(" ", "_")
+        # )
         ios = kivy_school.ios
         macos = kivy_school.macos
         if ios is not None:
@@ -53,20 +55,24 @@ class XcodeProjectBuilder:
         else:
             self.bundle_id_prefix = f"org.kivyschool"
 
-        self.info_plist_extra: dict = {}
+        info_plist_extra: dict = {}
+        self.info_plist_extra = info_plist_extra
         self.entitlements: dict = {}
         self.developer_team: str | None = None
         if ios is not None:
-            self.info_plist_extra.update(ios.info_plist)
+            info_plist_extra.update(ios.info_plist)
             self.entitlements.update(ios.entitlements)
             if ios.developer_team:
                 self.developer_team = ios.developer_team
         if macos is not None:
             # macOS keys win when both are present (entitlements typically diverge).
-            self.info_plist_extra.update(macos.info_plist)
+            info_plist_extra.update(macos.info_plist)
             self.entitlements.update(macos.entitlements)
             if macos.developer_team:
                 self.developer_team = macos.developer_team
+
+        info_plist_extra["AppModule"] = self.module_name
+
 
     @staticmethod
     def _prefix_from_bundle_id(bundle_id: str) -> str:
@@ -94,7 +100,7 @@ class XcodeProjectBuilder:
             "Resources",
             "Resources/Images.xcassets",
             "Resources/Images.xcassets/AppIcon.appiconset",
-            "Support",
+            "Frameworks",
             "app",
             "site_packages/iphoneos",
             "site_packages/iphonesimulator",
@@ -115,18 +121,22 @@ class XcodeProjectBuilder:
             launch.write_text(LAUNCH_SCREEN_STORYBOARD)
 
     def _write_support(self) -> None:
-        plist = self.project_dir / "Support/dylib-Info-template.plist"
+        plist = self.project_dir / "Frameworks/dylib-Info-template.plist"
         plist.write_text(STDLIB_PLIST_XML)
 
     def _write_sources(self) -> None:
-        shared = self.project_dir / "Sources/Shared/main.swift"
-        # Use iOS variant for the shared file; macOS-only target gets its own
-        # under Sources/MacOS for path symmetry. XcodeGen `destinationFilters`
-        # ensures each is only compiled for its platform.
-        shared.write_text(render_main_swift("iOS"))
-        macos_main = self.project_dir / "Sources/MacOS/main_macos.swift"
+        ios_main = self.project_dir / "Sources/IphoneOS/main.swift"
+        if not ios_main.exists():
+            ios_main.write_text(render_main_swift("iOS"))
+        macos_main = self.project_dir / "Sources/MacOS/main.swift"
         if not macos_main.exists():
             macos_main.write_text(render_main_swift("macOS"))
+        kivylauncher_src = Path(__file__).parent / "templates" / "KivyLauncher.swift"
+        shared_kl = self.project_dir / "Sources/Shared/KivyLauncher.swift"
+        if not shared_kl.exists():
+            code = kivylauncher_src.read_bytes()
+            shared_kl.write_bytes(code)
+        
 
     def _write_app(self) -> None:
         app_dir = self.project_dir / "app"
@@ -137,18 +147,18 @@ class XcodeProjectBuilder:
         if not entry.exists():
             entry.write_text(APP_MAIN_PY_TEMPLATE.format(module_name=self.module_name))
 
-    def _install_frameworks(self, platforms: list[str]) -> None:
+    def _install_frameworks(self) -> None:
         self._write_support()  # ensure dylib-Info-template.plist exists for XcodeGen validation
-        copy_python_xcframework(self.project_dir / "Support", platforms)
-        if "iOS" in platforms:
-            fetch_kivy_sdl2_xcframeworks(self.project_dir / "Support")  # TEMPORARY: remove once kivy2x ships .frameworks/
+        ApplePythonFramework(apple_python_cache_root()).install_to(self.project_dir / "Frameworks")
+        # if "iOS" in platforms:
+        #     fetch_kivy_sdl2_xcframeworks(self.project_dir / "Frameworks")  # TEMPORARY: remove once kivy2x ships .frameworks/
 
     # ------------------------------------------------------------------
     # Spec + xcodegen
     # ------------------------------------------------------------------
 
     def _build_spec(self) -> dict:
-        support = self.project_dir / "Support"
+        support = self.project_dir / "Frameworks"
         site_xcframeworks = sorted(
             p.name for p in support.iterdir()
             if p.is_dir() and p.suffix == ".xcframework"

@@ -1,7 +1,13 @@
 """Unit tests for ``ksproject_utils.xcode.setting_presets``."""
 from __future__ import annotations
 
+import pytest
+
 from ksproject_utils.xcode import setting_presets as sp
+
+# Apple/Xcode pipeline tests: only run in the macOS `apple` CI job, never on
+# Ubuntu/Windows (the all-OS job runs with `-m "not apple"`).
+pytestmark = pytest.mark.apple
 
 
 def test_merged_later_wins() -> None:

@@ -36,28 +36,41 @@ class ProjectSpec:
 
     def _packages(self) -> dict[str, dict[str, Any]]:
         return {
-            "CPython": {
-                "url": "https://github.com/py-swift/CPython",
-                "from": "313.0.0",
-            },
-            "PySwiftKit": {
-                "url": "https://github.com/py-swift/PySwiftKit",
-                "from": "313.0.0",
-            },
-            "KivyLauncher": {
-                "url": "https://github.com/kivy-school/KivyLauncher",
-                "branch": "master",
-            },
-            "Kivy_iOS_Module": {
-                "url": "https://github.com/kivy-school/Kivy_iOS_Module",
-                "branch": "master",
-            },
+            "PathKit": {
+                "url": "https://github.com/kylef/PathKit",
+                "from": "1.0.1"
+            }
+            # "CPython": {
+            #     "url": "https://github.com/py-swift/CPython",
+            #     "from": "313.0.0",
+            # },
+            # "PySwiftKit": {
+            #     "url": "https://github.com/py-swift/PySwiftKit",
+            #     "from": "313.0.0",
+            # },
+            # "KivyLauncher": {
+            #     "url": "https://github.com/kivy-school/KivyLauncher",
+            #     "branch": "master",
+            # },
+            # "Kivy_iOS_Module": {
+            #     "url": "https://github.com/kivy-school/Kivy_iOS_Module",
+            #     "branch": "master",
+            # },
         }
 
     def _options(self) -> dict[str, Any]:
         return {
             "bundleIdPrefix": self.bundle_id_prefix,
             "settingPresets": "none",
+            # Project-wide minimum deployment targets. XcodeGen emits the
+            # correct per-platform *_DEPLOYMENT_TARGET build settings from this.
+            # Needed because settingPresets is "none", so XcodeGen's bundled
+            # PLATFORM_* presets aren't applied. Values sourced from the Python
+            # preset mirror to keep a single source of truth.
+            "deploymentTarget": {
+                "iOS": sp.PLATFORM_IOS["IPHONEOS_DEPLOYMENT_TARGET"],
+                "macOS": sp.PLATFORM_MACOS["MACOSX_DEPLOYMENT_TARGET"],
+            },
         }
 
     def to_dict(self) -> dict[str, Any]:

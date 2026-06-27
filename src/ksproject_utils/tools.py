@@ -1,6 +1,6 @@
 import os
 import subprocess
-
+import re
 
 def which(name: str) -> str | None:
     result = subprocess.run(
@@ -51,3 +51,15 @@ def load_dotenv(file_path=".env"):
         print(f"Info: '{file_path}' file not found. Skipping.")
     except Exception as e:
         print(f"Error loading '{file_path}': {e}")
+
+
+REPLACE_CHARS = [
+    "-",
+    ".",
+    " "
+] 
+
+RESOLVE_REGEX = fr"[{"".join(REPLACE_CHARS)}]"
+
+def resolve_module_name(name: str) -> str:
+    return re.sub(RESOLVE_REGEX, "_", name).lower().strip()

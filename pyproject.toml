@@ -10,7 +10,6 @@ urls = { "Homepage" = "https://kivy-school.github.io/ksproject" }
 requires-python = ">=3.13"
 dependencies = [
     "kivy",
-    #"kivy-reloader[desktop]",
     "toml>=0.10.2",
     "pyyaml>=6.0",
     
@@ -18,29 +17,25 @@ dependencies = [
 
 [project.scripts]
 ksproject = "ksproject:main"
-ksproject-gui = "ksproject_gui:main"
 
-[project.optional-dependencies]
-gui = [
-    "carbonkivy",
-    "thorvg-cython",
-    "watchdog",
-    "pyobjc; sys_platform == 'darwin'",
-]
 
-full = [
-    "carbonkivy",
-    "thorvg-cython",
-    "kaki",
-    "watchdog",
-    "pyobjc; sys_platform == 'darwin'",
-]
-
-[tool.uv.sources]
-carbonkivy = { git = "https://github.com/CarbonKivy/CarbonKivy", rev = "master" }
 
 [tool.uv.build-backend]
-module-name = ["ksproject", "ksproject_gui", "ksproject_utils"]
+module-name = [
+    "ksproject",
+    "ksproject_utils"
+]
+
+# Provide metadata for the studio git dependency so uv does NOT download/build it
+# during universal resolution (uv lock resolves all extras/groups). Without this,
+# every `uv sync` and test run tries to build ksproject-studio. It is only actually
+# fetched/built when the `studio` extra is explicitly installed (`ksproject[studio]`).
+[[tool.uv.dependency-metadata]]
+name = "ksproject-studio"
+version = "0.0.1"
+
+[tool.uv.sources]
+ksproject-studio = { git = "http://github.com/kivy-school/ksproject-studio" }
 
 [dependency-groups]
 dev = [
@@ -48,6 +43,7 @@ dev = [
     "pytest-mock>=3.12",
     "pytest-xdist>=3.5",
 ]
+
 
 [tool.pytest.ini_options]
 minversion = "8.0"
