@@ -1,7 +1,13 @@
 """Unit tests for ``ksproject_utils.xcode.project_target.ProjectTarget``."""
 from __future__ import annotations
 
+import pytest
+
 from ksproject_utils.xcode.project_target import ProjectTarget
+
+# Apple/Xcode pipeline tests: only run in the macOS `apple` CI job, never on
+# Ubuntu/Windows (the all-OS job runs with `-m "not apple"`).
+pytestmark = pytest.mark.apple
 
 
 def _settings_dict(target: ProjectTarget) -> dict:
