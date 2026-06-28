@@ -46,7 +46,7 @@ class GradleProject:
     adb: ADB
     emulator: AndroidEmulator
     _toolchain: AndroidToolchain | None
-    builder: GradleProjectBuilder
+    builder: GradleProjectBuilder # <---- bootstrap instead ? ....
 
     def __init__(self, project_path: Path):
         project_path = Path(project_path).resolve()
@@ -270,8 +270,9 @@ class GradleProject:
         bundle: bool = False,
         clean: bool = False,
     ) -> Path:
-        """Run full pipeline: pip install → collect .gradle configs → generate → gradlew assemble/bundle."""
+        
         self.platform_pre_build_script()
+        """Run full pipeline: pip install → collect .gradle configs → generate → gradlew assemble/bundle."""
         self.install_site_packages()
         merged = self._collect_site_gradle_configs()
         self.generate(
@@ -279,8 +280,6 @@ class GradleProject:
             extra_gradle_dependencies=merged.gradle_dependencies,
             extra_permissions=merged.permissions,
         )
-        # late enough to still modify content ?
-        # or should it be in the gradle build (kts one)
         return self.gradle_assemble(variant, aar=aar, bundle=bundle, clean=clean)
 
     def _collect_site_gradle_configs(self) -> MergedGradleConfig:
