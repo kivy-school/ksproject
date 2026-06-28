@@ -72,6 +72,7 @@ class GradleProject:
         # Determine SDK version from pyproject.toml for the emulator.
         # Prefer android.api, fall back to android.sdk, then the toolchain default.
         android_data = self.builder.android
+        self.android_data = android_data
         sdk_version = (
             (
                 android_data.sdk or str(android_data.api)
@@ -138,13 +139,12 @@ class GradleProject:
             extra_permissions=extra_permissions or [],
         )
 
-    def platform_pre_build_script(self, data: object):
+    def platform_pre_build_script(self):
         
-        if not hasattr(data, "pre_build"): return
+        script = self.android_data.pre_build
         
         env = {**environ}
 
-        script: Path | None = getattr(data, "pre_build")
         if script:
             cur = Path.cwd()
             env["WHEELHOUSE"] = f"{cur / "wheelhouse"}"
@@ -270,8 +270,8 @@ class GradleProject:
         bundle: bool = False,
         clean: bool = False,
     ) -> Path:
-        self.platform_pre_build_script(self.pyproject.tool.kivy_school.android)
         """Run full pipeline: pip install → collect .gradle configs → generate → gradlew assemble/bundle."""
+        self.platform_pre_build_script()
         self.install_site_packages()
         merged = self._collect_site_gradle_configs()
         self.generate(
@@ -279,6 +279,8 @@ class GradleProject:
             extra_gradle_dependencies=merged.gradle_dependencies,
             extra_permissions=merged.permissions,
         )
+        # late enough to still modify content ?
+        # or should it be in the gradle build (kts one)
         return self.gradle_assemble(variant, aar=aar, bundle=bundle, clean=clean)
 
     def _collect_site_gradle_configs(self) -> MergedGradleConfig:
