@@ -12,7 +12,7 @@ dependencies = [
     "kivy",
     "toml>=0.10.2",
     "pyyaml>=6.0",
-    
+    "ksp-bootstraps",
 ]
 
 [project.scripts]
@@ -36,6 +36,7 @@ version = "0.0.1"
 
 [tool.uv.sources]
 ksproject-studio = { git = "http://github.com/kivy-school/ksproject-studio" }
+ksp-bootstraps = { path = "../ksp-bootstraps" }
 
 [dependency-groups]
 dev = [

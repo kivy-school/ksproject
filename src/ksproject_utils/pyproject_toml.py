@@ -1,8 +1,7 @@
-from enum import Enum
+from enum import Enum, StrEnum
 from pathlib import Path
 
 import toml
-
 
 class KivySchoolData:
 
@@ -10,6 +9,7 @@ class KivySchoolData:
     ios: "KivySchoolData.IosData | None"
     macos: "KivySchoolData.MacosData | None"
     android: "KivySchoolData.AndroidData | None"
+    bootstrap: str
 
     def __init__(self, data: dict):
         self.app_name = data.get("app_name")
@@ -20,6 +20,7 @@ class KivySchoolData:
         self.android = (
             KivySchoolData.AndroidData(data["android"]) if "android" in data else None
         )
+        self.bootstrap = data.get("bootstrap", "kivy")
 
     class IosData:
         bundle_id: str
@@ -40,13 +41,14 @@ class KivySchoolData:
             self.frameworks = data.get("frameworks", [])
             self.site_frameworks = data.get("site_frameworks", [])
             self.developer_team = data.get("developer_team")
-            self.pre_build = Path(data.get("pre_build")) if "pre_build" in data else None
-            self.post_build = Path(data.get("post_build")) if "post_build" in data else None
+            self.pre_build = Path(data.get("pre_build")) if "pre_build" in data else None # type: ignore
+            self.post_build = Path(data.get("post_build")) if "post_build" in data else None # type: ignore
 
     class MacosData:
         bundle_id: str
         info_plist: dict
         entitlements: dict
+        permissions: list[str]
         developer_team: str | None
         archs: list[str]
         pre_build: Path | None
@@ -56,41 +58,17 @@ class KivySchoolData:
             self.bundle_id = data["bundle_id"]
             self.info_plist = data.get("info_plist", {})
             self.entitlements = data.get("entitlements", {})
+            self.permissions = data.get("permissions", [])
             self.developer_team = data.get("developer_team")
             self.archs = data.get("archs", ["arm64", "x86_64"])
-            self.pre_build = Path(data.get("pre_build")) if "pre_build" in data else None
-            self.post_build = Path(data.get("post_build")) if "post_build" in data else None
+            self.pre_build = Path(data.get("pre_build")) if "pre_build" in data else None # type: ignore
+            self.post_build = Path(data.get("post_build")) if "post_build" in data else None # type: ignore
 
-    class ServiceData:
-        name: str
-        entrypoint: str
-        foreground: bool
-        foreground_service_type: str | None
-        start_type: str
-        notification_title: str
-        notification_text: str
-        notification_icon: str
-
-        def __init__(self, data: dict):
-            self.name = data["name"]
-            # Enforce module syntax if they accidentally leave ".py" or "/"
-
-            raw_entry = data.get("entrypoint", "service_main")
-            self.entrypoint = raw_entry.replace("/", ".").replace(".py", "")
-            self.foreground = data.get("foreground", False)
-            self.foreground_service_type = data.get("foreground_service_type")
-            self.start_type = data.get("start_type", "START_NOT_STICKY")
-            self.notification_title = data.get(
-                "notification_title", f"{self.name} is running"
-            )
-            self.notification_text = data.get(
-                "notification_text", "Background task active"
-            )
-            self.notification_icon = data.get("notification_icon", "stat_notify_sync")
+    
 
     class AndroidData:
         package_name: str
-        archs: list["KivySchoolData.AndroidData.Arch"]
+        archs: list["Arch"]
 
         api: int | None
         min_api: int | None
@@ -111,7 +89,7 @@ class KivySchoolData:
         meta_data: dict[str, str]
         gradle_dependencies: list[str]
         gradle_plugins: list[str]
-        services: list["KivySchoolData.ServiceData"]
+        services: list["ServiceData"]
         version_code: int
         version_name: str
         include_files: list[tuple[str, list[str]]]
@@ -122,7 +100,7 @@ class KivySchoolData:
         def __init__(self, data: dict):
             self.package_name = data["package_name"]
             self.archs = [
-                KivySchoolData.AndroidData.Arch(a) for a in data.get("archs", [])
+                self.Arch(a) for a in data.get("archs", [])
             ]
             self.api = data.get("api")
             self.min_api = data.get("min_api")
@@ -161,13 +139,13 @@ class KivySchoolData:
                         sources = [str(x) for x in item[1:]]
                     self.include_files.append((dest, sources))
             self.services = [
-                KivySchoolData.ServiceData(s) for s in data.get("services", [])
+                self.ServiceData(s) for s in data.get("services", [])
             ]
             self.version_code = data.get("version_code", 1)
             self.version_name = data.get("version_name", "1.0")
 
-            self.pre_build = Path(data.get("pre_build")) if "pre_build" in data else None
-            self.post_build = Path(data.get("post_build")) if "post_build" in data else None
+            self.pre_build = Path(data.get("pre_build")) if "pre_build" in data else None # type: ignore
+            self.post_build = Path(data.get("post_build")) if "post_build" in data else None # type: ignore
 
         def kivyschool_root(self, working_dir: Path) -> Path:
             """Root for kivy-school managed tools/caches.
@@ -180,10 +158,38 @@ class KivySchoolData:
             if self.global_tools_path is not None:
                 return self.global_tools_path
             return Path.home() / ".kivyschool"
-
-        class Arch(Enum):
+        
+        class Arch(StrEnum):
             ARM64_V8A = "arm64-v8a"
             X86_64 = "x86_64"
+        
+        class ServiceData:
+            name: str
+            entrypoint: str
+            foreground: bool
+            foreground_service_type: str | None
+            start_type: str
+            notification_title: str
+            notification_text: str
+            notification_icon: str
+
+            def __init__(self, data: dict):
+                self.name = data["name"]
+                # Enforce module syntax if they accidentally leave ".py" or "/"
+
+                raw_entry = data.get("entrypoint", "service_main")
+                self.entrypoint = raw_entry.replace("/", ".").replace(".py", "")
+                self.foreground = data.get("foreground", False)
+                self.foreground_service_type = data.get("foreground_service_type")
+                self.start_type = data.get("start_type", "START_NOT_STICKY")
+                self.notification_title = data.get(
+                    "notification_title", f"{self.name} is running"
+                )
+                self.notification_text = data.get(
+                    "notification_text", "Background task active"
+                )
+                self.notification_icon = data.get("notification_icon", "stat_notify_sync")
+
 
 
 class ToolData:
