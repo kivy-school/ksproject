@@ -37,11 +37,6 @@ version = "0.0.1"
 [tool.uv.sources]
 ksproject-studio = { git = "http://github.com/kivy-school/ksproject-studio" }
 
-[tool.uv.workspace]
-members = [
-    "ksp-bootstraps",
-]
-
 [dependency-groups]
 dev = [
     "pytest>=8.0",
