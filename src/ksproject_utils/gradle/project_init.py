@@ -39,6 +39,7 @@ class GradleProjectInit:
         android:allowBackup="true"
         android:supportsRtl="true"
         android:hardwareAccelerated="true"
+        android:extractNativeLibs="false"
         android:theme="@android:style/Theme.DeviceDefault.NoActionBar">{{ meta_data }}
 {{ services }}
         <activity
@@ -89,6 +90,12 @@ android {
         // ONESIGNAL_APP_ID setup for pyonesignal (reads from env and creates a string resource)
         val oneSignalId = System.getenv("ONESIGNAL_APP_ID") ?: ""
         resValue("string", "onesignal_app_id", oneSignalId)
+    }
+
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
     }
 
     externalNativeBuild {
