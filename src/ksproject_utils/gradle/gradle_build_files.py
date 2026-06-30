@@ -198,6 +198,12 @@ android {
         }
     }
 
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
+
     externalNativeBuild {
         cmake {
             path = file("src/main/cpp/CMakeLists.txt")
@@ -216,9 +222,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_11
     }
 
-    // CPython stdlib and packages contain underscore-prefixed directories
-    // (e.g. zipfile/_path) that AGP's default aapt ignore pattern strips.
-    // Override to keep them.
     androidResources {
         ignoreAssetsPatterns.clear()
         ignoreAssetsPatterns.addAll(listOf(
@@ -307,31 +310,114 @@ tasks.configureEach {{
     @staticmethod
     def _site_packages_tasks(arch_list_kts: str, python_version: str) -> str:
         return f"""\
-// ── site-packages copy tasks ─────────────────────────────────────────────────
 val sitePackagesAbis = listOf({arch_list_kts})
+val stagingDir = layout.buildDirectory.dir("python_assets_staging").get().asFile
+val assetsDir = layout.projectDirectory.dir("src/main/assets")
 
-// Copy each ABI's site-packages into assets/python{python_version}/site-packages/<abi>/
-// At runtime the app loads from the subdirectory matching its ABI.
-val copySitePackagesTasks = sitePackagesAbis.map {{ abi ->
-    tasks.register<Copy>("copySitePackages_${{abi}}") {{
+val stagePythonTasks = sitePackagesAbis.map {{ abi ->
+    tasks.register<Copy>("stagePython_${{abi}}") {{
         group = "python"
-        description = "Copy site-packages for $abi into assets"
-        val srcDir = file("../site_packages/$abi")
-        onlyIf {{ srcDir.exists() }}
-        from(srcDir) {{
-            exclude(".libs/**")
-            exclude(".java/**")
-            exclude(".kotlin/**")
-            exclude(".gradle/**")
+
+        val sitePackDir = layout.projectDirectory.dir("../site_packages/$abi")
+        from(sitePackDir) {{
+            exclude(".libs/**", ".java/**", ".kotlin/**", ".gradle/**")
+            into("site-packages/$abi")
         }}
-        into("src/main/assets/site-packages/$abi")
+
+        from(assetsDir.dir("python{python_version}")) {{
+            into("python{python_version}")
+        }}
+
+        from(assetsDir.dir("lib-dynload")) {{
+            into("lib-dynload")
+        }}
+
+        into(stagingDir)
     }}
+}}
+
+val cleanLegacyPython = tasks.register("cleanLegacyPython") {{
+    group = "python"
+    dependsOn(stagePythonTasks)
+
+    val assetsPath = assetsDir.asFile.absolutePath
+    doLast {{
+        val aDir = File(assetsPath)
+        File(aDir, "python{python_version}").deleteRecursively()
+        File(aDir, "lib-dynload").deleteRecursively()
+        File(aDir, "site-packages").deleteRecursively()
+    }}
+}}
+
+val optimizeStagedTasks = sitePackagesAbis.map {{ abi ->
+    tasks.register<Exec>("optimizeStaged_${{abi}}") {{
+        group = "python"
+        dependsOn("stagePython_${{abi}}")
+
+        val targetPath = stagingDir.absolutePath
+        val ndkDirPath = project.extensions.getByType(com.android.build.gradle.BaseExtension::class.java).ndkDirectory.absolutePath
+
+        onlyIf {{ File(targetPath).exists() }}
+
+        commandLine("python3", "-m", "compileall", "-b", "-o", "2", "-j", "0", "-q", targetPath)
+
+        doLast {{
+            val dir = File(targetPath)
+            if (!dir.exists()) return@doLast
+
+            val junkExts = listOf(".py", ".pyi", ".c", ".cpp", ".h", ".pyx", ".pxd", ".md", ".rst")
+            val junkDirs = setOf("tests", "test", "docs", "doc", "examples", "example", "tutorials", "benchmarks", "perf", ".mypy_cache", ".pytest_cache", "__pycache__")
+
+            val allFiles = dir.walkBottomUp().toList()
+
+            allFiles.parallelStream().forEach {{ f ->
+                if (f.isFile && junkExts.any {{ ext -> f.name.endsWith(ext) }}) {{
+                    f.delete()
+                }}
+            }}
+
+            allFiles.forEach {{ f ->
+                if (f.isDirectory && junkDirs.contains(f.name) && f.exists()) {{
+                    f.deleteRecursively()
+                }}
+            }}
+
+            val os = org.gradle.internal.os.OperatingSystem.current()
+            val hostTag = if (os.isWindows) "windows-x86_64" else if (os.isMacOsX) "darwin-x86_64" else "linux-x86_64"
+            val stripExe = if (os.isWindows) "llvm-strip.exe" else "llvm-strip"
+            val stripTool = File(ndkDirPath, "toolchains/llvm/prebuilt/$hostTag/bin/$stripExe")
+
+            if (stripTool.exists()) {{
+                val soFiles = dir.walkTopDown().filter {{ it.isFile && it.name.endsWith(".so") }}.toList()
+                soFiles.parallelStream().forEach {{ f ->
+                    ProcessBuilder(stripTool.absolutePath, "--strip-unneeded", f.absolutePath)
+                        .start()
+                        .waitFor()
+                }}
+            }}
+        }}
+    }}
+}}
+
+val zipPythonAssets = tasks.register<Zip>("zipPythonAssets") {{
+    group = "python"
+    dependsOn(optimizeStagedTasks)
+    dependsOn(cleanLegacyPython) 
+
+    archiveFileName.set("assets.zip")
+    destinationDirectory.set(assetsDir)
+
+    from(stagingDir) {{
+        include("**/*")
+    }}
+
+    entryCompression = ZipEntryCompression.DEFLATED
 }}
 
 tasks.register<Copy>("copySitePackagesJava") {{
     group = "python"
-    description = "Copy .java sources from site-packages into the app java source set (first available arch)"
-    val srcDir = sitePackagesAbis.map {{ file("../site_packages/$it/.java") }}.firstOrNull {{ it.exists() }}
+    description = "Copy .java sources from site-packages into the app java source set"
+    val srcDir = sitePackagesAbis.map {{ layout.projectDirectory.dir("../site_packages/$it/.java").asFile }}.firstOrNull {{ it.exists() }}
     if (srcDir != null) {{
         from(srcDir)
         into("src/main/java")
@@ -340,22 +426,21 @@ tasks.register<Copy>("copySitePackagesJava") {{
 
 tasks.register<Copy>("copySitePackagesKotlin") {{
     group = "python"
-    description = "Copy .kotlin sources from site-packages into the app kotlin source set (first available arch)"
-    val srcDir = sitePackagesAbis.map {{ file("../site_packages/$it/.kotlin") }}.firstOrNull {{ it.exists() }}
+    description = "Copy .kotlin sources from site-packages into the app kotlin source set"
+    val srcDir = sitePackagesAbis.map {{ layout.projectDirectory.dir("../site_packages/$it/.kotlin").asFile }}.firstOrNull {{ it.exists() }}
     if (srcDir != null) {{
         from(srcDir)
         into("src/main/kotlin")
     }}
 }}
 
-// Copy .libs/<abi>/ → src/main/jniLibs/<abi>/ (libSDL2.so etc. ship inside the wheel)
 val copySitePackagesNativeLibsTasks = sitePackagesAbis.map {{ abi ->
     tasks.register<Copy>("copySitePackagesNativeLibs_${{abi}}") {{
         group = "python"
         description = "Copy .libs/$abi native libraries into jniLibs/$abi"
-        val srcDir = file("../site_packages/$abi/.libs/$abi")
-        onlyIf {{ srcDir.exists() }}
-        from(srcDir) {{
+        val srcPath = layout.projectDirectory.dir("../site_packages/$abi/.libs/$abi").asFile.absolutePath
+        onlyIf {{ File(srcPath).exists() }}
+        from(srcPath) {{
             include("*.so")
         }}
         into("src/main/jniLibs/$abi")
@@ -363,19 +448,21 @@ val copySitePackagesNativeLibsTasks = sitePackagesAbis.map {{ abi ->
 }}
 
 tasks.named("preBuild") {{
-    copySitePackagesTasks.forEach {{ dependsOn(it) }}
+    dependsOn(zipPythonAssets)
     copySitePackagesNativeLibsTasks.forEach {{ dependsOn(it) }}
     dependsOn("copySitePackagesJava")
     dependsOn("copySitePackagesKotlin")
 }}
 
-// Ensure C++ build tasks wait for the native libraries to be copied!
 tasks.configureEach {{
+    if (name.contains("Assets") && name != "zipPythonAssets" && name != "cleanLegacyPython") {{
+        dependsOn(zipPythonAssets)
+    }}
     if (name.startsWith("buildCMake") || name.startsWith("configureCMake") || name.startsWith("generateJsonModel")) {{
         copySitePackagesNativeLibsTasks.forEach {{ dependsOn(it) }}
     }}
 }}
-// ─────────────────────────────────────────────────────────────────────────────"""
+"""
 
     # -------------------------------------------------------------------------
     # AndroidManifest
@@ -505,10 +592,7 @@ import android.system.ErrnoException;
 import android.system.Os;
 import android.util.Log;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import org.kivy.android.PythonActivity;
 
 public class MainActivity extends PythonActivity {{
@@ -593,21 +677,12 @@ public class MainActivity extends PythonActivity {{
                 public void run() {{
                     if (!appDir.exists()) appDir.mkdirs();
                     try {{
-                        unpackAsset(getAssets(), "python{python_version}", appDir);
-                        String abi = pickAbi(getAssets(), "site-packages");
-                        if (abi != null) {{
-                            File sitePackages = new File(appDir, "site-packages");
-                            sitePackages.mkdirs();
-                            unpackAssetTree(getAssets(), "site-packages/" + abi, sitePackages);
-                        }} else {{
-                            Log.e(TAG, "no matching ABI found in assets/site-packages");
+                        String abi = detectZipAbi(getAssets(), "assets.zip");
+                        if (abi == null) {{
+                            Log.e(TAG, "Could not find any matching ABI in assets.zip");
                         }}
-                        String dynAbi = pickAbi(getAssets(), "lib-dynload");
-                        if (dynAbi != null) {{
-                            File dynload = new File(appDir, "python{python_version}/lib-dynload");
-                            dynload.mkdirs();
-                            unpackAssetTree(getAssets(), "lib-dynload/" + dynAbi, dynload);
-                        }}
+                        
+                        extractZipAsset(getAssets(), "assets.zip", appDir, abi);
                         
                         // Signal to main.c that extraction is complete
                         unpackDoneFile.createNewFile();
@@ -619,16 +694,75 @@ public class MainActivity extends PythonActivity {{
         }}
     }}
 
-    private static String pickAbi(AssetManager am, String root)
-            throws IOException {{
-        String[] available = am.list(root);
-        if (available == null) return null;
+    /**
+     * Scans the zip file without extracting to determine which compiled ABIs are available.
+     * Matches against the device's supported ABIs to find the best match.
+     */
+    private static String detectZipAbi(AssetManager am, String zipFileName) {{
+        java.util.List<String> zipAbis = new java.util.ArrayList<>();
+        try (java.util.zip.ZipInputStream zis = new java.util.zip.ZipInputStream(am.open(zipFileName))) {{
+            java.util.zip.ZipEntry entry;
+            while ((entry = zis.getNextEntry()) != null) {{
+                String name = entry.getName();
+                if (name.startsWith("site-packages/")) {{
+                    String[] parts = name.split("/");
+                    if (parts.length > 1 && !zipAbis.contains(parts[1])) {{
+                        zipAbis.add(parts[1]);
+                    }}
+                }}
+            }}
+        }} catch (Exception e) {{
+            Log.e(TAG, "Failed to scan zip ABIs", e);
+        }}
+
         for (String supported : Build.SUPPORTED_ABIS) {{
-            for (String entry : available) {{
-                if (entry.equals(supported)) return supported;
+            if (zipAbis.contains(supported)) return supported;
+        }}
+        return zipAbis.isEmpty() ? null : zipAbis.get(0);
+    }}
+
+    /**
+     * Extracts the zip file, filtering and remapping ABI-specific folders
+     * so they match the legacy file structure CPython expects.
+     */
+    private static void extractZipAsset(AssetManager am, String zipFileName, File destDir, String abi) throws IOException {{
+        try (java.util.zip.ZipInputStream zis = new java.util.zip.ZipInputStream(new java.io.BufferedInputStream(am.open(zipFileName)))) {{
+            java.util.zip.ZipEntry entry;
+            byte[] buffer = new byte[32768]; // 32KB chunking for fast I/O
+
+            while ((entry = zis.getNextEntry()) != null) {{
+                String name = entry.getName();
+
+                if (name.startsWith("site-packages/")) {{
+                    if (abi == null || !name.startsWith("site-packages/" + abi + "/")) continue;
+                    name = "site-packages/" + name.substring(("site-packages/" + abi + "/").length());
+                }}
+                else if (name.startsWith("lib-dynload/")) {{
+                    if (abi == null || !name.startsWith("lib-dynload/" + abi + "/")) continue;
+                    name = "python{python_version}/lib-dynload/" + name.substring(("lib-dynload/" + abi + "/").length());
+                }}
+
+                if (name.isEmpty() || name.endsWith("/")) {{
+                    File d = new File(destDir, name);
+                    if (!d.exists()) d.mkdirs();
+                    continue;
+                }}
+
+                File outFile = new File(destDir, name);
+                File parent = outFile.getParentFile();
+                if (parent != null && !parent.exists()) {{
+                    parent.mkdirs();
+                }}
+
+                try (java.io.FileOutputStream fos = new java.io.FileOutputStream(outFile);
+                     java.io.BufferedOutputStream bos = new java.io.BufferedOutputStream(fos, buffer.length)) {{
+                    int len;
+                    while ((len = zis.read(buffer)) > 0) {{
+                        bos.write(buffer, 0, len);
+                    }}
+                }}
             }}
         }}
-        return null;
     }}
 
     private static void setEnv(String name, String value) {{
@@ -636,80 +770,6 @@ public class MainActivity extends PythonActivity {{
             Os.setenv(name, value, true);
         }} catch (ErrnoException e) {{
             Log.e(TAG, "setenv " + name + " failed", e);
-        }}
-    }}
-
-    private static void unpackAsset(AssetManager am, String src, File destRoot)
-            throws IOException {{
-        String[] entries = am.list(src);
-        File outFile = new File(destRoot, src);
-
-        if (entries == null || entries.length == 0) {{
-            // It's a file - Unpack it
-            File parent = outFile.getParentFile();
-            if (parent != null && !parent.exists()) {{
-                parent.mkdirs();
-            }}
-
-            // Using Buffered streams and a larger 16KB buffer for faster I/O
-            try (InputStream in = new java.io.BufferedInputStream(am.open(src));
-                 OutputStream out = new java.io.BufferedOutputStream(new FileOutputStream(outFile))) {{
-                byte[] buf = new byte[16384]; 
-                int n;
-                while ((n = in.read(buf)) > 0) {{
-                    out.write(buf, 0, n);
-                }}
-            }}
-        }} else {{
-            // It's a directory - Recurse
-            if (!outFile.exists()) {{
-                outFile.mkdirs();
-            }}
-            for (String child : entries) {{
-                // Template will process the string concatenation here
-                unpackAsset(am, src + "/" + child, destRoot);
-            }}
-        }}
-    }}
-
-    /** Like unpackAsset but strips the leading {{srcRoot}} so that
-     * assets/site-packages/x86_64/foo lands as destRoot/foo. */
-    private static void unpackAssetTree(
-        AssetManager am, String srcRoot, File destRoot
-    ) throws IOException {{
-        unpackAssetTreeRec(am, srcRoot, srcRoot, destRoot);
-    }}
-
-    private static void unpackAssetTreeRec(
-        AssetManager am, String srcRoot, String current, File destRoot
-    ) throws IOException {{
-        String[] entries = am.list(current);
-        if (entries == null || entries.length == 0) {{
-            // It's a file - calculate relative path and unpack it
-            String rel = current.length() > srcRoot.length()
-                ? current.substring(srcRoot.length() + 1)
-                : "";
-            File outFile = new File(destRoot, rel);
-            
-            File parent = outFile.getParentFile();
-            if (parent != null && !parent.exists()) {{
-                parent.mkdirs();
-            }}
-
-            try (InputStream in = new java.io.BufferedInputStream(am.open(current));
-                 OutputStream out = new java.io.BufferedOutputStream(new FileOutputStream(outFile))) {{
-                byte[] buf = new byte[16384];
-                int n;
-                while ((n = in.read(buf)) > 0) {{
-                    out.write(buf, 0, n);
-                }}
-            }}
-            return;
-        }}
-
-        // It's a directory - loop through children and recurse
-        for (String child : entries) {{
-            unpackAssetTreeRec(am, srcRoot, current + "/" + child, destRoot);
         }}
     }}
 }}
