@@ -146,6 +146,7 @@ class GradleProjectBuilder:
             gradle_dependencies=merged_deps,
             version_code=v_code,
             version_name=v_name,
+            post_build=(self.android.post_build if self.android else None),
         )
 
         main_dir = app_dir / "src" / "main"

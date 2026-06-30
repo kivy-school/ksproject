@@ -141,6 +141,7 @@ include(":app")
         gradle_dependencies: list[str] | None = None,
         version_name: str = "1.0",
         version_code: int = 1,
+        post_build: Path | None = None,
     ) -> None:
 
         abi_filters = ", ".join(f'"{a.value}"' for a in archs)
@@ -164,6 +165,7 @@ include(":app")
         site_packages_tasks = GradleBuildFiles._site_packages_tasks(
             arch_list_kts, python_version
         )
+        site_packages_tasks += GradleBuildFiles._post_build_task(post_build)
 
         template_path = project_dir / "build.tmpl.gradle.kts"
 
@@ -252,6 +254,55 @@ dependencies {
 
         (app_dir / "build.gradle.kts").write_text(build_content, encoding="utf-8")
         (app_dir / "libs").mkdir(parents=True, exist_ok=True)
+
+    @staticmethod
+    def _post_build_task(post_build: Path | None) -> str:
+        """Gradle Exec task that runs the user's post_build hook against the
+        staged app tree, after the copySitePackages* tasks have populated
+        src/main/{assets,jniLibs,java,kotlin} but before AGP merges/packages it.
+
+        This is the Gradle-native equivalent of the xcode post-build run_script
+        phase: it executes inside the build process, not in the Python CLI.
+        """
+        if post_build is None:
+            return ""
+
+        script = str(post_build).replace("\\", "/")
+        if post_build.suffix == ".py":
+            command_line = f'commandLine("uv", "run", postBuildScript.absolutePath)'
+        else:
+            command_line = f"commandLine(postBuildScript.absolutePath)"
+
+        return f"""
+// ── post_build hook ──────────────────────────────────────────────────────────
+// Runs the user's android.post_build script on the staged app content before
+// AGP merges/packages it — the last point at which app content can be modified.
+val ksprojectPostBuild = tasks.register<Exec>("ksprojectPostBuild") {{
+    group = "python"
+    description = "Run user post_build hook on staged app content before packaging"
+    val appSrcRoot = rootProject.projectDir.parentFile.parentFile
+    val postBuildScript = file("$appSrcRoot/{script}")
+    workingDir = appSrcRoot
+    environment("WHEELHOUSE", file("$appSrcRoot/wheelhouse").absolutePath)
+    environment("APP_MAIN", file("src/main").absolutePath)
+    {command_line}
+
+    // Content must be fully staged before the hook runs.
+    copySitePackagesTasks.forEach {{ dependsOn(it) }}
+    copySitePackagesNativeLibsTasks.forEach {{ dependsOn(it) }}
+    dependsOn("copySitePackagesJava")
+    dependsOn("copySitePackagesKotlin")
+}}
+
+// Make the packaging-input merge tasks wait for the hook, so its edits land
+// inside the APK/AAR.
+tasks.configureEach {{
+    if (name.startsWith("merge") &&
+        (name.endsWith("Assets") || name.endsWith("JniLibFolders"))) {{
+        dependsOn(ksprojectPostBuild)
+    }}
+}}
+// ─────────────────────────────────────────────────────────────────────────────"""
 
     @staticmethod
     def _site_packages_tasks(arch_list_kts: str, python_version: str) -> str:

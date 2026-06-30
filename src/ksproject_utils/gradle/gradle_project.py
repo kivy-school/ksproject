@@ -10,6 +10,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from os import environ
 
 from ..pip_install import PipInstaller
 from ..platforms import (
@@ -45,7 +46,7 @@ class GradleProject:
     adb: ADB
     emulator: AndroidEmulator
     _toolchain: AndroidToolchain | None
-    builder: GradleProjectBuilder
+    builder: GradleProjectBuilder # <---- bootstrap instead ? ....
 
     def __init__(self, project_path: Path):
         project_path = Path(project_path).resolve()
@@ -71,6 +72,7 @@ class GradleProject:
         # Determine SDK version from pyproject.toml for the emulator.
         # Prefer android.api, fall back to android.sdk, then the toolchain default.
         android_data = self.builder.android
+        self.android_data = android_data
         sdk_version = (
             (
                 android_data.sdk or str(android_data.api)
@@ -136,6 +138,29 @@ class GradleProject:
             extra_gradle_dependencies=extra_gradle_dependencies or [],
             extra_permissions=extra_permissions or [],
         )
+
+    def platform_pre_build_script(self):
+        
+        script = self.android_data.pre_build
+        
+        env = {**environ}
+
+        if script:
+            cur = Path.cwd()
+            env["WHEELHOUSE"] = f"{cur / "wheelhouse"}"
+            match script.suffix:
+                case ".py":
+                    subprocess.run(
+                        ["uv", "run", str(script.absolute())],
+                        check=True,
+                        env=env
+                    )
+                case _:
+                    subprocess.run(
+                        [str(script.absolute())],
+                        check=True,
+                        env=env
+                    )
 
     def install_site_packages(self) -> None:
         """Install the project (and its deps) into per-arch site_packages dirs."""
@@ -245,6 +270,8 @@ class GradleProject:
         bundle: bool = False,
         clean: bool = False,
     ) -> Path:
+        
+        self.platform_pre_build_script()
         """Run full pipeline: pip install → collect .gradle configs → generate → gradlew assemble/bundle."""
         self.install_site_packages()
         merged = self._collect_site_gradle_configs()
