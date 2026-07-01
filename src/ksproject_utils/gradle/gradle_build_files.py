@@ -233,7 +233,8 @@ android {
 
 dependencies {
     implementation(fileTree("libs") { include("*.aar", "*.jar") })
-{{ extra_deps }}}
+{{ extra_deps }}
+}
 
 {{ site_packages_tasks }}
 """
@@ -360,13 +361,14 @@ val optimizeStagedTasks = sitePackagesAbis.map {{ abi ->
         onlyIf {{ File(targetPath).exists() }}
 
         commandLine("python3", "-m", "compileall", "-b", "-o", "2", "-j", "0", "-q", targetPath)
+        isIgnoreExitValue = true
 
         doLast {{
             val dir = File(targetPath)
             if (!dir.exists()) return@doLast
 
             val junkExts = listOf(".py", ".pyi", ".c", ".cpp", ".h", ".pyx", ".pxd", ".md", ".rst")
-            val junkDirs = setOf("tests", "test", "docs", "doc", "examples", "example", "tutorials", "benchmarks", "perf", ".mypy_cache", ".pytest_cache", "__pycache__")
+            val junkDirs = setOf("tests", "test", "docs", "doc", "examples", "example", "tutorials", "benchmarks", "perf", ".mypy_cache", ".pytest_cache", "__pycache__", "bin", "unittest")
 
             val allFiles = dir.walkBottomUp().toList()
 
