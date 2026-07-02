@@ -142,6 +142,7 @@ include(":app")
         version_name: str = "1.0",
         version_code: int = 1,
         post_build: Path | None = None,
+        byte_compile_default: bool = False,
     ) -> None:
 
         abi_filters = ", ".join(f'"{a.value}"' for a in archs)
@@ -163,7 +164,7 @@ include(":app")
 
         ndk_path_str = str(ndk_path).replace("\\", "/") if ndk_path else ""
         site_packages_tasks = GradleBuildFiles._site_packages_tasks(
-            arch_list_kts, python_version
+            arch_list_kts, python_version, byte_compile_default
         )
         site_packages_tasks += GradleBuildFiles._post_build_task(post_build)
 
@@ -309,7 +310,8 @@ tasks.configureEach {{
 // ─────────────────────────────────────────────────────────────────────────────"""
 
     @staticmethod
-    def _site_packages_tasks(arch_list_kts: str, python_version: str) -> str:
+    def _site_packages_tasks(arch_list_kts: str, python_version: str, byte_compile_default: bool) -> str:
+        kt_bool = str(byte_compile_default).lower()
         return f"""\
 val sitePackagesAbis = listOf({arch_list_kts})
 val stagingDir = layout.buildDirectory.dir("python_assets_staging").get().asFile
@@ -351,23 +353,33 @@ val cleanLegacyPython = tasks.register("cleanLegacyPython") {{
 }}
 
 val optimizeStagedTasks = sitePackagesAbis.map {{ abi ->
-    tasks.register<Exec>("optimizeStaged_${{abi}}") {{
+    tasks.register("optimizeStaged_${{abi}}") {{
         group = "python"
         dependsOn("stagePython_${{abi}}")
 
-        val targetPath = stagingDir.absolutePath
-        val ndkDirPath = project.extensions.getByType(com.android.build.gradle.BaseExtension::class.java).ndkDirectory.absolutePath
-
-        onlyIf {{ File(targetPath).exists() }}
-
-        commandLine("python3", "-m", "compileall", "-b", "-o", "2", "-j", "0", "-q", targetPath)
-        isIgnoreExitValue = true
-
         doLast {{
+            val targetPath = stagingDir.absolutePath
             val dir = File(targetPath)
             if (!dir.exists()) return@doLast
 
-            val junkExts = listOf(".py", ".pyi", ".c", ".cpp", ".h", ".pyx", ".pxd", ".md", ".rst")
+            val isCmdLineForced = project.hasProperty("forceCompile")
+            val isReleaseBuild = gradle.startParameter.taskNames.any {{ 
+                it.contains("Release", ignoreCase = true) 
+            }}
+            val shouldCompile = isReleaseBuild || isCmdLineForced || {kt_bool}
+
+            if (shouldCompile) {{
+                project.exec {{
+                    commandLine("python3", "-m", "compileall", "-b", "-o", "2", "-j", "0", "-q", targetPath)
+                    isIgnoreExitValue = true
+                }}
+            }}
+
+            val junkExts = mutableListOf(".pyi", ".c", ".cpp", ".h", ".pyx", ".pxd", ".md", ".rst")
+            if (shouldCompile) {{
+                junkExts.add(".py")
+            }}
+
             val junkDirs = setOf("tests", "test", "docs", "doc", "examples", "example", "tutorials", "benchmarks", "perf", ".mypy_cache", ".pytest_cache", "__pycache__", "bin", "unittest")
 
             val allFiles = dir.walkBottomUp().toList()
@@ -384,6 +396,7 @@ val optimizeStagedTasks = sitePackagesAbis.map {{ abi ->
                 }}
             }}
 
+            val ndkDirPath = project.extensions.getByType(com.android.build.gradle.BaseExtension::class.java).ndkDirectory.absolutePath
             val os = org.gradle.internal.os.OperatingSystem.current()
             val hostTag = if (os.isWindows) "windows-x86_64" else if (os.isMacOsX) "darwin-x86_64" else "linux-x86_64"
             val stripExe = if (os.isWindows) "llvm-strip.exe" else "llvm-strip"

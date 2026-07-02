@@ -299,6 +299,11 @@ permissions = [
 #     ["gradle/app", ["./google-services.json", "./some-other-config.xml"]]
 # ]
 
+# pre_build = "path/to/android_prebuild.py"
+# post_build = "path/to/android_prebuild.py"
+
+byte_compile_python = true
+
 # <meta-data> entries inside <application>
 # [tool.kivy-school.android.meta_data]
 # "com.google.android.gms.ads.APPLICATION_ID" = "ca-app-pub-xxxxxxxx~xxxxxxxx"
