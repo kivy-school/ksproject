@@ -202,6 +202,11 @@ android {
     packaging {
         jniLibs {
             useLegacyPackaging = true
+            # excludes += setOf(
+            #     "**/libcrypto.so",
+            #     "**/libssl.so",
+            #     "**/libsqlite3.so"
+            # )
         }
     }
 
