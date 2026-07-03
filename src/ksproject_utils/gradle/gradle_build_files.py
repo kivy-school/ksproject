@@ -357,15 +357,18 @@ val optimizeStagedTasks = sitePackagesAbis.map {{ abi ->
         group = "python"
         dependsOn("stagePython_${{abi}}")
 
+        val isCmdLineForced = project.hasProperty("forceCompile")
+        val isReleaseBuild = gradle.startParameter.taskNames.any {{ 
+            it.contains("Release", ignoreCase = true) 
+        }}
+        val androidExt = project.extensions.getByType(com.android.build.gradle.BaseExtension::class.java)
+        val ndkDir = androidExt.ndkDirectory.absolutePath
+
         doLast {{
             val targetPath = stagingDir.absolutePath
             val dir = File(targetPath)
             if (!dir.exists()) return@doLast
 
-            val isCmdLineForced = project.hasProperty("forceCompile")
-            val isReleaseBuild = gradle.startParameter.taskNames.any {{ 
-                it.contains("Release", ignoreCase = true) 
-            }}
             val shouldCompile = isReleaseBuild || isCmdLineForced || {kt_bool}
 
             if (shouldCompile) {{
@@ -381,7 +384,6 @@ val optimizeStagedTasks = sitePackagesAbis.map {{ abi ->
             }}
 
             val junkDirs = setOf("tests", "test", "docs", "doc", "examples", "example", "tutorials", "benchmarks", "perf", ".mypy_cache", ".pytest_cache", "__pycache__", "bin", "unittest")
-
             val allFiles = dir.walkBottomUp().toList()
 
             allFiles.parallelStream().forEach {{ f ->
@@ -396,11 +398,10 @@ val optimizeStagedTasks = sitePackagesAbis.map {{ abi ->
                 }}
             }}
 
-            val ndkDirPath = project.extensions.getByType(com.android.build.gradle.BaseExtension::class.java).ndkDirectory.absolutePath
             val os = org.gradle.internal.os.OperatingSystem.current()
             val hostTag = if (os.isWindows) "windows-x86_64" else if (os.isMacOsX) "darwin-x86_64" else "linux-x86_64"
             val stripExe = if (os.isWindows) "llvm-strip.exe" else "llvm-strip"
-            val stripTool = File(ndkDirPath, "toolchains/llvm/prebuilt/$hostTag/bin/$stripExe")
+            val stripTool = File(ndkDir, "toolchains/llvm/prebuilt/$hostTag/bin/$stripExe")
 
             if (stripTool.exists()) {{
                 val soFiles = dir.walkTopDown().filter {{ it.isFile && it.name.endsWith(".so") }}.toList()
