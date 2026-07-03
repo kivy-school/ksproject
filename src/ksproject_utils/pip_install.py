@@ -5,8 +5,10 @@ import subprocess
 import tomllib
 from pathlib import Path
 
-from .platforms import Platform
+#from .platforms import Platform
 from .tools import get_uv
+
+from ksp_bootstraps.platforms import Platform
 
 UV = get_uv()
 
@@ -19,7 +21,8 @@ class PipInstaller:
     @staticmethod
     def install(uv_src: str, platform: Platform, site_packages: str) -> None:
         project_dir = Path(uv_src).resolve()
-
+        if UV is None:
+            raise Exception("no uv toolchain")
         try:
             subprocess.check_call(
                 [

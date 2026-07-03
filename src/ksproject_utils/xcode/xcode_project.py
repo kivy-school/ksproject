@@ -15,16 +15,60 @@ from ..pip_install import PipInstaller
 from ..platforms import IOSArm64Platform, IOSSim_Arm64Platform, IOSSim_X86_64Platform, MacOSPlatform, MacOSArm64Platform, MacOSX86_64Platform
 from ..pyproject_toml import PyProjectToml
 from .python_apple import copy_site_frameworks
-from .xcode_project_builder import XcodeProjectBuilder
+#from .xcode_project_builder import XcodeProjectBuilder
+from ..pyproject_toml import KivySchoolData
+from .xcodegen_runner import XcodeGenRunner
+from .python_apple import PY_VERSION, ApplePythonFramework, apple_python_cache_root
 
+from ksp_bootstraps.bootstrap import BootstrapProtocol
+from ksp_bootstraps.bootstraps import get_bootstrap
 
 class XcodeProjectError(Exception):
     pass
 
+#AppleData = KivySchoolData.MacosData | KivySchoolData.IosData
+AppleData = KivySchoolData.AppleData
+
+class XcodeProjectDelegate:
+    working_dir: Path
+    xcode_dir: Path
+    data: AppleData
+    #macos_data: KivySchoolData.MacosData
+    #bootstrap: BootstrapProtocol
+    toolchain: XcodeGenRunner
+
+    def __init__(self, working_dir: Path, xcode_dir: Path, data: AppleData, toolchain: XcodeGenRunner) -> None:
+        self.working_dir = working_dir
+        self.xcode_dir = xcode_dir
+        self.data = data
+        self.toolchain = toolchain
+
+    def install_cpython(self):
+        data = self.data
+        toolchain = self.toolchain
+        ApplePythonFramework(apple_python_cache_root()).install_to(self.xcode_dir / "Frameworks")
+        # install_cpython_android(
+        #     data.kivyschool_root(self.working_dir),
+        #     [arch.value for arch in data.archs],
+        #     toolchain.sdk_path,
+        #     toolchain.ndk_path,
+        #     toolchain.java_path
+        # )
+
+    def xcode_generate(self, **kw):
+        self.toolchain.generate(**kw)
+
+    
+
+    @property
+    def py_version(self) -> str:
+        return PY_VERSION
 
 class XcodeProject:
 
-    builder: XcodeProjectBuilder
+    #builder: XcodeProjectBuilder
+    bootstrap: BootstrapProtocol
+    delegate: XcodeProjectDelegate
 
     def __init__(self, project_path: Path):
         project_path = Path(project_path).resolve()
@@ -34,11 +78,30 @@ class XcodeProject:
             )
         self.project_path = project_path
         self.pyproject = PyProjectToml(str(project_path / "pyproject.toml"))
-        if self.pyproject.tool.kivy_school is None:
+        kivy_school = self.pyproject.tool.kivy_school
+        if kivy_school is None:
             raise XcodeProjectError(
                 "[tool.kivy-school] section is missing in pyproject.toml"
             )
-        self.builder = XcodeProjectBuilder(self.pyproject, project_path)
+        apple_data = kivy_school.apple
+        if apple_data is None:
+            raise XcodeProjectError(
+                "[tool.kivy-school.macos] section is missing in pyproject.toml"
+            )
+        
+        #self.builder = XcodeProjectBuilder(self.pyproject, project_path)
+        delegate = XcodeProjectDelegate(
+            project_path,
+            self.xcode_dir,
+            apple_data,
+            XcodeGenRunner()
+        )
+        self.delegate = delegate
+        self.bootstrap = get_bootstrap(
+            kivy_school.bootstrap,
+            self.pyproject,
+            delegate
+        )
 
     # ------------------------------------------------------------------
     # Properties
@@ -46,11 +109,15 @@ class XcodeProject:
 
     @property
     def app_name(self) -> str:
-        return self.builder.app_name
+        ks = self.pyproject.tool.kivy_school
+        if ks and ks.app_name:
+            return ks.app_name
+        raise Exception("tool.kivy-school.app_name is missing")
 
     @property
     def xcode_dir(self) -> Path:
-        return self.builder.project_dir
+        return self.project_path / "project_dist" / "xcode"
+
 
     @property
     def xcodeproj(self) -> Path:
@@ -61,10 +128,18 @@ class XcodeProject:
     # ------------------------------------------------------------------
 
     def generate(self, platforms: list[str] | None = None) -> Path:
-        return self.builder.generate(platforms=platforms)
+        result = self.bootstrap.generate(platform="apple",platforms=platforms)
+        if result: 
+            return result
+        else:
+            raise Exception("bootstrap didnt return xcode path")
 
     def open_in_xcode(self) -> None:
         subprocess.run(["open", str(self.xcodeproj)], check=False)
+
+    def install_frameworks(self):
+
+        self.bootstrap.install_frameworks()
 
     def install_site_packages(
         self, platforms: list[str], simulator: bool = False
@@ -165,23 +240,31 @@ class XcodeProject:
                 "Run `ksproject ios build` first."
             )
         return candidates[-1]
+    
 
     def ios_build(self, variant: str = "debug", simulator: bool = False) -> Path:
+        
         platforms = ["iOS", "macOS"]
         just_created = not self.xcodeproj.exists()
         if just_created:
+            #raise Exception()
             self.generate(platforms=platforms)
             self.open_in_xcode()
-        self.builder._install_frameworks()
-        self.platform_pre_build_script(self.pyproject.tool.kivy_school.ios)
+        self.bootstrap.install_frameworks()
+        kivy_school = self.pyproject.tool.kivy_school
+        if kivy_school:
+            apple = kivy_school.apple
+            if apple:
+                self.platform_pre_build_script(apple.ios)
         self.install_site_packages(platforms=["iOS"], simulator=simulator)
-        self.builder.sync_site_xcframeworks()
+        self.bootstrap.sync_site_xcframeworks()
         dest = (
             "generic/platform=iOS Simulator"
             if simulator
             else "generic/platform=iOS"
         )
         return self._xcodebuild(dest, variant)
+    
 
     def macos_build(self, variant: str = "debug") -> Path:
         platforms = ["iOS", "macOS"]
@@ -189,9 +272,12 @@ class XcodeProject:
         if just_created:
             self.generate(platforms=platforms)
             self.open_in_xcode()
-        self.builder._install_frameworks()
-        
-        self.platform_pre_build_script(self.pyproject.tool.kivy_school.macos)
+        self.bootstrap.install_frameworks()
+        kivy_school = self.pyproject.tool.kivy_school
+        if kivy_school:
+            apple = kivy_school.apple
+            if apple:
+                self.platform_pre_build_script(apple.macos) # type: ignore
         self.install_site_packages(platforms=["iOS", "macOS"])
         return self._xcodebuild("generic/platform=macOS", variant)
     
@@ -299,7 +385,7 @@ class XcodeProject:
             uuid = target["uuid"]
             kind = target["kind"]
         else:
-            target = self._find_device_by_uuid(uuid)
+            target = self._find_device_by_uuid(uuid) # type: ignore
             kind = target["kind"] if target else "simulator"
 
         app = self._find_app()
@@ -307,27 +393,27 @@ class XcodeProject:
         if kind == "simulator":
             print(f"Booting simulator {uuid}...")
             subprocess.run(
-                ["xcrun", "simctl", "boot", uuid],
+                ["xcrun", "simctl", "boot", uuid], # type: ignore
                 check=False, capture_output=True,
-            )
+            ) # type: ignore
             print(f"Installing {app.name} (this may take ~30-60s)...")
-            subprocess.run(["xcrun", "simctl", "install", uuid, str(app)], check=True)
+            subprocess.run(["xcrun", "simctl", "install", uuid, str(app)], check=True) # type: ignore
             print("Launching...")
             subprocess.run(
-                ["xcrun", "simctl", "launch", "--console-pty", uuid, self._bundle_id()],
+                ["xcrun", "simctl", "launch", "--console-pty", uuid, self._bundle_id()], # type: ignore
                 check=True,
-            )
+            ) # type: ignore
         else:
             subprocess.run(
                 ["xcrun", "devicectl", "device", "install", "app",
-                 "--device", uuid, str(app)],
+                 "--device", uuid, str(app)], # type: ignore
                 check=True,
-            )
+            ) # type: ignore
             subprocess.run(
                 ["xcrun", "devicectl", "device", "process", "launch",
-                 "--device", uuid, self._bundle_id()],
+                 "--device", uuid, self._bundle_id()], # type: ignore
                 check=True,
-            )
+            ) # type: ignore
 
     def macos_run(self) -> None:
         app = self._find_app()

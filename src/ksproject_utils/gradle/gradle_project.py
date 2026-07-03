@@ -13,7 +13,8 @@ from pathlib import Path
 from os import environ
 
 from ..pip_install import PipInstaller
-from ..platforms import (
+from ksp_bootstraps.platforms import (
+    Platform,
     AndroidArm64Platform,
     AndroidPlatform,
     AndroidX86_64Platform,
@@ -27,7 +28,17 @@ from .android_toolchain import (
     AndroidToolchain,
 )
 from .collect_gradle_configs import MergedGradleConfig, collect_and_merge
-from .gradle_project_builder import GradleProjectBuilder
+
+from .cpython_android import (
+    ANDROID_VERSION,
+    PY_VERSION,
+    android_prefix,
+    install_cpython_android,
+)
+
+#from .gradle_project_builder import GradleProjectBuilder
+from ksp_bootstraps.bootstrap import BootstrapProtocol
+from ksp_bootstraps.bootstraps import get_bootstrap
 
 Arch = KivySchoolData.AndroidData.Arch
 
@@ -41,12 +52,67 @@ class GradleProjectError(Exception):
     pass
 
 
+class GradleProjectDelegate:
+    working_dir: Path
+    data: KivySchoolData.AndroidData
+    #bootstrap: BootstrapProtocol
+    toolchain: AndroidToolchain
+
+    def __init__(self, working_dir: Path, data: KivySchoolData.AndroidData, toolchain: AndroidToolchain) -> None:
+        self.working_dir = working_dir
+        self.data = data
+        self.toolchain = toolchain
+
+    def install_cpython(self):
+        data = self.data
+        toolchain = self.toolchain
+        install_cpython_android(
+            data.kivyschool_root(self.working_dir),
+            [arch.value for arch in data.archs],
+            toolchain.sdk_path,
+            toolchain.ndk_path,
+            toolchain.java_path
+        )
+            
+    def android_prefix(self, ks_root: Path, arch: str, android_version: str) -> Path:
+        return android_prefix(ks_root, arch, android_version)
+
+    @property
+    def default_api_version(self) -> int:
+        return DEFAULT_API_VERSION
+    
+    @property
+    def sdk_path(self) -> str: ...
+    
+    @property
+    def ndk_version(self) -> str:
+        return self.toolchain.ndk_version
+    
+    @property
+    def ndk_path(self) -> str:
+        return self.toolchain.ndk_path
+    
+    @property
+    def java_path(self) -> str: 
+        return self.toolchain.java_path
+    
+    @property
+    def android_py_version(self) -> str: 
+        return ANDROID_VERSION
+
+    @property
+    def py_version(self) -> str:
+        return PY_VERSION
+
+
+
 class GradleProject:
 
     adb: ADB
     emulator: AndroidEmulator
     _toolchain: AndroidToolchain | None
-    builder: GradleProjectBuilder # <---- bootstrap instead ? ....
+    bootstrap: BootstrapProtocol
+    pyproject: PyProjectToml
 
     def __init__(self, project_path: Path):
         project_path = Path(project_path).resolve()
@@ -65,13 +131,15 @@ class GradleProject:
             raise GradleProjectError(
                 "[tool.kivy-school.android] section is missing in pyproject.toml"
             )
+        self.android_data = kivy_school.android
 
-        self.builder = GradleProjectBuilder(self.pyproject, project_path)
         self._toolchain = None
+
+
 
         # Determine SDK version from pyproject.toml for the emulator.
         # Prefer android.api, fall back to android.sdk, then the toolchain default.
-        android_data = self.builder.android
+        android_data = kivy_school.android
         self.android_data = android_data
         sdk_version = (
             (
@@ -85,7 +153,7 @@ class GradleProject:
 
         # Try lightweight SDK lookup (no downloads). Falls back to full resolve
         # only when needed (via the toolchain property).
-        sdk_path = AndroidToolchain.find_sdk_path(self.builder.android, project_path)
+        sdk_path = AndroidToolchain.find_sdk_path(android_data, project_path)
         if sdk_path is not None:
             self.adb = ADB(sdk_path)
             self.emulator = AndroidEmulator(sdk_path, sdk_version)
@@ -94,17 +162,30 @@ class GradleProject:
             # toolchain resolution (triggered by build).
             self.adb = None  # type: ignore[assignment]
             self.emulator = None  # type: ignore[assignment]
+        
+        #self.builder = GradleProjectBuilder(self.pyproject, project_path)
+        delegate = GradleProjectDelegate(
+            project_path,
+            kivy_school.android,
+            self.toolchain
+        )
+
+        self.bootstrap = get_bootstrap(
+            name=kivy_school.bootstrap,
+            pyproject=self.pyproject,
+            delegate=delegate
+        )
 
     @property
     def toolchain(self) -> AndroidToolchain:
         """Full toolchain resolution (may download SDK/NDK/Java). Only needed for builds."""
         if self._toolchain is None:
             self._toolchain = AndroidToolchain.resolve(
-                self.builder.android, self.project_path
+                self.android_data, self.project_path
             )
             # Now that toolchain is resolved, ensure adb/emulator are set up.
             if self.adb is None:
-                android_data = self.builder.android
+                android_data = self.android_data
                 sdk_version = (
                     (
                         android_data.sdk or str(android_data.api)
@@ -133,10 +214,12 @@ class GradleProject:
         extra_permissions: list[str] | None = None,
     ) -> None:
         """Write Gradle files, build CPython, copy stdlib + jniLibs."""
-        self.builder.generate(
+        self.bootstrap.generate(
+            platform="android",
             aar=aar,
             extra_gradle_dependencies=extra_gradle_dependencies or [],
             extra_permissions=extra_permissions or [],
+            sdk_path=self.toolchain.sdk_path
         )
 
     def platform_pre_build_script(self):
@@ -164,7 +247,7 @@ class GradleProject:
 
     def install_site_packages(self) -> None:
         """Install the project (and its deps) into per-arch site_packages dirs."""
-        for arch in self.builder.archs:
+        for arch in self.android_data.archs:
             cls = _ARCH_TO_PLATFORM_CLS.get(arch)
             if cls is None:
                 raise GradleProjectError(f"No AndroidPlatform mapping for arch {arch}")
@@ -285,7 +368,7 @@ class GradleProject:
     def _collect_site_gradle_configs(self) -> MergedGradleConfig:
         """Scan all per-arch site_packages dirs for .gradle/*.json and merge."""
         sp_dirs = []
-        for arch in self.builder.archs:
+        for arch in self.android_data.archs:
             cls = _ARCH_TO_PLATFORM_CLS.get(arch)
             if cls is None:
                 continue
@@ -385,7 +468,7 @@ class GradleProject:
             serial = self.emulator.boot_and_wait(name, self.adb)
 
         self.adb.install(apk, serial)
-        self.adb.start_app(serial, self.builder.package_name)
+        self.adb.start_app(serial, self.android_data.package_name)
 
     # ------------------------------------------------------------------
     # Signing & Keystore Generation
