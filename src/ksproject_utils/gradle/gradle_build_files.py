@@ -369,10 +369,10 @@ val optimizeStagedTasks = sitePackagesAbis.map {{ abi ->
             val shouldCompile = isReleaseBuild || isCmdLineForced || {kt_bool}
 
             if (shouldCompile) {{
-                project.exec {{
-                    commandLine("python3", "-m", "compileall", "-b", "-o", "2", "-j", "0", "-q", targetPath)
-                    isIgnoreExitValue = true
-                }}
+                ProcessBuilder("python3", "-m", "compileall", "-b", "-o", "2", "-j", "0", "-q", targetPath)
+                    .redirectErrorStream(true)
+                    .start()
+                    .waitFor()
             }}
 
             val junkExts = mutableListOf(".pyi", ".c", ".cpp", ".h", ".pyx", ".pxd", ".md", ".rst")
