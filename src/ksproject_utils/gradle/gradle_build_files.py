@@ -313,6 +313,67 @@ tasks.configureEach {{
     def _site_packages_tasks(arch_list_kts: str, python_version: str, byte_compile_default: bool) -> str:
         kt_bool = str(byte_compile_default).lower()
         return f"""\
+abstract class OptimizePythonTask : DefaultTask() {{
+    @get:Input
+    abstract val shouldCompile: Property<Boolean>
+
+    @get:Input
+    abstract val targetPath: Property<String>
+
+    @get:Input
+    abstract val ndkDir: Property<String>
+
+    @TaskAction
+    fun runOptimization() {{
+        val path = targetPath.get()
+        val dir = File(path)
+        if (!dir.exists()) return
+
+        val doCompile = shouldCompile.get()
+
+        if (doCompile) {{
+            ProcessBuilder("python3", "-m", "compileall", "-b", "-o", "2", "-j", "0", "-q", path)
+                .redirectErrorStream(true)
+                .start()
+                .waitFor()
+        }}
+
+        val junkExts = mutableListOf(".pyi", ".c", ".cpp", ".h", ".pyx", ".pxd", ".md", ".rst")
+        if (doCompile) {{
+            junkExts.add(".py")
+        }}
+
+        val junkDirs = setOf("tests", "test", "docs", "doc", "examples", "example", "tutorials", "benchmarks", "perf", ".mypy_cache", ".pytest_cache", "__pycache__", "bin", "unittest")
+        val allFiles = dir.walkBottomUp().toList()
+
+        allFiles.parallelStream().forEach {{ f ->
+            if (f.isFile && junkExts.any {{ ext -> f.name.endsWith(ext) }}) {{
+                f.delete()
+            }}
+        }}
+
+        allFiles.forEach {{ f ->
+            if (f.isDirectory && junkDirs.contains(f.name) && f.exists()) {{
+                f.deleteRecursively()
+            }}
+        }}
+
+        val os = org.gradle.internal.os.OperatingSystem.current()
+        val hostTag = if (os.isWindows) "windows-x86_64" else if (os.isMacOsX) "darwin-x86_64" else "linux-x86_64"
+        val stripExe = if (os.isWindows) "llvm-strip.exe" else "llvm-strip"
+        val stripTool = File(ndkDir.get(), "toolchains/llvm/prebuilt/$hostTag/bin/$stripExe")
+
+        if (stripTool.exists()) {{
+            val soFiles = dir.walkTopDown().filter {{ it.isFile && it.name.endsWith(".so") }}.toList()
+            soFiles.parallelStream().forEach {{ f ->
+                ProcessBuilder(stripTool.absolutePath, "--strip-unneeded", f.absolutePath)
+                    .start()
+                    .waitFor()
+            }}
+        }}
+    }}
+}}
+
 val sitePackagesAbis = listOf({arch_list_kts})
 val stagingDir = layout.buildDirectory.dir("python_assets_staging").get().asFile
 val assetsDir = layout.projectDirectory.dir("src/main/assets")
@@ -339,21 +400,18 @@ val stagePythonTasks = sitePackagesAbis.map {{ abi ->
     }}
 }}
 
-val cleanLegacyPython = tasks.register("cleanLegacyPython") {{
+val cleanLegacyPython = tasks.register<Delete>("cleanLegacyPython") {{
     group = "python"
     dependsOn(stagePythonTasks)
-
-    val assetsPath = assetsDir.asFile.absolutePath
-    doLast {{
-        val aDir = File(assetsPath)
-        File(aDir, "python{python_version}").deleteRecursively()
-        File(aDir, "lib-dynload").deleteRecursively()
-        File(aDir, "site-packages").deleteRecursively()
-    }}
+    delete(
+        assetsDir.dir("python{python_version}"),
+        assetsDir.dir("lib-dynload"),
+        assetsDir.dir("site-packages")
+    )
 }}
 
 val optimizeStagedTasks = sitePackagesAbis.map {{ abi ->
-    tasks.register("optimizeStaged_${{abi}}") {{
+    tasks.register<OptimizePythonTask>("optimizeStaged_${{abi}}") {{
         group = "python"
         dependsOn("stagePython_${{abi}}")
 
@@ -362,56 +420,10 @@ val optimizeStagedTasks = sitePackagesAbis.map {{ abi ->
             it.contains("Release", ignoreCase = true) 
         }}
         val androidExt = project.extensions.getByType(com.android.build.gradle.BaseExtension::class.java)
-        val ndkDir = androidExt.ndkDirectory.absolutePath
 
-        doLast {{
-            val targetPath = stagingDir.absolutePath
-            val dir = File(targetPath)
-            if (!dir.exists()) return@doLast
-
-            val shouldCompile = isReleaseBuild || isCmdLineForced || {kt_bool}
-
-            if (shouldCompile) {{
-                ProcessBuilder("python3", "-m", "compileall", "-b", "-o", "2", "-j", "0", "-q", targetPath)
-                    .redirectErrorStream(true)
-                    .start()
-                    .waitFor()
-            }}
-
-            val junkExts = mutableListOf(".pyi", ".c", ".cpp", ".h", ".pyx", ".pxd", ".md", ".rst")
-            if (shouldCompile) {{
-                junkExts.add(".py")
-            }}
-
-            val junkDirs = setOf("tests", "test", "docs", "doc", "examples", "example", "tutorials", "benchmarks", "perf", ".mypy_cache", ".pytest_cache", "__pycache__", "bin", "unittest")
-            val allFiles = dir.walkBottomUp().toList()
-
-            allFiles.parallelStream().forEach {{ f ->
-                if (f.isFile && junkExts.any {{ ext -> f.name.endsWith(ext) }}) {{
-                    f.delete()
-                }}
-            }}
-
-            allFiles.forEach {{ f ->
-                if (f.isDirectory && junkDirs.contains(f.name) && f.exists()) {{
-                    f.deleteRecursively()
-                }}
-            }}
-
-            val os = org.gradle.internal.os.OperatingSystem.current()
-            val hostTag = if (os.isWindows) "windows-x86_64" else if (os.isMacOsX) "darwin-x86_64" else "linux-x86_64"
-            val stripExe = if (os.isWindows) "llvm-strip.exe" else "llvm-strip"
-            val stripTool = File(ndkDir, "toolchains/llvm/prebuilt/$hostTag/bin/$stripExe")
-
-            if (stripTool.exists()) {{
-                val soFiles = dir.walkTopDown().filter {{ it.isFile && it.name.endsWith(".so") }}.toList()
-                soFiles.parallelStream().forEach {{ f ->
-                    ProcessBuilder(stripTool.absolutePath, "--strip-unneeded", f.absolutePath)
-                        .start()
-                        .waitFor()
-                }}
-            }}
-        }}
+        shouldCompile.set(isReleaseBuild || isCmdLineForced || {kt_bool})
+        targetPath.set(stagingDir.absolutePath)
+        ndkDir.set(androidExt.ndkDirectory.absolutePath)
     }}
 }}
 
