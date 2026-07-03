@@ -39,7 +39,6 @@ class GradleProjectInit:
         android:allowBackup="true"
         android:supportsRtl="true"
         android:hardwareAccelerated="true"
-        android:extractNativeLibs="false"
         android:theme="@android:style/Theme.DeviceDefault.NoActionBar">{{ meta_data }}
 {{ services }}
         <activity
@@ -95,6 +94,11 @@ android {
     packaging {
         jniLibs {
             useLegacyPackaging = true
+            # excludes += setOf(
+            #     "**/libcrypto.so",
+            #     "**/libssl.so",
+            #     "**/libsqlite3.so"
+            # )
         }
     }
 
@@ -130,7 +134,8 @@ android {
 
 dependencies {
     implementation(fileTree("libs") { include("*.aar", "*.jar") })
-{{ extra_deps }}}
+{{ extra_deps }}
+}
 
 {{ site_packages_tasks }}
 """
