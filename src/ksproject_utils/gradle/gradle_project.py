@@ -51,6 +51,7 @@ _ARCH_TO_PLATFORM_CLS: dict[Arch, type[AndroidPlatform]] = {
 class GradleProjectError(Exception):
     pass
 
+
 class GradleProjectDelegate:
     working_dir: Path
     data: KivySchoolData.AndroidData
@@ -62,41 +63,37 @@ class GradleProjectDelegate:
         self.data = data
         self.toolchain = toolchain
 
-    def install_cpython(self, platform: Platform):
-        match platform:
-            case AndroidPlatform():
-                data = self.data
-                toolchain = self.toolchain
-                install_cpython_android(
-                    data.kivyschool_root(self.working_dir),
-                    [arch.value for arch in data.archs],
-                    toolchain.sdk_path,
-                    toolchain.ndk_path,
-                    toolchain.java_path
-                )
-            case _:
-                raise NotImplementedError()
-
+    def install_cpython(self):
+        data = self.data
+        toolchain = self.toolchain
+        install_cpython_android(
+            data.kivyschool_root(self.working_dir),
+            [arch.value for arch in data.archs],
+            toolchain.sdk_path,
+            toolchain.ndk_path,
+            toolchain.java_path
+        )
+            
     def android_prefix(self, ks_root: Path, arch: str, android_version: str) -> Path:
         return android_prefix(ks_root, arch, android_version)
 
     @property
-    def android_default_api_version(self) -> int:
+    def default_api_version(self) -> int:
         return DEFAULT_API_VERSION
     
     @property
-    def android_sdk_path(self) -> str: ...
+    def sdk_path(self) -> str: ...
     
     @property
-    def android_ndk_version(self) -> str:
+    def ndk_version(self) -> str:
         return self.toolchain.ndk_version
     
     @property
-    def android_ndk_path(self) -> str:
+    def ndk_path(self) -> str:
         return self.toolchain.ndk_path
     
     @property
-    def android_java_path(self) -> str: 
+    def java_path(self) -> str: 
         return self.toolchain.java_path
     
     @property
@@ -106,6 +103,8 @@ class GradleProjectDelegate:
     @property
     def py_version(self) -> str:
         return PY_VERSION
+
+
 
 class GradleProject:
 

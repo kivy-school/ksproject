@@ -35,7 +35,7 @@ version = "0.0.1"
 
 [tool.uv.sources]
 ksproject-studio = { git = "http://github.com/kivy-school/ksproject-studio" }
-ksp-bootstraps = { git = "http://github.com/kivy-school/ksp-bootstraps", branch = "optimize" }
+ksp-bootstraps = { path = "../ksp-bootstraps", editable = true }
 
 [dependency-groups]
 dev = [

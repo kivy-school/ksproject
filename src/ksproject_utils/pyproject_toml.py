@@ -6,63 +6,74 @@ import toml
 class KivySchoolData:
 
     app_name: str | None
-    ios: "KivySchoolData.IosData | None"
-    macos: "KivySchoolData.MacosData | None"
+    # ios: "KivySchoolData.IosData | None"
+    # macos: "KivySchoolData.MacosData | None"
     android: "KivySchoolData.AndroidData | None"
+    apple: "KivySchoolData.AppleData | None"
     bootstrap: str
 
     def __init__(self, data: dict):
         self.app_name = data.get("app_name")
-        self.ios = KivySchoolData.IosData(data["ios"]) if "ios" in data else None
-        self.macos = (
-            KivySchoolData.MacosData(data["macos"]) if "macos" in data else None
+        # self.ios = KivySchoolData.IosData(data["ios"]) if "ios" in data else None
+        # self.macos = (
+        #     KivySchoolData.MacosData(data["macos"]) if "macos" in data else None
+        # )
+        self.apple = self.AppleData(
+            self.AppleData.IosData(data["ios"]) if "ios" in data else None,
+            self.AppleData.MacosData(data["macos"]) if "macos" in data else None
         )
         self.android = (
             KivySchoolData.AndroidData(data["android"]) if "android" in data else None
         )
         self.bootstrap = data.get("bootstrap", "kivy")
+    
+    class AppleData:
 
-    class IosData:
-        bundle_id: str
-        info_plist: dict
-        entitlements: dict
-        permissions: list[str]
-        frameworks: list[str]
-        site_frameworks: list[str]
-        developer_team: str | None
-        pre_build: Path | None
-        post_build: Path | None
+        def __init__(self, ios: "IosData | None", macos: "MacosData | None"):
+            self.ios = ios
+            self.macos = macos
 
-        def __init__(self, data: dict):
-            self.bundle_id = data["bundle_id"]
-            self.info_plist = data.get("info_plist", {})
-            self.entitlements = data.get("entitlements", {})
-            self.permissions = data.get("permissions", [])
-            self.frameworks = data.get("frameworks", [])
-            self.site_frameworks = data.get("site_frameworks", [])
-            self.developer_team = data.get("developer_team")
-            self.pre_build = Path(data.get("pre_build")) if "pre_build" in data else None # type: ignore
-            self.post_build = Path(data.get("post_build")) if "post_build" in data else None # type: ignore
+        class IosData:
+            bundle_id: str
+            info_plist: dict
+            entitlements: dict
+            permissions: list[str]
+            frameworks: list[str]
+            site_frameworks: list[str]
+            developer_team: str | None
+            pre_build: Path | None
+            post_build: Path | None
 
-    class MacosData:
-        bundle_id: str
-        info_plist: dict
-        entitlements: dict
-        permissions: list[str]
-        developer_team: str | None
-        archs: list[str]
-        pre_build: Path | None
-        post_build: Path | None
+            def __init__(self, data: dict):
+                self.bundle_id = data["bundle_id"]
+                self.info_plist = data.get("info_plist", {})
+                self.entitlements = data.get("entitlements", {})
+                self.permissions = data.get("permissions", [])
+                self.frameworks = data.get("frameworks", [])
+                self.site_frameworks = data.get("site_frameworks", [])
+                self.developer_team = data.get("developer_team")
+                self.pre_build = Path(data.get("pre_build")) if "pre_build" in data else None # type: ignore
+                self.post_build = Path(data.get("post_build")) if "post_build" in data else None # type: ignore
 
-        def __init__(self, data: dict):
-            self.bundle_id = data["bundle_id"]
-            self.info_plist = data.get("info_plist", {})
-            self.entitlements = data.get("entitlements", {})
-            self.permissions = data.get("permissions", [])
-            self.developer_team = data.get("developer_team")
-            self.archs = data.get("archs", ["arm64", "x86_64"])
-            self.pre_build = Path(data.get("pre_build")) if "pre_build" in data else None # type: ignore
-            self.post_build = Path(data.get("post_build")) if "post_build" in data else None # type: ignore
+        class MacosData:
+            bundle_id: str
+            info_plist: dict
+            entitlements: dict
+            permissions: list[str]
+            developer_team: str | None
+            archs: list[str]
+            pre_build: Path | None
+            post_build: Path | None
+
+            def __init__(self, data: dict):
+                self.bundle_id = data["bundle_id"]
+                self.info_plist = data.get("info_plist", {})
+                self.entitlements = data.get("entitlements", {})
+                self.permissions = data.get("permissions", [])
+                self.developer_team = data.get("developer_team")
+                self.archs = data.get("archs", ["arm64", "x86_64"])
+                self.pre_build = Path(data.get("pre_build")) if "pre_build" in data else None # type: ignore
+                self.post_build = Path(data.get("post_build")) if "post_build" in data else None # type: ignore
 
     
 
