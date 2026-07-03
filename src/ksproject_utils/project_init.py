@@ -379,4 +379,6 @@ google-services.json
         GradleProjectInit(self.project_path, self.module_name).execute()
 
     def _ensure_wheelhouse(self) -> None:
-        (self.project_path / "wheelhouse").mkdir(exist_ok=True)
+        wheelhouse = (self.project_path / "wheelhouse")
+        wheelhouse.mkdir(exist_ok=True)
+        (wheelhouse / ".gitkeep").touch()

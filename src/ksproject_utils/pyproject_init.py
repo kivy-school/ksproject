@@ -75,6 +75,8 @@ global_tools = true # Set to <false> to use project-local SDK/NDK (./.kivyschool
 # pre_build = "path/to/android_prebuild.py"
 # post_build = "path/to/android_prebuild.py"
 
+byte_compile_python = true
+
 # <meta-data> entries inside <application>
 # [tool.kivy-school.android.meta_data]
 # "com.google.android.gms.ads.APPLICATION_ID" = "ca-app-pub-xxxxxxxx~xxxxxxxx"

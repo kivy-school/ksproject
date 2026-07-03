@@ -108,6 +108,8 @@ class KivySchoolData:
         pre_build: Path | None
         post_build: Path | None
 
+        byte_compile_python: bool
+
         def __init__(self, data: dict):
             self.package_name = data["package_name"]
             self.archs = [
@@ -158,6 +160,8 @@ class KivySchoolData:
             self.pre_build = Path(data.get("pre_build")) if "pre_build" in data else None # type: ignore
             self.post_build = Path(data.get("post_build")) if "post_build" in data else None # type: ignore
 
+            self.byte_compile_python = bool(data.get("byte_compile_python", True))
+            
         def kivyschool_root(self, working_dir: Path) -> Path:
             """Root for kivy-school managed tools/caches.
 
