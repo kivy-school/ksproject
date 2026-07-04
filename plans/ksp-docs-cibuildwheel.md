@@ -1,5 +1,9 @@
 
-# make guides for building kivy 2.3.x (kivy2x repo - master) and 3.0.0 (kivy repo - master)
+# make guides for building kivy 2.3.x (kivy2x repo - master) and 3.0.0 (kivy repo - master) in docs..
+
+write a section is ksproject docs about how to use wheelhouse, and use kivy2x and kivy 3.0.0 master as examples
+since we going to have bootstraps for those 2 by default...
+soo user can modify the build them self and produce right platform wheels..
 
 ## kivy2x
 
@@ -40,7 +44,7 @@ uv run ./tools/add-ios-frameworks.py ../wheelhouse
 ### android
 * needs to write the before-all script and also figure out the thorvg part
 * renaming thorvg to kivythor or what it was they wanted as...
-(also look into if thorvg-cython going to have issues )
+(also look into if thorvg-cython going to have issues co-existing with the thorvg lib that cython also has..)
 * we properly also need post script for making the wheels add SDL3 kivythor components etc to .libs
 (ends up merged in site-packages/.libs)
 
