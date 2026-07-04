@@ -56,10 +56,13 @@ cd kivy2x
 
 === "Android"
 
-    Point `ANDROID_NDK_HOME` at an NDK — if you've already built with ksproject, the one it installed works:
+    ksproject already manages an NDK — ask it for the path. Since ksproject is a dev dependency of your app (never a global tool), run the export from your **app's root** with `uv run`, then switch to the kivy2x clone:
 
     ```bash
-    export ANDROID_NDK_HOME="$HOME/.kivyschool/android-sdk/ndk/28.2.13676358"
+    # in your ksproject app root
+    export ANDROID_NDK_HOME=$(uv run ksproject android get-path ndk)
+
+    cd ../kivy2x   # wherever you cloned it
     cibuildwheel --platform android --archs all --output-dir ./wheelhouse
     ```
 
@@ -125,7 +128,10 @@ cd kivy
         Once those land, the build will look like:
 
         ```bash
-        export ANDROID_NDK_HOME="$HOME/.kivyschool/android-sdk/ndk/28.2.13676358"
+        # in your ksproject app root
+        export ANDROID_NDK_HOME=$(uv run ksproject android get-path ndk)
+
+        cd ../kivy   # wherever you cloned it
         export CIBW_BEFORE_ALL_ANDROID="./tools/build_android_dependencies.sh"
         cibuildwheel --platform android --archs all --output-dir ./wheelhouse
         ```
