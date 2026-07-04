@@ -57,7 +57,7 @@ class XcodeProjectDelegate:
         toolchain = self.toolchain
         framework = ApplePythonFramework(
             apple_python_cache_root(),
-            version=self.py_pin.full_or(DEFAULT_APPLE_PY_VERSION),
+            version=self.py_pin.resolve(DEFAULT_APPLE_PY_VERSION),
         )
         # Fail fast on a .python-version pin BeeWare doesn't ship, before
         # any downloads or project generation happen.

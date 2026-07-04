@@ -102,7 +102,7 @@ class GradleProjectDelegate:
     
     @property
     def android_py_version(self) -> str:
-        return self.py_pin.full_or(ANDROID_VERSION)
+        return self.py_pin.resolve(ANDROID_VERSION)
 
     @property
     def py_version(self) -> str:
