@@ -20,6 +20,10 @@ from pathlib import Path
 PY_VERSION = "3.13"
 PY_SUB_VERSION = "b11"
 
+# Used when the app project doesn't pin an exact patch release in
+# .python-version. Must have an entry in ``apple_python_versions``.
+DEFAULT_APPLE_PY_VERSION = "3.13.11"
+
 _KIVY_SDL2_VERSION = "2.3.10"
 _KIVY_SDL2_WHEEL = f"kivy_sdl2-{_KIVY_SDL2_VERSION}-py3-none-any.whl"
 _KIVY_SDL2_URL = (
@@ -254,6 +258,20 @@ def get_beeware_version(major: int, minor: int) -> BeewarePythonVersion | None:
         if fw.major == major and fw.minor == minor: return fw
     return None
 
+
+def supported_apple_py_versions() -> list[str]:
+    """Exact Python versions BeeWare ships Python-Apple-support builds for."""
+    return [f"3.{fw.major}.{fw.minor}" for fw in apple_python_versions]
+
+
+def unsupported_apple_py_error(version: str) -> AppleSupportError:
+    return AppleSupportError(
+        f"Python {version} has no BeeWare Python-Apple-support build. "
+        f"Supported versions: {', '.join(supported_apple_py_versions())} — "
+        f"pin one of these in .python-version (or use a bare major.minor "
+        f"like '3.13' to get the default {DEFAULT_APPLE_PY_VERSION})."
+    )
+
 class ApplePythonFramework:
 
     support_root: Path
@@ -261,7 +279,7 @@ class ApplePythonFramework:
     major_version: int
     minor_version: int
 
-    def __init__(self, support_root: Path, version: str = "3.13.11"):
+    def __init__(self, support_root: Path, version: str = DEFAULT_APPLE_PY_VERSION):
         self.support_root = support_root
         self.version = version
         main_ver, maj_ver, min_ver = [int(x) for x in version.split(".")]
@@ -303,13 +321,13 @@ class ApplePythonFramework:
     def download_macos(self, destination: Path) -> None:
         fw = self.framework
         if not fw:
-            raise AppleSupportError(f"{self.version} has no beeware build")
+            raise unsupported_apple_py_error(self.version)
         self.download(fw.macos_url, destination)
 
     def download_ios(self, destination: Path) -> None:
         fw = self.framework
         if not fw:
-            raise AppleSupportError(f"{self.version} has no beeware build")
+            raise unsupported_apple_py_error(self.version)
         self.download(fw.ios_url, destination)
 
     def merge_frameworks(self) -> Path:

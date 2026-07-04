@@ -39,6 +39,7 @@ from .cpython_android import (
 #from .gradle_project_builder import GradleProjectBuilder
 from ksp_bootstraps.bootstrap import BootstrapProtocol
 from ksp_bootstraps.bootstraps import get_bootstrap
+from ..python_version import read_python_version_pin
 
 Arch = KivySchoolData.AndroidData.Arch
 
@@ -62,6 +63,7 @@ class GradleProjectDelegate:
         self.working_dir = working_dir
         self.data = data
         self.toolchain = toolchain
+        self.py_pin = read_python_version_pin(working_dir)
 
     def install_cpython(self):
         data = self.data
@@ -71,7 +73,9 @@ class GradleProjectDelegate:
             [arch.value for arch in data.archs],
             toolchain.sdk_path,
             toolchain.ndk_path,
-            toolchain.java_path
+            toolchain.java_path,
+            py_version=self.py_version,
+            android_version=self.android_py_version,
         )
             
     def android_prefix(self, ks_root: Path, arch: str, android_version: str) -> Path:
@@ -97,12 +101,17 @@ class GradleProjectDelegate:
         return self.toolchain.java_path
     
     @property
-    def android_py_version(self) -> str: 
-        return ANDROID_VERSION
+    def android_py_version(self) -> str:
+        return self.py_pin.full_or(ANDROID_VERSION)
 
     @property
     def py_version(self) -> str:
-        return PY_VERSION
+        return self.py_pin.major_minor_or(PY_VERSION)
+
+    @property
+    def uv_py_version(self) -> str:
+        """Exact version for `uv run --python` pins in generated scripts."""
+        return self.py_pin.full_or(self.py_version)
 
 
 

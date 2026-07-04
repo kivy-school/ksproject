@@ -77,7 +77,47 @@ def _indent(s: str, prefix: str) -> str:
     return s.replace("\n", "\n" + prefix)
 
 
-INSTALL_PY_MODULES_SCRIPT = f"""set -e
+# Release-only: strip build/source artifacts, byte-compile every .py with a
+# uv-managed interpreter matching the bundled CPython (so .pyc magic numbers
+# line up), then drop the .py sources. A .py that fails to compile has a
+# syntax error and could never be imported anyway, so compile errors are
+# non-fatal. Runs before the signing phase.
+_RELEASE_OPTIMIZE_SITE = r"""
+if [ "$CONFIGURATION" = "Release" ]; then
+    export PATH="$HOME/.local/bin:$PATH"
+    if [ "$EFFECTIVE_PLATFORM_NAME" = "-iphonesimulator" ] || [ "$EFFECTIVE_PLATFORM_NAME" = "-iphoneos" ]; then
+        STRIP_ROOT="$CODESIGNING_FOLDER_PATH/python/site_packages"
+    else
+        STRIP_ROOT="$BUILT_PRODUCTS_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/python/site_packages"
+    fi
+    if [ -d "$STRIP_ROOT" ]; then
+        echo "Release: removing __pycache__ and source/build artifacts from $STRIP_ROOT"
+        find "$STRIP_ROOT" -type d -name "__pycache__" -prune -exec rm -rf {} +
+        find "$STRIP_ROOT" -type f \( \
+            -name "*.c" -o -name "*.h" -o -name "*.cpp" -o -name "*.hpp" \
+            -o -name "*.pyx" -o -name "*.pxd" -o -name "*.pxi" \
+            -o -name "*.pyi" -o -name "py.typed" \
+        \) -delete
+        echo "Release: byte-compiling site_packages with uv-managed Python __PY_VERSION__"
+        uv run --no-project --python __PY_VERSION__ python -m compileall -b -o 2 -j 0 -q -f "$STRIP_ROOT" || echo "warning: some files failed to byte-compile (syntax errors); they were never importable"
+        find "$STRIP_ROOT" -type f -name "*.py" -delete
+        find "$STRIP_ROOT" -type d -name "__pycache__" -prune -exec rm -rf {} +
+    fi
+fi
+"""
+
+
+def install_py_modules_script(uv_python: str | None = None) -> str:
+    """Render the install/optimize build phase.
+
+    ``uv_python`` is the version pin for the release byte-compile step
+    (exact patch from the project's .python-version when available);
+    defaults to the bundled runtime's major.minor.
+    """
+    optimize = _RELEASE_OPTIMIZE_SITE.replace(
+        "__PY_VERSION__", uv_python or f"3.{PY_SUB_VERSION}"
+    )
+    return f"""set -e
 if [ "$EFFECTIVE_PLATFORM_NAME" = "-iphonesimulator" ] || [ "$EFFECTIVE_PLATFORM_NAME" = "-iphoneos" ]; then
     echo "Installing Python modules for iOS Device/Simulator"
     {_indent(_INSTALL_PY_IOS, "    ")}
@@ -89,7 +129,10 @@ fi
 PYTHON="$PROJECT_DIR/python3"
 PY_APP="$CODESIGNING_FOLDER_PATH/app"
 PY_SITE="$CODESIGNING_FOLDER_PATH/site_packages"
-"""
+""" + optimize
+
+
+INSTALL_PY_MODULES_SCRIPT = install_py_modules_script()
 
 
 _SIGN_PY_IOS_BODY = r"""install_dylib () {
@@ -196,7 +239,8 @@ class ProjectTarget:
         entitlements: dict[str, Any] | None,
         site_xcframeworks: list[str] | None = None,
         developer_team: str | None = None,
-        post_build: Path | None = None
+        post_build: Path | None = None,
+        uv_python: str | None = None
     ) -> None:
         self.name = name
         self.info_plist_extra = info_plist_extra
@@ -204,6 +248,7 @@ class ProjectTarget:
         self.site_xcframeworks: list[str] = site_xcframeworks or []
         self.developer_team = developer_team
         self.post_build = post_build
+        self.uv_python = uv_python
 
     # ----- settings -----
 
@@ -308,7 +353,7 @@ class ProjectTarget:
             {"script": INSTALL_APP_MODULE_SCRIPT, "name": "Install App Module"},
             {"script": post_text, "name": "ksproject post-build"},
             {
-                "script": INSTALL_PY_MODULES_SCRIPT,
+                "script": install_py_modules_script(self.uv_python),
                 "name": "Install target specific Python modules",
             },
             {"script": SIGN_PYTHON_BINARY_SCRIPT, "name": "Sign Python Binary Modules"},

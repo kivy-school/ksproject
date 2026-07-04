@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 
 from ksproject_utils.gradle.android_toolchain import AndroidToolchain
+from ksproject_utils.gradle.github_actions import write_playstore_workflow
 from ksproject_utils.gradle.gradle_project import GradleProject
 from ksproject_utils.pyproject_toml import PyProjectToml
 
@@ -133,6 +134,13 @@ class GradleCommands:
 
         p_genkey.set_defaults(func=self.genkey)
 
+        # --- CREATE-ACTION ---
+        p_action = asub.add_parser(
+            "create-action",
+            help="Create a tag-triggered GitHub Actions Play Store workflow",
+        )
+        p_action.set_defaults(func=self.create_action)
+
         # --- GET-PATH ---
         p_get_path = asub.add_parser(
             "get-path", help="Print the resolved path for a tool"
@@ -244,6 +252,23 @@ class GradleCommands:
         )
 
         print(f"Keystore generated: {output}")
+        return 0
+
+    def create_action(self, args: argparse.Namespace) -> int:
+        # Read pyproject directly (like get_path) — constructing GradleProject
+        # would trigger full toolchain resolution just to write a file.
+        pyproject = PyProjectToml(str(Path.cwd() / "pyproject.toml"))
+        android = (
+            pyproject.tool.kivy_school.android if pyproject.tool.kivy_school else None
+        )
+        if android is None:
+            print(
+                "Error: [tool.kivy-school.android] section is missing in pyproject.toml",
+                file=sys.stderr,
+            )
+            return 1
+        workflow = write_playstore_workflow(Path.cwd(), android.package_name)
+        print(f"workflow: {workflow}")
         return 0
 
     def devices(self, args: argparse.Namespace) -> int:

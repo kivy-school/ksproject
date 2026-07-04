@@ -14,11 +14,19 @@ from os import environ
 from ..pip_install import PipInstaller
 from ..platforms import IOSArm64Platform, IOSSim_Arm64Platform, IOSSim_X86_64Platform, MacOSPlatform, MacOSArm64Platform, MacOSX86_64Platform
 from ..pyproject_toml import PyProjectToml
+from .github_actions import write_appstore_workflow
 from .python_apple import copy_site_frameworks
 #from .xcode_project_builder import XcodeProjectBuilder
 from ..pyproject_toml import KivySchoolData
 from .xcodegen_runner import XcodeGenRunner
-from .python_apple import PY_VERSION, ApplePythonFramework, apple_python_cache_root
+from .python_apple import (
+    DEFAULT_APPLE_PY_VERSION,
+    PY_VERSION,
+    ApplePythonFramework,
+    apple_python_cache_root,
+    unsupported_apple_py_error,
+)
+from ..python_version import read_python_version_pin
 
 from ksp_bootstraps.bootstrap import BootstrapProtocol
 from ksp_bootstraps.bootstraps import get_bootstrap
@@ -42,11 +50,20 @@ class XcodeProjectDelegate:
         self.xcode_dir = xcode_dir
         self.data = data
         self.toolchain = toolchain
+        self.py_pin = read_python_version_pin(working_dir)
 
     def install_cpython(self):
         data = self.data
         toolchain = self.toolchain
-        ApplePythonFramework(apple_python_cache_root()).install_to(self.xcode_dir / "Frameworks")
+        framework = ApplePythonFramework(
+            apple_python_cache_root(),
+            version=self.py_pin.full_or(DEFAULT_APPLE_PY_VERSION),
+        )
+        # Fail fast on a .python-version pin BeeWare doesn't ship, before
+        # any downloads or project generation happen.
+        if framework.framework is None:
+            raise unsupported_apple_py_error(framework.version)
+        framework.install_to(self.xcode_dir / "Frameworks")
         # install_cpython_android(
         #     data.kivyschool_root(self.working_dir),
         #     [arch.value for arch in data.archs],
@@ -62,7 +79,12 @@ class XcodeProjectDelegate:
 
     @property
     def py_version(self) -> str:
-        return PY_VERSION
+        return self.py_pin.major_minor_or(PY_VERSION)
+
+    @property
+    def uv_py_version(self) -> str:
+        """Exact version for `uv run --python` pins in generated scripts."""
+        return self.py_pin.full_or(self.py_version)
 
 class XcodeProject:
 
@@ -228,16 +250,36 @@ class XcodeProject:
             raise XcodeProjectError(
                 f"xcodebuild exited with code {result.returncode}"
             )
-        # Locate the .app inside derivedData.
-        return self._find_app()
+        # Locate the .app inside derivedData for the sdk we just built.
+        if "iOS Simulator" in destination:
+            sdk = "iphonesimulator"
+        elif "iOS" in destination:
+            sdk = "iphoneos"
+        else:
+            sdk = "macos"
+        return self._find_app(sdk=sdk)
 
-    def _find_app(self) -> Path:
+    @staticmethod
+    def _app_sdk(app: Path) -> str:
+        # Products subdir looks like "Debug-iphoneos", "Release-iphonesimulator"
+        # or plain "Debug"/"Release" for macOS.
+        name = app.parent.name
+        if name.endswith("-iphonesimulator"):
+            return "iphonesimulator"
+        if name.endswith("-iphoneos"):
+            return "iphoneos"
+        return "macos"
+
+    def _find_app(self, sdk: str | None = None) -> Path:
         products = self.xcode_dir / "build" / "Build" / "Products"
         candidates = sorted(products.rglob(f"{self.app_name}.app"))
+        if sdk is not None:
+            candidates = [c for c in candidates if self._app_sdk(c) == sdk]
         if not candidates:
+            where = f" for {sdk}" if sdk else ""
             raise XcodeProjectError(
-                f"No {self.app_name}.app found under {products}. "
-                "Run `ksproject ios build` first."
+                f"No {self.app_name}.app found{where} under {products}. "
+                "Run the matching build first."
             )
         return candidates[-1]
     
@@ -280,7 +322,227 @@ class XcodeProject:
                 self.platform_pre_build_script(apple.macos) # type: ignore
         self.install_site_packages(platforms=["iOS", "macOS"])
         return self._xcodebuild("generic/platform=macOS", variant)
-    
+
+    # ------------------------------------------------------------------
+    # Archive / App Store Connect upload
+    # ------------------------------------------------------------------
+
+    def _xcarchive(self, destination: str, variant: str, sdk: str) -> Path:
+        if not self.xcodeproj.exists():
+            raise XcodeProjectError(
+                f"Xcode project not generated yet: {self.xcodeproj} missing. "
+                "Run a build first."
+            )
+        config = self._configuration(variant)
+        derived = self.xcode_dir / "build"
+        archive_path = self.xcode_dir / "archives" / f"{self.app_name}-{sdk}.xcarchive"
+        cmd = [
+            "xcodebuild", "archive",
+            "-project", str(self.xcodeproj),
+            "-scheme", self.app_name,
+            "-configuration", config,
+            "-destination", destination,
+            "-archivePath", str(archive_path),
+            "-derivedDataPath", str(derived),
+            "-allowProvisioningUpdates",
+            "-skipPackagePluginValidation",
+            "-skipMacroValidation",
+        ]
+        result = subprocess.run(cmd, cwd=self.xcode_dir, stdin=subprocess.DEVNULL)
+        if result.returncode != 0:
+            raise XcodeProjectError(
+                f"xcodebuild archive exited with code {result.returncode}"
+            )
+        return archive_path
+
+    def _export_upload(
+        self,
+        archive_path: Path,
+        team: str | None,
+        key_id: str,
+        issuer_id: str,
+        key_path: Path,
+    ) -> None:
+        export_dir = self.xcode_dir / "export"
+        opts: dict = {
+            "method": "app-store-connect",
+            "destination": "upload",
+        }
+        if team:
+            opts["teamID"] = team
+        opts_path = self.xcode_dir / "ExportOptions.plist"
+        with open(opts_path, "wb") as f:
+            plistlib.dump(opts, f)
+        cmd = [
+            "xcodebuild", "-exportArchive",
+            "-archivePath", str(archive_path),
+            "-exportOptionsPlist", str(opts_path),
+            "-exportPath", str(export_dir),
+            "-allowProvisioningUpdates",
+            "-authenticationKeyID", key_id,
+            "-authenticationKeyIssuerID", issuer_id,
+            "-authenticationKeyPath", str(key_path),
+        ]
+        result = subprocess.run(cmd, cwd=self.xcode_dir, stdin=subprocess.DEVNULL)
+        if result.returncode != 0:
+            raise XcodeProjectError(
+                f"xcodebuild -exportArchive (upload) exited with code {result.returncode}"
+            )
+
+    def _resolve_upload_creds(
+        self,
+        key_id: str | None,
+        issuer_id: str | None,
+        key_path: str | None,
+    ) -> tuple[str, str, Path]:
+        key_id = key_id or environ.get("ASC_KEY_ID")
+        issuer_id = issuer_id or environ.get("ASC_ISSUER_ID")
+        key_path = key_path or environ.get("ASC_KEY_PATH")
+        missing = [
+            name
+            for name, val in (
+                ("--asc-key-id / ASC_KEY_ID", key_id),
+                ("--asc-issuer-id / ASC_ISSUER_ID", issuer_id),
+                ("--asc-key-path / ASC_KEY_PATH", key_path),
+            )
+            if not val
+        ]
+        if missing:
+            raise XcodeProjectError(
+                "App Store Connect upload requires: " + ", ".join(missing)
+            )
+        p8 = Path(key_path).expanduser()  # type: ignore[arg-type]
+        if not p8.is_file():
+            raise XcodeProjectError(f"App Store Connect key file not found: {p8}")
+        return key_id, issuer_id, p8  # type: ignore[return-value]
+
+    def _stamp_bundle_versions(
+        self, build_number: str | None, app_version: str | None
+    ) -> None:
+        """Rewrite CFBundleVersion / CFBundleShortVersionString in the
+        generated app Info.plist so every upload gets a unique build number."""
+        if build_number is None and app_version is None:
+            return
+        info_plist = self.xcode_dir / "Sources" / "Info.plist"
+        if not info_plist.is_file():
+            raise XcodeProjectError(
+                f"App Info.plist not found: {info_plist}. Generate the "
+                "Xcode project first."
+            )
+        with open(info_plist, "rb") as f:
+            props = plistlib.load(f)
+        if build_number is not None:
+            props["CFBundleVersion"] = build_number
+        if app_version is not None:
+            props["CFBundleShortVersionString"] = app_version
+        with open(info_plist, "wb") as f:
+            plistlib.dump(props, f)
+        print(
+            f"Stamped {info_plist.name}: "
+            f"version={props.get('CFBundleShortVersionString')} "
+            f"build={props.get('CFBundleVersion')}"
+        )
+
+    def _archive(
+        self,
+        *,
+        platform_data: object,
+        install_platforms: list[str],
+        destination: str,
+        sdk: str,
+        team: str | None,
+        variant: str,
+        upload: bool,
+        key_id: str | None,
+        issuer_id: str | None,
+        key_path: str | None,
+        build_number: str | None = None,
+        app_version: str | None = None,
+    ) -> Path:
+        # Resolve upload credentials up front so we fail before the long build.
+        creds = (
+            self._resolve_upload_creds(key_id, issuer_id, key_path)
+            if upload
+            else None
+        )
+        if upload and not team:
+            raise XcodeProjectError(
+                "App Store archive needs a developer_team set in "
+                "[tool.kivy-school.ios]/[tool.kivy-school.macos]."
+            )
+        just_created = not self.xcodeproj.exists()
+        if just_created:
+            self.generate(platforms=["iOS", "macOS"])
+            self.open_in_xcode()
+        self.bootstrap.install_frameworks()
+        self.platform_pre_build_script(platform_data)
+        self.install_site_packages(platforms=install_platforms)
+        self.bootstrap.sync_site_xcframeworks()
+        self._stamp_bundle_versions(build_number, app_version)
+        archive_path = self._xcarchive(destination, variant, sdk)
+        if upload:
+            assert creds is not None
+            self._export_upload(archive_path, team, *creds)
+        return archive_path
+
+    def ios_archive(
+        self,
+        variant: str = "release",
+        upload: bool = False,
+        key_id: str | None = None,
+        issuer_id: str | None = None,
+        key_path: str | None = None,
+        build_number: str | None = None,
+        app_version: str | None = None,
+    ) -> Path:
+        apple = self.pyproject.tool.kivy_school.apple  # type: ignore[union-attr]
+        ios = apple.ios if apple else None
+        return self._archive(
+            platform_data=ios,
+            install_platforms=["iOS"],
+            destination="generic/platform=iOS",
+            sdk="ios",
+            team=ios.developer_team if ios else None,
+            variant=variant,
+            upload=upload,
+            key_id=key_id,
+            issuer_id=issuer_id,
+            key_path=key_path,
+            build_number=build_number,
+            app_version=app_version,
+        )
+
+    def macos_archive(
+        self,
+        variant: str = "release",
+        upload: bool = False,
+        key_id: str | None = None,
+        issuer_id: str | None = None,
+        key_path: str | None = None,
+        build_number: str | None = None,
+        app_version: str | None = None,
+    ) -> Path:
+        apple = self.pyproject.tool.kivy_school.apple  # type: ignore[union-attr]
+        macos = apple.macos if apple else None
+        return self._archive(
+            platform_data=macos,
+            install_platforms=["iOS", "macOS"],
+            destination="generic/platform=macOS",
+            sdk="macos",
+            team=macos.developer_team if macos else None,
+            variant=variant,
+            upload=upload,
+            key_id=key_id,
+            issuer_id=issuer_id,
+            key_path=key_path,
+            build_number=build_number,
+            app_version=app_version,
+        )
+
+    def create_action(self, platform: str) -> Path:
+        """Write a tag-triggered App Store upload workflow for ``platform``."""
+        return write_appstore_workflow(self.project_path, platform)
+
     def platform_pre_build_script(self, data: object):
         
         if not hasattr(data, "pre_build"): return
@@ -368,8 +630,8 @@ class XcodeProject:
     # Run
     # ------------------------------------------------------------------
 
-    def _bundle_id(self) -> str:
-        info_plist = self._find_app() / "Info.plist"
+    def _bundle_id(self, app: Path) -> str:
+        info_plist = app / "Info.plist"
         with open(info_plist, "rb") as f:
             return plistlib.load(f)["CFBundleIdentifier"]
 
@@ -388,7 +650,9 @@ class XcodeProject:
             target = self._find_device_by_uuid(uuid) # type: ignore
             kind = target["kind"] if target else "simulator"
 
-        app = self._find_app()
+        sdk = "iphonesimulator" if kind == "simulator" else "iphoneos"
+        app = self._find_app(sdk=sdk)
+        bundle_id = self._bundle_id(app)
         print(f"App: {app}")
         if kind == "simulator":
             print(f"Booting simulator {uuid}...")
@@ -400,7 +664,7 @@ class XcodeProject:
             subprocess.run(["xcrun", "simctl", "install", uuid, str(app)], check=True) # type: ignore
             print("Launching...")
             subprocess.run(
-                ["xcrun", "simctl", "launch", "--console-pty", uuid, self._bundle_id()], # type: ignore
+                ["xcrun", "simctl", "launch", "--console-pty", uuid, bundle_id], # type: ignore
                 check=True,
             ) # type: ignore
         else:
@@ -411,13 +675,20 @@ class XcodeProject:
             ) # type: ignore
             subprocess.run(
                 ["xcrun", "devicectl", "device", "process", "launch",
-                 "--device", uuid, self._bundle_id()], # type: ignore
+                 "--console", "--device", uuid, bundle_id], # type: ignore
                 check=True,
             ) # type: ignore
 
     def macos_run(self) -> None:
-        app = self._find_app()
-        subprocess.run(["open", "-W", str(app)], check=False)
+        app = self._find_app(sdk="macos")
+        # Launch the executable directly (not via `open`) so the app's
+        # stdout/stderr stream to this terminal.
+        with open(app / "Contents" / "Info.plist", "rb") as f:
+            executable = plistlib.load(f)["CFBundleExecutable"]
+        subprocess.run(
+            [str(app / "Contents" / "MacOS" / executable)],
+            check=False,
+        )
 
     # ------------------------------------------------------------------
     # Helpers

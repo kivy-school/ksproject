@@ -47,7 +47,8 @@ from ksproject_utils.gradle.cpython_android import (  # noqa: E402
 DEFAULT_ANDROID_API = 21
 DIST_NAME = "libpython"
 
-# Stdlib dirs/files we never ship.
+# Stdlib dirs/files we never ship. Version-specific config-3.X dirs are
+# added per-run in collect_stdlib().
 STDLIB_EXCLUDE_DIRS = {
     "lib-dynload",
     "site-packages",
@@ -58,17 +59,15 @@ STDLIB_EXCLUDE_DIRS = {
     "turtledemo",
     "ensurepip",
     "__pycache__",
-    "config-3.13",
-    "config-3.13t",
 }
 
 
-def find_ndk(sdk: Path) -> Path:
+def find_ndk(sdk: Path) -> Path | None:
     ndk_root = sdk / "ndk"
+    if not ndk_root.is_dir():
+        return None
     versions = sorted([p for p in ndk_root.iterdir() if p.is_dir()])
-    if not versions:
-        raise SystemExit(f"No NDK found under {ndk_root}")
-    return versions[-1]
+    return versions[-1] if versions else None
 
 
 def host_tag() -> str:
@@ -99,7 +98,10 @@ def inspect(libpython: Path, ndk: Path) -> None:
             print(line)
 
 
-def strip_lib(lib: Path, ndk: Path) -> None:
+def strip_lib(lib: Path, ndk: Path | None) -> None:
+    if ndk is None:
+        # No NDK available; official python.org binaries ship pre-stripped.
+        return
     strip = llvm_tool(ndk, "llvm-strip")
     before = lib.stat().st_size
     subprocess.run([str(strip), "--strip-unneeded", str(lib)], check=True)
@@ -116,13 +118,19 @@ def platform_tag(api: int, abi: str) -> str:
 
 
 def collect_stdlib(prefix: Path, py_minor: str) -> list[Path]:
+    # Build-config dirs are "config-3.X", "config-3.Xt" or, on Android,
+    # "config-3.X-aarch64-linux-android" — match by prefix.
+    config_prefix = f"config-{py_minor}"
     root = prefix / "lib" / f"python{py_minor}"
     out: list[Path] = []
     for path in root.rglob("*"):
         if not path.is_file():
             continue
         rel = path.relative_to(root)
-        if any(part in STDLIB_EXCLUDE_DIRS for part in rel.parts):
+        if any(
+            part in STDLIB_EXCLUDE_DIRS or part.startswith(config_prefix)
+            for part in rel.parts
+        ):
             continue
         if path.suffix in (".pyc", ".so"):
             continue
@@ -143,7 +151,7 @@ def build_wheel(
     api: int,
     prefix: Path,
     py_minor: str,
-    ndk: Path,
+    ndk: Path | None,
 ) -> Path:
     tag = platform_tag(api, abi)
     wheel_name = f"{DIST_NAME}-{version}-{rev}-py3-none-{tag}.whl"
@@ -156,12 +164,33 @@ def build_wheel(
         shutil.rmtree(stage)
     stage.mkdir(parents=True)
 
+    # (src_path, arcname_inside_wheel)
+    entries: list[tuple[Path, str]] = []
+
+    # Runtime libs from prefix/lib: libpython plus the OpenSSL/SQLite deps
+    # (and their _python-renamed variants) that lib-dynload modules link
+    # against. Only libpython is mandatory.
     libpy_src = prefix / "lib" / f"libpython{py_minor}.so"
     if not libpy_src.exists():
         raise SystemExit(f"missing {libpy_src}")
-    libpy_stage = stage / f"libpython{py_minor}.so"
-    shutil.copy2(libpy_src, libpy_stage)
-    strip_lib(libpy_stage, ndk)
+    lib_names = [
+        f"libpython{py_minor}.so",
+        "libcrypto.so",
+        "libcrypto_python.so",
+        "libsqlite3.so",
+        "libsqlite3_python.so",
+        "libssl.so",
+        "libssl_python.so",
+    ]
+    for name in lib_names:
+        src = prefix / "lib" / name
+        if not src.exists():
+            print(f"  note: {name} not present in prefix/lib, skipping")
+            continue
+        dst = stage / name
+        shutil.copy2(src, dst)
+        strip_lib(dst, ndk)
+        entries.append((dst, f"libpython/prefix/{abi}/lib/{name}"))
 
     dynload_src = prefix / "lib" / f"python{py_minor}" / "lib-dynload"
     dynload_stage = stage / "lib-dynload"
@@ -170,26 +199,6 @@ def build_wheel(
         dst = dynload_stage / so.name
         shutil.copy2(so, dst)
         strip_lib(dst, ndk)
-
-    # (src_path, arcname_inside_wheel)
-    entries: list[tuple[Path, str]] = []
-    lib_python_files = [
-        (stage / item, f"libpython/prefix/{abi}/lib/")
-        for item in [
-            "libpython.so",
-            "libcrypto.so",
-            "libcrypto_python.so",
-            "libsqlite3.so",
-            "libsqlite3_python.so",
-            "libssl.so",
-            "libssl_python.so",
-        ]
-    ]
-    for entry in lib_python_files:
-        entries.append(entry)
-    # entries.append(
-    #     (libpy_stage, f"libpython/prefix/{abi}/lib/libpython{py_minor}.so")
-    # )
 
     for so in sorted(dynload_stage.glob("*.so")):
         entries.append(
@@ -270,7 +279,16 @@ def build_wheel(
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument(
-        "--version", default=ANDROID_VERSION, help="CPython version (e.g. 3.13.8)"
+        "version",
+        nargs="?",
+        default=None,
+        help=f"CPython version (e.g. 3.13.11); defaults to {ANDROID_VERSION}",
+    )
+    ap.add_argument(
+        "--version",
+        dest="version_flag",
+        default=None,
+        help="CPython version (alternative to the positional argument)",
     )
     ap.add_argument("--rev", default="0", help="build-tag suffix (e.g. 0, 1, ...)")
     ap.add_argument(
@@ -315,20 +333,27 @@ def main() -> int:
     )
     args = ap.parse_args()
 
+    version = args.version or args.version_flag or ANDROID_VERSION
     archs = [a.strip() for a in args.archs.split(",") if a.strip()]
-    py_minor = ".".join(args.version.split(".")[:2])
+    py_minor = ".".join(version.split(".")[:2])
 
-    if not args.sdk:
-        raise SystemExit("--sdk / ANDROID_HOME required")
-    sdk_path = Path(args.sdk)
-    ndk_path = Path(args.ndk) if args.ndk else find_ndk(sdk_path)
+    sdk_path = Path(args.sdk) if args.sdk else None
+    ndk_path = Path(args.ndk) if args.ndk else (find_ndk(sdk_path) if sdk_path else None)
+    if ndk_path is None:
+        if args.inspect_only:
+            raise SystemExit("--inspect-only needs an NDK (--sdk / --ndk)")
+        print(
+            "note: no Android SDK/NDK found — llvm-strip will be skipped "
+            "(fine for official python.org binaries, which are pre-stripped); "
+            "building from source is unavailable"
+        )
 
     args.work_dir.mkdir(parents=True, exist_ok=True)
     ks_root = args.work_dir / ".kivyschool"
 
     if args.inspect_only:
         for arch in archs:
-            pfx = android_prefix(ks_root, arch, args.version)
+            pfx = android_prefix(ks_root, arch, version)
             lib = pfx / "lib" / f"libpython{py_minor}.so"
             if lib.exists():
                 inspect(lib, ndk_path)
@@ -339,22 +364,22 @@ def main() -> int:
         install_cpython_android(
             ks_root=ks_root,
             archs=archs,
-            sdk=str(sdk_path),
-            ndk=str(ndk_path),
+            sdk=str(sdk_path) if sdk_path else None,
+            ndk=str(ndk_path) if ndk_path else None,
             java=args.java,
             py_version=py_minor,
-            android_version=args.version,
+            android_version=version,
         )
 
-    out_root = args.out_dir / f"{args.version}-{args.rev}"
+    out_root = args.out_dir / f"{version}-{args.rev}"
     out_root.mkdir(parents=True, exist_ok=True)
 
     for arch in archs:
-        pfx = android_prefix(ks_root, arch, args.version)
+        pfx = android_prefix(ks_root, arch, version)
         print(f"\n[{arch}] building wheel (api={args.api})")
         build_wheel(
             out_dir=out_root,
-            version=args.version,
+            version=version,
             rev=args.rev,
             abi=arch,
             api=args.api,
