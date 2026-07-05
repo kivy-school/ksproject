@@ -61,6 +61,12 @@ def android_prefix(
     )
 
 
+# Python's _ssl/_hashlib load libcrypto_python.so; the plain-named
+# lib/libcrypto.so is a build-time linking artifact and is deleted from the
+# prefix at the end of every install.
+_EXCLUDED_PREFIX_FILES = {"lib/libcrypto.so"}
+
+
 def install_cpython_android(
     ks_root: Path,
     archs: list[str],
@@ -81,51 +87,56 @@ def install_cpython_android(
             or _try_install_official(ks_root, a, android_version, py_version)
         )
     ]
-    if not remaining:
-        return
+    if remaining:
+        cpython_dir = ks_root / f"Python-{android_version}"
 
-    cpython_dir = ks_root / f"Python-{android_version}"
+        if not cpython_dir.exists():
+            ks_root.mkdir(parents=True, exist_ok=True)
+            print(f"Downloading CPython {android_version} source...")
+            url = (
+                f"https://www.python.org/ftp/python/{android_version}"
+                f"/Python-{android_version}.tgz"
+            )
+            tar_path = ks_root / f"Python-{android_version}.tgz"
+            urllib.request.urlretrieve(url, tar_path)
+            with tarfile.open(tar_path) as tf:
+                tf.extractall(ks_root)
+            tar_path.unlink(missing_ok=True)
 
-    if not cpython_dir.exists():
-        ks_root.mkdir(parents=True, exist_ok=True)
-        print(f"Downloading CPython {android_version} source...")
-        url = (
-            f"https://www.python.org/ftp/python/{android_version}"
-            f"/Python-{android_version}.tgz"
-        )
-        tar_path = ks_root / f"Python-{android_version}.tgz"
-        urllib.request.urlretrieve(url, tar_path)
-        with tarfile.open(tar_path) as tf:
-            tf.extractall(ks_root)
-        tar_path.unlink(missing_ok=True)
+        env = os.environ.copy()
+        if sdk:
+            env["ANDROID_HOME"] = sdk
+        if ndk:
+            env["ANDROID_NDK_ROOT"] = ndk
+        if java:
+            env["JAVA_HOME"] = java
 
-    env = os.environ.copy()
-    if sdk:
-        env["ANDROID_HOME"] = sdk
-    if ndk:
-        env["ANDROID_NDK_ROOT"] = ndk
-    if java:
-        env["JAVA_HOME"] = java
+        # configure-build must run once before any configure-host
+        build_dir = cpython_dir / "cross-build" / "build"
+        if not build_dir.exists():
+            print("Configuring CPython build-machine interpreter...")
+            _run_android(["configure-build"], cpython_dir, env)
+            print("Building CPython build-machine interpreter...")
+            _run_android(["make-build"], cpython_dir, env)
 
-    # configure-build must run once before any configure-host
-    build_dir = cpython_dir / "cross-build" / "build"
-    if not build_dir.exists():
-        print("Configuring CPython build-machine interpreter...")
-        _run_android(["configure-build"], cpython_dir, env)
-        print("Building CPython build-machine interpreter...")
-        _run_android(["make-build"], cpython_dir, env)
+        for arch in remaining:
+            triple = android_triple(arch)
+            prefix = cpython_dir / "cross-build" / triple / "prefix"
+            if (prefix / f"lib/libpython{py_version}.so").exists():
+                print(f"CPython {py_version} for {arch} already built")
+                continue
 
-    for arch in remaining:
-        triple = android_triple(arch)
-        prefix = cpython_dir / "cross-build" / triple / "prefix"
-        if (prefix / f"lib/libpython{py_version}.so").exists():
-            print(f"CPython {py_version} for {arch} already built")
-            continue
+            print(f"Building CPython {android_version} for {arch} ({triple})...")
+            _run_android(["configure-host", triple], cpython_dir, env)
+            _run_android(["make-host", triple], cpython_dir, env)
+            print(f"CPython {py_version} for {arch} built successfully")
 
-        print(f"Building CPython {android_version} for {arch} ({triple})...")
-        _run_android(["configure-host", triple], cpython_dir, env)
-        _run_android(["make-host", triple], cpython_dir, env)
-        print(f"CPython {py_version} for {arch} built successfully")
+    # Regardless of how the prefix got here (fresh install or an old cache),
+    # the excluded files must not exist after install.
+    for arch in archs:
+        prefix = android_prefix(ks_root, arch, android_version)
+        for excluded in _EXCLUDED_PREFIX_FILES:
+            (prefix / excluded).unlink(missing_ok=True)
 
 
 def _try_install_prebuilt(

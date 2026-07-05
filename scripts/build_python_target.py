@@ -175,7 +175,7 @@ def build_wheel(
         raise SystemExit(f"missing {libpy_src}")
     lib_names = [
         f"libpython{py_minor}.so",
-        "libcrypto.so",
+        #"libcrypto.so",
         "libcrypto_python.so",
         "libsqlite3.so",
         "libsqlite3_python.so",
