@@ -243,6 +243,7 @@ class XcodeProject:
             "-derivedDataPath", str(derived),
             "-skipPackagePluginValidation",
             "-skipMacroValidation",
+            "-allowProvisioningUpdates",
             "build",
         ]
         result = subprocess.run(cmd, cwd=self.xcode_dir, stdin=subprocess.DEVNULL)
