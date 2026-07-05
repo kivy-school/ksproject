@@ -12,11 +12,14 @@ Typical reasons to do this:
 
 ## Prerequisites
 
-Install cibuildwheel (3.2 or newer — the first release supporting both iOS and Android targets):
+Add cibuildwheel (3.2 or newer — the first release supporting both iOS and Android targets) to your app's **dev dependencies**. Like ksproject itself, it lives in your project — dev-group dependencies stay on your dev machine and are never installed into the app's on-device site-packages:
 
 ```bash
-uv tool install cibuildwheel
+# in your ksproject app root
+uv add cibuildwheel --dev
 ```
+
+The build commands below run from inside the Kivy clone, so they invoke cibuildwheel through your app's environment with `uv run --project ../myapp` — adjust that path to wherever your app actually lives.
 
 What you can build depends on your host machine:
 
@@ -49,21 +52,21 @@ cd kivy2x
 === "iOS"
 
     ```bash
-    cibuildwheel --platform ios --archs all --output-dir ./wheelhouse
+    uv run --project ../myapp cibuildwheel --platform ios --archs all --output-dir ./wheelhouse
     ```
 
     `--archs all` builds device (`arm64_iphoneos`) and simulator (`arm64_iphonesimulator`, `x86_64_iphonesimulator`) wheels.
 
 === "Android"
 
-    ksproject already manages an NDK — ask it for the path. Since ksproject is a dev dependency of your app (never a global tool), run the export from your **app's root** with `uv run`, then switch to the kivy2x clone:
+    ksproject already manages an NDK — ask it for the path. Run the export from your **app's root** with `uv run`, then switch to the kivy2x clone:
 
     ```bash
     # in your ksproject app root
     export ANDROID_NDK_HOME=$(uv run ksproject android get-path ndk)
 
     cd ../kivy2x   # wherever you cloned it
-    cibuildwheel --platform android --archs all --output-dir ./wheelhouse
+    uv run --project ../myapp cibuildwheel --platform android --archs all --output-dir ./wheelhouse
     ```
 
     `--archs all` builds `arm64_v8a` and `x86_64` wheels.
@@ -71,7 +74,7 @@ cd kivy2x
 === "macOS"
 
     ```bash
-    cibuildwheel --platform macos --archs all --output-dir ./wheelhouse
+    uv run --project ../myapp cibuildwheel --platform macos --archs all --output-dir ./wheelhouse
     ```
 
     (`--platform` can be omitted on a macOS host — it defaults to the host platform.)
@@ -79,7 +82,7 @@ cd kivy2x
 === "Linux"
 
     ```bash
-    cibuildwheel --platform linux --archs all --output-dir ./wheelhouse
+    uv run --project ../myapp cibuildwheel --platform linux --archs all --output-dir ./wheelhouse
     ```
 
     (`--platform` can be omitted on a Linux host.)
@@ -87,7 +90,7 @@ cd kivy2x
 === "Windows"
 
     ```powershell
-    cibuildwheel --platform windows --archs all --output-dir ./wheelhouse
+    uv run --project ..\myapp cibuildwheel --platform windows --archs all --output-dir ./wheelhouse
     ```
 
     (`--platform` can be omitted on a Windows host.)
@@ -110,7 +113,7 @@ cd kivy
     ```bash
     export KIVY_DEPS_ROOT=$(pwd)/ios-kivy-dependencies
     export CIBW_BEFORE_ALL_IOS=./tools/build_ios_dependencies.sh
-    cibuildwheel --platform ios --archs all --output-dir ./wheelhouse
+    uv run --project ../myapp cibuildwheel --platform ios --archs all --output-dir ./wheelhouse
     uv run ./tools/add-ios-frameworks.py ./wheelhouse
     ```
 
@@ -133,7 +136,7 @@ cd kivy
 
         cd ../kivy   # wherever you cloned it
         export CIBW_BEFORE_ALL_ANDROID="./tools/build_android_dependencies.sh"
-        cibuildwheel --platform android --archs all --output-dir ./wheelhouse
+        uv run --project ../myapp cibuildwheel --platform android --archs all --output-dir ./wheelhouse
         ```
 
         Until then, use **kivy2x** for Android.
@@ -142,14 +145,14 @@ cd kivy
 
     ```bash
     export CIBW_BEFORE_ALL_MACOS="./tools/build_macos_dependencies.sh"
-    cibuildwheel --platform macos --archs all --output-dir ./wheelhouse
+    uv run --project ../myapp cibuildwheel --platform macos --archs all --output-dir ./wheelhouse
     ```
 
 === "Linux"
 
     ```bash
     export CIBW_BEFORE_ALL_LINUX="./tools/build_linux_dependencies.sh"
-    cibuildwheel --platform linux --archs all --output-dir ./wheelhouse
+    uv run --project ../myapp cibuildwheel --platform linux --archs all --output-dir ./wheelhouse
     ```
 
 ---
