@@ -17,12 +17,14 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
+from ..python_version import SupportedPythonVersion
+
 PY_VERSION = "3.13"
 PY_SUB_VERSION = "b11"
 
 # Used when the app project doesn't pin an exact patch release in
-# .python-version. Must have an entry in ``apple_python_versions``.
-DEFAULT_APPLE_PY_VERSION = "3.13.11"
+# .python-version. Must have an entry in ``_BEEWARE_TAGS``.
+DEFAULT_APPLE_PY_VERSION = SupportedPythonVersion.V3_13_11.value
 
 _KIVY_SDL2_VERSION = "2.3.10"
 _KIVY_SDL2_WHEEL = f"kivy_sdl2-{_KIVY_SDL2_VERSION}-py3-none-any.whl"
@@ -237,19 +239,20 @@ class BeewarePythonVersion:
     def url(self) -> str:
         return self.macos_url
 
+# BeeWare Python-Apple-support release tag for every supported version.
+# Keyed by the global SupportedPythonVersion enum so apple support and
+# .python-version validation can never drift apart.
+_BEEWARE_TAGS: dict[SupportedPythonVersion, str] = {
+    SupportedPythonVersion.V3_13_8: "b12",
+    SupportedPythonVersion.V3_13_11: "b13",
+    SupportedPythonVersion.V3_13_14: "b14",
+    SupportedPythonVersion.V3_14_2: "b9",
+    SupportedPythonVersion.V3_14_6: "b10",
+}
+
 apple_python_versions = [
-    BeewarePythonVersion(
-        "b13", 13, 11
-    ),
-    BeewarePythonVersion(
-        "b14", 13, 14
-    ),
-    BeewarePythonVersion(
-        "b9", 14, 2
-    ),
-    BeewarePythonVersion(
-        "b10", 14, 6
-    )
+    BeewarePythonVersion(tag, int(v.split(".")[1]), int(v.split(".")[2]))
+    for v, tag in _BEEWARE_TAGS.items()
 ]
 
 
