@@ -120,6 +120,12 @@ android {
         targetCompatibility = JavaVersion.VERSION_11
     }
 
+    sourceSets {
+        getByName("main") {
+            assets.srcDir(layout.buildDirectory.dir("generated/python_assets").get().asFile)
+        }
+    }
+
     // CPython stdlib and packages contain underscore-prefixed directories
     // (e.g. zipfile/_path) that AGP's default aapt ignore pattern strips.
     // Override to keep them.
@@ -127,7 +133,8 @@ android {
         ignoreAssetsPatterns.clear()
         ignoreAssetsPatterns.addAll(listOf(
             "!.svn", "!.git", "!.ds_store", "!*.scc",
-            "!CVS", "!thumbs.db", "!picasa.ini", "!*~"
+            "!CVS", "!thumbs.db", "!picasa.ini", "!*~",
+            "python*", "lib-dynload", "site-packages"
         ))
     }
 }
