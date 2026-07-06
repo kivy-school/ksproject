@@ -303,8 +303,7 @@ class GradleProject:
             )
 
         args = [str(gradlew)]
-        if clean:
-            args.append("clean")
+        args.append("clean")
         args.append(task)
 
         cmd_str = " ".join(args[1:])
