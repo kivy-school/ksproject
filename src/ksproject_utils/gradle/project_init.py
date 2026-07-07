@@ -94,11 +94,11 @@ android {
     packaging {
         jniLibs {
             useLegacyPackaging = true
-            # excludes += setOf(
-            #     "**/libcrypto.so",
-            #     "**/libssl.so",
-            #     "**/libsqlite3.so"
-            # )
+            //excludes += setOf(
+            //    "**/libcrypto.so",
+            //    "**/libssl.so",
+            //    "**/libsqlite3.so"
+            //)
         }
     }
 
