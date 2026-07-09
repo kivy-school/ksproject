@@ -11,6 +11,7 @@ from ksproject_utils.tools import load_dotenv
 
 from ksproject.apple_commands import AppleCommands
 from ksproject.gradle_commands import GradleCommands
+from ksproject.msvc_commands import MsvcCommands
 
 
 
@@ -19,6 +20,7 @@ class KSProjectCLI:
     def __init__(self) -> None:
         self._gradle = GradleCommands()
         self._apple = AppleCommands()
+        self._msvc = MsvcCommands()
         self.parser = self._build_parser()
 
     # ------------------------------------------------------------------
@@ -42,6 +44,7 @@ class KSProjectCLI:
 
         self._gradle.register(sub)
         self._apple.register(sub)
+        self._msvc.register(sub)
 
 
         return parser

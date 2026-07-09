@@ -10,6 +10,7 @@ class KivySchoolData:
     ios: "KivySchoolData.IosData | None"
     macos: "KivySchoolData.MacosData | None"
     android: "KivySchoolData.AndroidData | None"
+    windows: "KivySchoolData.WindowsData | None"
 
     def __init__(self, data: dict):
         self.app_name = data.get("app_name")
@@ -19,6 +20,9 @@ class KivySchoolData:
         )
         self.android = (
             KivySchoolData.AndroidData(data["android"]) if "android" in data else None
+        )
+        self.windows = (
+            KivySchoolData.WindowsData(data["windows"]) if "windows" in data else None
         )
 
     class IosData:
@@ -40,8 +44,12 @@ class KivySchoolData:
             self.frameworks = data.get("frameworks", [])
             self.site_frameworks = data.get("site_frameworks", [])
             self.developer_team = data.get("developer_team")
-            self.pre_build = Path(data.get("pre_build")) if "pre_build" in data else None
-            self.post_build = Path(data.get("post_build")) if "post_build" in data else None
+            self.pre_build = (
+                Path(data.get("pre_build")) if "pre_build" in data else None
+            )
+            self.post_build = (
+                Path(data.get("post_build")) if "post_build" in data else None
+            )
 
     class MacosData:
         bundle_id: str
@@ -58,8 +66,43 @@ class KivySchoolData:
             self.entitlements = data.get("entitlements", {})
             self.developer_team = data.get("developer_team")
             self.archs = data.get("archs", ["arm64", "x86_64"])
-            self.pre_build = Path(data.get("pre_build")) if "pre_build" in data else None
-            self.post_build = Path(data.get("post_build")) if "post_build" in data else None
+            self.pre_build = (
+                Path(data.get("pre_build")) if "pre_build" in data else None
+            )
+            self.post_build = (
+                Path(data.get("post_build")) if "post_build" in data else None
+            )
+
+    class WindowsData:
+        icon: str | None
+        python_version: str | None
+        require_admin: bool
+        include_files: list[tuple[str, list[str]]]
+        pre_build: Path | None
+        post_build: Path | None
+
+        def __init__(self, data: dict):
+            self.icon = data.get("icon")
+            self.python_version = data.get("python_version", "3.11.5")
+            self.require_admin = bool(data.get("require_admin", False))
+
+            raw_includes = data.get("include_files", [])
+            self.include_files = []
+            for item in raw_includes:
+                if isinstance(item, (list, tuple)) and len(item) >= 2:
+                    dest = str(item[0])
+                    if len(item) == 2 and isinstance(item[1], (list, tuple)):
+                        sources = [str(x) for x in item[1]]
+                    else:
+                        sources = [str(x) for x in item[1:]]
+                    self.include_files.append((dest, sources))
+
+            self.pre_build = (
+                Path(data.get("pre_build")) if "pre_build" in data else None
+            )
+            self.post_build = (
+                Path(data.get("post_build")) if "post_build" in data else None
+            )
 
     class ServiceData:
         name: str
@@ -73,8 +116,6 @@ class KivySchoolData:
 
         def __init__(self, data: dict):
             self.name = data["name"]
-            # Enforce module syntax if they accidentally leave ".py" or "/"
-
             raw_entry = data.get("entrypoint", "service_main")
             self.entrypoint = raw_entry.replace("/", ".").replace(".py", "")
             self.foreground = data.get("foreground", False)
@@ -91,13 +132,11 @@ class KivySchoolData:
     class AndroidData:
         package_name: str
         archs: list["KivySchoolData.AndroidData.Arch"]
-
         api: int | None
         min_api: int | None
         sdk: str | None
         ndk: str | None
         ndk_api: int | None
-
         sdk_path: Path | None
         ndk_path: Path | None
         java_path: Path | None
@@ -115,10 +154,8 @@ class KivySchoolData:
         version_code: int
         version_name: str
         include_files: list[tuple[str, list[str]]]
-
         pre_build: Path | None
         post_build: Path | None
-
         byte_compile_python: bool
 
         def __init__(self, data: dict):
@@ -167,10 +204,12 @@ class KivySchoolData:
             ]
             self.version_code = data.get("version_code", 1)
             self.version_name = data.get("version_name", "1.0")
-
-            self.pre_build = Path(data.get("pre_build")) if "pre_build" in data else None
-            self.post_build = Path(data.get("post_build")) if "post_build" in data else None
-
+            self.pre_build = (
+                Path(data.get("pre_build")) if "pre_build" in data else None
+            )
+            self.post_build = (
+                Path(data.get("post_build")) if "post_build" in data else None
+            )
             self.byte_compile_python = bool(data.get("byte_compile_python", True))
 
         def kivyschool_root(self, working_dir: Path) -> Path:
@@ -191,7 +230,6 @@ class KivySchoolData:
 
 
 class ToolData:
-
     kivy_school: KivySchoolData | None
 
     def __init__(self, data: dict):
@@ -208,7 +246,6 @@ class Project:
 
 
 class PyProjectToml:
-
     project: Project
     tool: ToolData
 

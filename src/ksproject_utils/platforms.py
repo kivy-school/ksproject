@@ -94,3 +94,26 @@ class MacOSX86_64Platform(MacOSPlatform):
     pip_platform = "x86_64-apple-darwin"
     pip_arch = "x86_64"
     slice = "macos-x86_64"
+
+
+class WindowsPlatform(Platform):
+    sdk_platform = "windows"
+
+    def __init__(self, root: str):
+        self.root = root
+        self.project_path = f"{root}/project_dist/windows"
+
+    @property
+    def site_packages(self) -> str:
+        return f"{self.project_path}/site_packages/windows"
+
+
+class WindowsX86_64Platform(WindowsPlatform):
+    # This precise target triple is required by 'uv' to fetch MSVC wheels
+    pip_platform = "x86_64-pc-windows-msvc"
+    pip_arch = "x86_64"
+
+
+class WindowsArm64Platform(WindowsPlatform):
+    pip_platform = "aarch64-pc-windows-msvc"
+    pip_arch = "arm64"
