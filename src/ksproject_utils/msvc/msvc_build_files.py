@@ -106,8 +106,7 @@ setup(
         print("            Cythonization successful. Scrubbing source files...")
 
         for py_file in app_dir.rglob("*.py"):
-            if py_file.name not in ["__init__.py", "__main__.py"]:
-                py_file.unlink(missing_ok=True)
+            py_file.unlink(missing_ok=True)
 
         for c_file in app_dir.rglob("*.c"):
             c_file.unlink(missing_ok=True)
