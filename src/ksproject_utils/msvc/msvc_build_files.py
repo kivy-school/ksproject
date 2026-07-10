@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import os
+import subprocess
+import shutil
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -20,73 +22,194 @@ class MsvcBuildFiles:
         env_dir = build_dir / "windows_env"
         if env_dir.exists() and any(env_dir.iterdir()):
             return env_dir
-            
+
         env_dir.mkdir(parents=True, exist_ok=True)
         zip_path = build_dir / f"python-{python_version}-embed-amd64.zip"
-        
+
         url = f"https://www.python.org/ftp/python/{python_version}/python-{python_version}-embed-amd64.zip"
         print(f"[ksproject] Downloading Windows Embeddable Python {python_version}...")
-        
+
         try:
             urllib.request.urlretrieve(url, zip_path)
-            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            with zipfile.ZipFile(zip_path, "r") as zip_ref:
                 zip_ref.extractall(env_dir)
             zip_path.unlink()
-            
+
             for pth_file in env_dir.glob("*._pth"):
                 pth_file.unlink()
                 print(f"[ksproject] Deleted {pth_file.name} to disable Isolated Mode.")
-                
+
         except Exception as e:
             raise MsvcBuildError(f"Failed to provision Python {python_version}: {e}")
-            
+
         return env_dir
 
     @staticmethod
-    def create_payload_zip(build_dir: Path, app_dir: Path, site_packages_dir: Path, env_dir: Path) -> Path:
+    def create_payload_zip(
+        build_dir: Path,
+        site_packages_dir: Path,
+        env_dir: Path,
+        python_version: str,
+        optimize: bool = True,
+    ) -> Path:
         payload_path = build_dir / "payload.zip"
-        
-        print("[ksproject] Assembling monolithic executable payload...")
-        with zipfile.ZipFile(payload_path, 'w', zipfile.ZIP_DEFLATED) as zf:
-            
+        staging_dir = build_dir / "payload_staging"
+
+        print("[ksproject] Staging files for monolithic payload...")
+        if staging_dir.exists():
+            shutil.rmtree(staging_dir)
+        staging_dir.mkdir(parents=True)
+
+        staged_sp = staging_dir / "site-packages"
+        if site_packages_dir.exists():
+            shutil.copytree(site_packages_dir, staged_sp)
+
+        if optimize:
+            print(
+                f"[ksproject] Resolving uv Python {python_version} executable path..."
+            )
+            try:
+                python_exe = subprocess.check_output(
+                    ["uv", "python", "find", python_version],
+                    text=True,
+                    creationflags=0x08000000,
+                ).strip()
+
+                print(f"[ksproject] Byte-compiling payload using: {python_exe}")
+
+                subprocess.run(
+                    [
+                        python_exe,
+                        "-m",
+                        "compileall",
+                        "-b",
+                        "-o",
+                        "2",
+                        "-j",
+                        "0",
+                        "-q",
+                        str(staging_dir),
+                    ],
+                    check=False,
+                    creationflags=0x08000000,
+                )
+
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                print(
+                    f"[ksproject] Failed to find Python {python_version} via uv. Skipping optimization."
+                )
+
+        print("[ksproject] Stripping junk files and unneeded source code...")
+        junk_exts = {
+            ".pyi",
+            ".c",
+            ".cpp",
+            ".h",
+            ".pyx",
+            ".pxd",
+            ".md",
+            ".rst",
+            ".chm",
+            ".html",
+            ".htm",
+        }
+        if optimize:
+            junk_exts.add(".py")
+        junk_dirs = {
+            "tests",
+            "test",
+            "docs",
+            "doc",
+            "examples",
+            "example",
+            "tutorials",
+            "benchmarks",
+            "perf",
+            ".mypy_cache",
+            ".pytest_cache",
+            "__pycache__",
+            "bin",
+            "unittest",
+            "share",
+            "demos",
+        }
+
+        for root, dirs, files in os.walk(staging_dir, topdown=False):
+            for file in files:
+                p = Path(root) / file
+                if p.suffix in junk_exts:
+                    try:
+                        p.unlink()
+                    except:
+                        pass
+
+            for d in dirs:
+                if d.lower() in junk_dirs:
+                    p = Path(root) / d
+                    try:
+                        shutil.rmtree(p)
+                    except:
+                        pass
+
+        print("[ksproject] Assembling optimized zip archive...")
+        with zipfile.ZipFile(payload_path, "w", zipfile.ZIP_DEFLATED) as zf:
+
             if env_dir.exists():
                 for item in env_dir.iterdir():
                     if item.is_file():
                         zf.write(item, item.name)
-            
-            if app_dir.exists():
-                for root, _, files in os.walk(app_dir):
-                    for file in files:
-                        file_path = Path(root) / file
-                        arcname = file_path.relative_to(app_dir.parent)
-                        zf.write(file_path, arcname)
-                        
-            if site_packages_dir.exists():
-                for root, _, files in os.walk(site_packages_dir):
-                    for file in files:
-                        file_path = Path(root) / file
-                        arcname = Path("site-packages") / file_path.relative_to(site_packages_dir)
-                        zf.write(file_path, arcname)
-                        
+
+            for root, _, files in os.walk(staging_dir):
+                for file in files:
+                    file_path = Path(root) / file
+                    arcname = file_path.relative_to(staging_dir)
+                    zf.write(file_path, arcname)
+
         return payload_path
 
     @staticmethod
-    def write_resources_rc(build_dir: Path, payload_path: Path, icon_path: Path | None = None) -> None:
-        """Writes the MSVC resource script (.rc)."""
+    def write_resources_rc(
+        build_dir: Path,
+        payload_path: Path,
+        icon_path: Path | None = None,
+        require_admin: bool = False,
+    ) -> None:
+        """Writes the MSVC resource script (.rc) and UAC manifest."""
         rc_content = f'101 RCDATA "{payload_path.absolute().as_posix()}"\n'
-        
+
         if icon_path and icon_path.exists():
             rc_content += f'IDI_ICON1 ICON "{icon_path.absolute().as_posix()}"\n'
+
+        if require_admin:
+            manifest_content = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+  <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
+    <security>
+      <requestedPrivileges>
+        <requestedExecutionLevel level="requireAdministrator" uiAccess="false"/>
+      </requestedPrivileges>
+    </security>
+  </trustInfo>
+  <application xmlns="urn:schemas-microsoft-com:asm.v3">
+      <windowsSettings>
+          <dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">PerMonitorV2</dpiAwareness>
+          <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">true</dpiAware>
+      </windowsSettings>
+  </application>
+</assembly>"""
+            manifest_path = build_dir / "app.manifest"
+            manifest_path.write_text(manifest_content, encoding="utf-8")
+            rc_content += f'1 24 "{manifest_path.absolute().as_posix()}"\n'
 
         (build_dir / "resources.rc").write_text(rc_content, encoding="utf-8")
 
     @staticmethod
     def write_main_c(build_dir: Path, package_name: str, python_version: str) -> None:
         """Generates the C bootstrap code to extract the payload and initialize Python."""
-        
+
         py_dll_ver = python_version.replace(".", "")[:3]
         py_zip = f"python{py_dll_ver}.zip"
-        
+
         content = f"""\
 #define PY_SSIZE_T_CLEAN
 #include <windows.h>
@@ -161,8 +284,17 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     Py_Initialize();
 
-    char dllCmd[1024];
-    sprintf_s(dllCmd, 1024, "import os\\nif hasattr(os, 'add_dll_directory'): os.add_dll_directory(r'%s\\\\site-packages\\\\libs')", extractDir);
+    char dllCmd[2048];
+    sprintf_s(dllCmd, 2048, 
+        "import os, sys\\n"
+        "env_dir = r'''%s'''\\n"
+        "sys.prefix = os.path.join(env_dir, 'site-packages')\\n"
+        "sys.exec_prefix = sys.prefix\\n"
+        "os.environ['KIVY_DEPS_ROOT'] = sys.prefix\\n"
+        "libs_dir = os.path.join(sys.prefix, 'libs')\\n"
+        "if os.path.exists(libs_dir) and hasattr(os, 'add_dll_directory'):\\n"
+        "    os.add_dll_directory(libs_dir)\\n", 
+        extractDir);
     PyRun_SimpleString(dllCmd);
     
     PyObject *runpy = PyImport_ImportModule("runpy");
@@ -194,6 +326,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     Py_FinalizeEx();
     return 0;
+}}
+
+int main(int argc, char** argv) {{
+    return WinMain(GetModuleHandle(NULL), NULL, GetCommandLineA(), SW_SHOWDEFAULT);
 }}
 """
         (build_dir / "main.c").write_text(content, encoding="utf-8")

@@ -80,11 +80,13 @@ class KivySchoolData:
         include_files: list[tuple[str, list[str]]]
         pre_build: Path | None
         post_build: Path | None
+        byte_compile_python: bool
 
         def __init__(self, data: dict):
             self.icon = data.get("icon")
-            self.python_version = data.get("python_version", "3.11.5")
+            self.python_version = data.get("python_version", "3.13.5")
             self.require_admin = bool(data.get("require_admin", False))
+            self.byte_compile_python = bool(data.get("byte_compile_python", True))
 
             raw_includes = data.get("include_files", [])
             self.include_files = []
