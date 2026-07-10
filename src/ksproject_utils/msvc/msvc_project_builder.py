@@ -95,12 +95,12 @@ class MsvcProjectBuilder:
         if dll_count > 0:
             print(f"[ksproject] Zipping {dll_count} native DLLs into payload...")
 
-    def generate(self) -> None:
+    def generate(self, variant: str = "release") -> None:
         dist_dir = self.working_dir / "project_dist" / "windows"
         dist_dir.mkdir(parents=True, exist_ok=True)
 
         py_version = self.windows.python_version or "3.11.5"
-        optimize = getattr(self.windows, "byte_compile_python", True)
+        optimize = True if variant == "release" else self.windows.byte_compile_python
 
         env_dir = MsvcBuildFiles.provision_embeddable_python(dist_dir, py_version)
         icon_path = self._resolve_and_convert_icon(dist_dir)
@@ -112,6 +112,7 @@ class MsvcProjectBuilder:
         self._copy_venv_dlls(site_packages_dir)
 
         payload_path = MsvcBuildFiles.create_payload_zip(
+            self.package_name,
             dist_dir,
             site_packages_dir,
             env_dir,

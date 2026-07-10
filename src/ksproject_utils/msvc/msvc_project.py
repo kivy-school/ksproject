@@ -72,9 +72,9 @@ class MsvcProject:
             site_packages=platform.site_packages,
         )
 
-    def generate(self) -> None:
+    def generate(self, *args) -> None:
         """Write MSVC files, download python, and zip payload."""
-        self.builder.generate()
+        self.builder.generate(*args)
 
     def msvc_assemble(self, variant: str = "release", clean: bool = False) -> Path:
         """Locates the local Visual Studio compiler, grabs host Python headers, and links the executable."""
@@ -166,7 +166,7 @@ class MsvcProject:
         """Run full pipeline: pre-build -> pip install -> generate -> msvc compile."""
         self.platform_pre_build_script()
         self.install_site_packages()
-        self.generate()
+        self.generate(variant)
         return self.msvc_assemble(variant, clean=clean)
 
     def run(self) -> None:

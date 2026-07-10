@@ -45,7 +45,84 @@ class MsvcBuildFiles:
         return env_dir
 
     @staticmethod
+    def cythonize_app_module(site_packages_dir: Path, package_name: str) -> None:
+        """
+        Compiles the application's Python source files into Cython extensions (.pyd)
+        and removes the original .py and generated .c files to hide the source code.
+        """
+        app_dir = site_packages_dir / package_name
+
+        if not app_dir.exists():
+            print(
+                f"[ksproject] App module not found at {app_dir}, skipping Cythonization."
+            )
+            return
+
+        try:
+            import Cython  # noqa: F401
+        except ImportError:
+            print(
+                "[ksproject] Warning: Cython is not installed. Skipping source obfuscation."
+            )
+            return
+
+        print(f"[ksproject] Cythonizing app module '{package_name}' to hide source...")
+
+        setup_py_path = site_packages_dir / "setup.py"
+        setup_py_content = f"""
+from setuptools import setup
+from Cython.Build import cythonize
+from pathlib import Path
+
+package_name = "{package_name}"
+source_files = [str(p) for p in Path(package_name).rglob('*.py') if p.name not in ('__init__.py', '__main__.py')]
+
+setup(
+    ext_modules=cythonize(
+        source_files,
+        compiler_directives={{'language_level': '3', 'always_allow_keywords': True}},
+        quiet=True
+    )
+)
+"""
+        setup_py_path.write_text(setup_py_content, encoding="utf-8")
+
+        import sys
+
+        print("            Building C extensions (this may take a moment)...")
+        result = subprocess.run(
+            [sys.executable, "setup.py", "build_ext", "--inplace"],
+            cwd=site_packages_dir,
+            capture_output=True,
+            text=True,
+        )
+
+        if result.returncode != 0:
+            print("[ksproject] Error during Cythonization:")
+            print(result.stderr)
+            setup_py_path.unlink(missing_ok=True)
+            return
+
+        print("            Cythonization successful. Scrubbing source files...")
+
+        for py_file in app_dir.rglob("*.py"):
+            if py_file.name not in ["__init__.py", "__main__.py"]:
+                py_file.unlink(missing_ok=True)
+
+        for c_file in app_dir.rglob("*.c"):
+            c_file.unlink(missing_ok=True)
+
+        setup_py_path.unlink(missing_ok=True)
+
+        build_dir = site_packages_dir / "build"
+        if build_dir.exists() and build_dir.is_dir():
+            shutil.rmtree(build_dir)
+
+        print("[ksproject] Source code hidden successfully.")
+
+    @staticmethod
     def create_payload_zip(
+        package_name: str,
         build_dir: Path,
         site_packages_dir: Path,
         env_dir: Path,
@@ -63,6 +140,8 @@ class MsvcBuildFiles:
         staged_sp = staging_dir / "site-packages"
         if site_packages_dir.exists():
             shutil.copytree(site_packages_dir, staged_sp)
+
+        MsvcBuildFiles.cythonize_app_module(staged_sp, package_name)
 
         if optimize:
             print(
