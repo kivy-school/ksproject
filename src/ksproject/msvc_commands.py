@@ -39,7 +39,7 @@ class MsvcCommands:
         try:
             project = MsvcProject(Path.cwd())
             output = project.build(variant=args.variant, clean=args.clean)
-            print(f"EXE: {output}")
+            print(f"EXECUTABLE at: {output}")
             return 0
         except Exception as e:
             print(f"Error building Windows project: {e}", file=sys.stderr)

@@ -79,6 +79,9 @@ class MsvcProject:
     def msvc_assemble(self, variant: str = "release", clean: bool = False) -> Path:
         """Locates the local Visual Studio compiler, grabs host Python headers, and links the executable."""
         import sysconfig
+        import time
+
+        start_time = time.time()
 
         vswhere = (
             Path(os.environ.get("ProgramFiles(x86)", "C:/Program Files (x86)"))
@@ -146,6 +149,16 @@ class MsvcProject:
         exe_path = self.build_dir / output_exe
         if not exe_path.exists():
             raise MsvcProjectError(f"Expected executable not found at {exe_path}")
+
+        elapsed_seconds = time.time() - start_time
+        mins, secs = divmod(elapsed_seconds, 60)
+        
+        if mins > 0:
+            time_str = f"{int(mins)}m {secs:.1f}s"
+        else:
+            time_str = f"{secs:.1f}s"
+            
+        print(f"\nBUILD SUCCESSFUL in {time_str}")
 
         return exe_path
 
