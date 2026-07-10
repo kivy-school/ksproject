@@ -134,7 +134,7 @@ class MsvcProject:
 
         cmd = f"""call "{vcvars}" && cd /d "{self.build_dir}" && rc.exe resources.rc && cl.exe main.c resources.res /I"{python_include}" /link /LIBPATH:"{python_libs}" python3.lib user32.lib delayimp.lib /DELAYLOAD:python3.dll /SUBSYSTEM:{subsystem} {manifest_flag} /OUT:"{output_exe}" """
 
-        print(f"Build with: {cmd.strip()}")
+        print(f"\nBuild with: {cmd.strip()}\n")
         use_shell = sys.platform == "win32"
         compile_result = subprocess.run(cmd, shell=use_shell, env=os.environ.copy())
 
