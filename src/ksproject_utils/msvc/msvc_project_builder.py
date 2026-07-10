@@ -99,6 +99,18 @@ class MsvcProjectBuilder:
         dist_dir = self.working_dir / "project_dist" / "windows"
         dist_dir.mkdir(parents=True, exist_ok=True)
 
+        exe_path = dist_dir / f"{self.package_name}.exe"
+        if exe_path.exists():
+            try:
+                exe_path.unlink()
+                print(f"[ksproject] Removed old build: {exe_path.name}")
+            except PermissionError:
+                print(f"\n[ksproject] ERROR: Cannot delete '{exe_path.name}'.")
+                print("[ksproject] Windows says the file is in use. Is the app still running?")
+                print("[ksproject] Please close the app and try building again.\n")
+                import sys
+                sys.exit(1)
+
         py_version = self.windows.python_version or "3.11.5"
         optimize = True if variant == "release" else self.windows.byte_compile_python
 
