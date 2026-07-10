@@ -81,12 +81,14 @@ class KivySchoolData:
         pre_build: Path | None
         post_build: Path | None
         byte_compile_python: bool
+        include_tkinter: bool
 
         def __init__(self, data: dict):
             self.icon = data.get("icon")
             self.python_version = data.get("python_version", "3.13.5")
             self.require_admin = bool(data.get("require_admin", False))
             self.byte_compile_python = bool(data.get("byte_compile_python", True))
+            self.include_tkinter = bool(data.get("include_tkinter", False))
 
             raw_includes = data.get("include_files", [])
             self.include_files = []

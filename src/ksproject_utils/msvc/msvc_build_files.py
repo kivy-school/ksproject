@@ -233,9 +233,11 @@ setup(
         with zipfile.ZipFile(payload_path, "w", zipfile.ZIP_DEFLATED) as zf:
 
             if env_dir.exists():
-                for item in env_dir.iterdir():
-                    if item.is_file():
-                        zf.write(item, item.name)
+                for root, _, files in os.walk(env_dir):
+                    for file in files:
+                        file_path = Path(root) / file
+                        arcname = file_path.relative_to(env_dir)
+                        zf.write(file_path, arcname)
 
             for root, _, files in os.walk(staging_dir):
                 for file in files:
@@ -329,6 +331,8 @@ void RunCommandSilent(const char* cmd) {{
 }}
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {{
+    SetProcessDPIAware();
+
     char tempPath[MAX_PATH];
     GetTempPathA(MAX_PATH, tempPath);
 
@@ -370,8 +374,18 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         "sys.exec_prefix = sys.prefix\\n"
         "os.environ['KIVY_DEPS_ROOT'] = sys.prefix\\n"
         "libs_dir = os.path.join(sys.prefix, 'libs')\\n"
-        "if os.path.exists(libs_dir) and hasattr(os, 'add_dll_directory'):\\n"
-        "    os.add_dll_directory(libs_dir)\\n", 
+        "if hasattr(os, 'add_dll_directory'):\\n"
+        "    if os.path.exists(libs_dir):\\n"
+        "        os.add_dll_directory(libs_dir)\\n"
+        "    os.add_dll_directory(env_dir)\\n"
+        "os.environ['PATH'] = env_dir + os.pathsep + os.environ.get('PATH', '')\\n"
+        "tcl_root = os.path.join(env_dir, 'tcl')\\n"
+        "if os.path.exists(tcl_root):\\n"
+        "    for d in os.listdir(tcl_root):\\n"
+        "        d_path = os.path.join(tcl_root, d)\\n"
+        "        if os.path.isdir(d_path):\\n"
+        "            if d.startswith('tcl'): os.environ['TCL_LIBRARY'] = d_path\\n"
+        "            elif d.startswith('tk'): os.environ['TK_LIBRARY'] = d_path\\n", 
         extractDir);
     PyRun_SimpleString(dllCmd);
     

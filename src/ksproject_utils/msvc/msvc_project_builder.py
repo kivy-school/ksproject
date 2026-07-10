@@ -95,6 +95,36 @@ class MsvcProjectBuilder:
         if dll_count > 0:
             print(f"[ksproject] Zipping {dll_count} native DLLs into payload...")
 
+    def _inject_tkinter(self, env_dir: Path, site_packages_dir: Path) -> None:
+        """Rips the Tkinter standard library and TCL runtime from the host Python and injects them."""
+        import sys
+        import shutil
+
+        base_prefix = Path(sys.base_prefix)
+
+        src_tkinter = base_prefix / "Lib" / "tkinter"
+        dest_tkinter = site_packages_dir / "tkinter"
+        if src_tkinter.exists() and not dest_tkinter.exists():
+            print("[ksproject] Injecting Tkinter standard library...")
+            shutil.copytree(src_tkinter, dest_tkinter)
+
+        src_tcl = base_prefix / "tcl"
+        dest_tcl = env_dir / "tcl"
+        if src_tcl.exists() and not dest_tcl.exists():
+            print("[ksproject] Injecting native TCL/TK scripts...")
+            shutil.copytree(src_tcl, dest_tcl)
+
+        dlls_dir = base_prefix / "DLLs"
+        if dlls_dir.exists():
+            for f in dlls_dir.glob("_tkinter.pyd"):
+                shutil.copy2(f, env_dir / f.name)
+            for f in dlls_dir.glob("tcl*.dll"):
+                shutil.copy2(f, env_dir / f.name)
+            for f in dlls_dir.glob("tk*.dll"):
+                shutil.copy2(f, env_dir / f.name)
+            for f in dlls_dir.glob("zlib*.dll"):
+                shutil.copy2(f, env_dir / f.name)
+
     def generate(self, variant: str = "release") -> None:
         dist_dir = self.working_dir / "project_dist" / "windows"
         dist_dir.mkdir(parents=True, exist_ok=True)
@@ -122,7 +152,8 @@ class MsvcProjectBuilder:
         )
 
         self._copy_venv_dlls(site_packages_dir)
-
+        if self.windows.include_tkinter:
+            self._inject_tkinter(env_dir, site_packages_dir)
         payload_path = MsvcBuildFiles.create_payload_zip(
             self.package_name,
             dist_dir,
