@@ -38,7 +38,7 @@ The wheelhouse participates in every resolution uv performs for your project:
 |---------|--------------|
 | `uv run`, `uv sync` (desktop) | Wheels matching your desktop platform are installed into `.venv` |
 | `uv run ksproject android build` | ksproject runs `uv pip install --python-platform <android-arch>` per ABI; Android wheels (`*-android_*.whl`) in the wheelhouse are candidates |
-| `uv run ksproject apple build` | Same, for iOS/macOS target platforms (`*-ios_*.whl`, `*-macosx_*.whl`) |
+| `uv run ksproject apple ios build` (or `sim` / `macos`) | Same, for iOS/macOS target platforms (`*-ios_*.whl`, `*-macosx_*.whl`) |
 
 During a mobile build, ksproject cross-installs your project and its dependencies into per-arch `site_packages` directories. uv selects the wheel whose **platform tag** matches the target — so a single wheelhouse can hold wheels for all platforms side by side; the right one is chosen per build.
 
