@@ -373,8 +373,9 @@ ksproject automatically:
 | Convention | Platform | Purpose |
 |------------|----------|---------|
 | `.java/` | Android | Java source files compiled into APK |
+| `.kotlin/` | Android | Kotlin source files compiled into APK |
 | `.gradle/*.json` | Android | Gradle dependencies + permissions |
 | `.libs/<abi>/` | Android | Pre-compiled native `.so` libraries |
-| `.frameworks/` | iOS/macOS | xcframeworks linked into `.app` |
+| `.frameworks/` | iOS/macOS | xcframeworks embedded into `.app/Frameworks/` |
 
 The plugin system means the Python packaging ecosystem (`pip install`) becomes the delivery mechanism for native mobile assets — no manual Gradle or Xcode configuration needed.

@@ -55,7 +55,7 @@ One tool to go from Python code to native mobile apps — no manual Gradle or Xc
 
     ---
 
-    Automatic SDK/NDK/Java installation, Gradle project generation, multi-arch APK/AAB builds, and one-command deploy to emulators or physical devices.
+    Automatic SDK/NDK/Java installation, Gradle project generation, multi-arch APK/AAB builds, keystore signing, and one-command deploy to emulators or physical devices.
 
     [:octicons-arrow-right-24: Build for Android](android/building.md)
 
@@ -63,7 +63,7 @@ One tool to go from Python code to native mobile apps — no manual Gradle or Xc
 
     ---
 
-    XcodeGen-based project generation with Python.xcframework, SDL2, and one-command deploy to simulators or devices via xcodebuild.
+    XcodeGen-based project generation with Python.xcframework, SDL2, App Store archiving, and one-command deploy to simulators or devices via xcodebuild.
 
     [:octicons-arrow-right-24: Build for iOS](ios/building.md)
 
@@ -143,7 +143,7 @@ uv run ksproject android run --name "Pixel_8"
 
     ---
 
-    `uv run ksproject android build` or `uv run ksproject ios build` generates native project files, installs cross-compiled site-packages per architecture, and compiles the final app.
+    `uv run ksproject android build` or `uv run ksproject apple ios build` generates native project files, installs cross-compiled site-packages per architecture, and compiles the final app.
 
 -   :material-numeric-4-circle:{ .lg .middle } **Run**
 
@@ -202,5 +202,13 @@ uv run ksproject android run --name "Pixel_8"
     Create pip packages that inject Java sources, Gradle dependencies, and permissions into apps that install them.
 
     [:octicons-arrow-right-24: Plugin guide](plugins/overview.md)
+
+-   :material-package-down:{ .lg .middle } **Wheelhouse**
+
+    ---
+
+    Drop your own platform wheels — a patched Kivy, an unreleased dependency — into `wheelhouse/` and ksproject uses them in mobile builds.
+
+    [:octicons-arrow-right-24: Wheelhouse guide](wheelhouse/overview.md)
 
 </div>
