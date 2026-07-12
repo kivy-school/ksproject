@@ -11,7 +11,7 @@ requires-python = ">=3.13"
 dependencies = [
     "toml>=0.10.2",
     "pyyaml>=6.0",
-    "ksp-bootstraps",
+    "ksp-bootstraps<0.1.0",
 ]
 
 [project.scripts]
