@@ -1,6 +1,6 @@
 [project]
 name = "ksproject"
-version = "0.0.1"
+version = "0.0.1.post0"
 description = "Compile python apps for Android and iOS."
 readme = "README.md"
 authors = [
