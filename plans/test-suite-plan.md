@@ -27,7 +27,7 @@ Tiered pytest suite under `ksproject/tests/`: fast unit + hermetic integration b
 3. **tools.Tools** — discovery against `fake_kivyschool`; missing-tool errors.
 4. **xcode/project_target** — `DEVELOPMENT_TEAM`, `CODE_SIGN_STYLE`, `info_plist_extra`, `entitlements` merge.
 5. **xcode/setting_presets** — `sp.merged()`, `target_settings("auto")`, destination shape.
-6. **gradle/gradle_build_files** — emitted `build.gradle` / `settings.gradle` snapshot.
+6. ~~**gradle/gradle_build_files** — emitted `build.gradle` / `settings.gradle` snapshot.~~ *(removed — build-file emission moved to the `ksp_bootstraps` package (`bootstrap.generate()`); no longer in `ksproject_utils`. Covered by Phase 3 integration, not a unit snapshot here.)*
 
 ### Phase 3 — Hermetic integration
 1. Android `global_tools=false` toolchain wiring → resolved paths match `<tmp>/.kivyschool/...` and default versions.
@@ -64,7 +64,7 @@ Tiered pytest suite under `ksproject/tests/`: fast unit + hermetic integration b
 - [x] `AndroidToolchain.find_*` discovery
 - [x] `ProjectTarget` settings (`DEVELOPMENT_TEAM`, entitlements, info_plist)
 - [x] `setting_presets` merge
-- [x] `gradle_build_files` snapshot (root + app)
+- [ ] ~~`gradle_build_files` snapshot (root + app)~~ *(N/A — emission moved to `ksp_bootstraps`; verified via Phase 3 integration instead)*
 
 ### Android — Gradle (macOS / Linux / Windows)
 - [x] **G2** `global_tools=false` versions match default `.kivyschool` *(hermetic via `fake_kivyschool`)*

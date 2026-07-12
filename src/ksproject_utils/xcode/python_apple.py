@@ -17,8 +17,14 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
+from ..python_version import SupportedPythonVersion
+
 PY_VERSION = "3.13"
 PY_SUB_VERSION = "b11"
+
+# Used when the app project doesn't pin an exact patch release in
+# .python-version. Must have an entry in ``_BEEWARE_TAGS``.
+DEFAULT_APPLE_PY_VERSION = SupportedPythonVersion.V3_13_11.value
 
 _KIVY_SDL2_VERSION = "2.3.10"
 _KIVY_SDL2_WHEEL = f"kivy_sdl2-{_KIVY_SDL2_VERSION}-py3-none-any.whl"
@@ -233,19 +239,20 @@ class BeewarePythonVersion:
     def url(self) -> str:
         return self.macos_url
 
+# BeeWare Python-Apple-support release tag for every supported version.
+# Keyed by the global SupportedPythonVersion enum so apple support and
+# .python-version validation can never drift apart.
+_BEEWARE_TAGS: dict[SupportedPythonVersion, str] = {
+    SupportedPythonVersion.V3_13_8: "b12",
+    SupportedPythonVersion.V3_13_11: "b13",
+    SupportedPythonVersion.V3_13_14: "b14",
+    SupportedPythonVersion.V3_14_2: "b9",
+    SupportedPythonVersion.V3_14_6: "b10",
+}
+
 apple_python_versions = [
-    BeewarePythonVersion(
-        "b13", 13, 11
-    ),
-    BeewarePythonVersion(
-        "b14", 13, 14
-    ),
-    BeewarePythonVersion(
-        "b9", 14, 2
-    ),
-    BeewarePythonVersion(
-        "b10", 14, 6
-    )
+    BeewarePythonVersion(tag, int(v.split(".")[1]), int(v.split(".")[2]))
+    for v, tag in _BEEWARE_TAGS.items()
 ]
 
 
@@ -254,6 +261,20 @@ def get_beeware_version(major: int, minor: int) -> BeewarePythonVersion | None:
         if fw.major == major and fw.minor == minor: return fw
     return None
 
+
+def supported_apple_py_versions() -> list[str]:
+    """Exact Python versions BeeWare ships Python-Apple-support builds for."""
+    return [f"3.{fw.major}.{fw.minor}" for fw in apple_python_versions]
+
+
+def unsupported_apple_py_error(version: str) -> AppleSupportError:
+    return AppleSupportError(
+        f"Python {version} has no BeeWare Python-Apple-support build. "
+        f"Supported versions: {', '.join(supported_apple_py_versions())} — "
+        f"pin one of these in .python-version (or use a bare major.minor "
+        f"like '3.13' to get the default {DEFAULT_APPLE_PY_VERSION})."
+    )
+
 class ApplePythonFramework:
 
     support_root: Path
@@ -261,7 +282,7 @@ class ApplePythonFramework:
     major_version: int
     minor_version: int
 
-    def __init__(self, support_root: Path, version: str = "3.13.11"):
+    def __init__(self, support_root: Path, version: str = DEFAULT_APPLE_PY_VERSION):
         self.support_root = support_root
         self.version = version
         main_ver, maj_ver, min_ver = [int(x) for x in version.split(".")]
@@ -303,13 +324,13 @@ class ApplePythonFramework:
     def download_macos(self, destination: Path) -> None:
         fw = self.framework
         if not fw:
-            raise AppleSupportError(f"{self.version} has no beeware build")
+            raise unsupported_apple_py_error(self.version)
         self.download(fw.macos_url, destination)
 
     def download_ios(self, destination: Path) -> None:
         fw = self.framework
         if not fw:
-            raise AppleSupportError(f"{self.version} has no beeware build")
+            raise unsupported_apple_py_error(self.version)
         self.download(fw.ios_url, destination)
 
     def merge_frameworks(self) -> Path:

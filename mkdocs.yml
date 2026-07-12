@@ -107,3 +107,6 @@ nav:
       - Site-Packages & Frameworks: ios/site-packages.md
   - Plugins:
       - Expanding Apps with Pips: plugins/overview.md
+  - Wheelhouse:
+      - Using the Wheelhouse: wheelhouse/overview.md
+      - Building Kivy Wheels: wheelhouse/building-kivy-wheels.md

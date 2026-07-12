@@ -382,4 +382,3 @@ google-services.json
         wheelhouse = (self.project_path / "wheelhouse")
         wheelhouse.mkdir(exist_ok=True)
         (wheelhouse / ".gitkeep").touch()
-

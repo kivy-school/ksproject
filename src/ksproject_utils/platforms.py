@@ -9,7 +9,8 @@ class Platform:
 
     project_path: str
 
-    site_packages: str
+    @property
+    def site_packages(self) -> str: ...
 
 
 class AndroidPlatform(Platform):

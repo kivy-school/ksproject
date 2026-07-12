@@ -15,24 +15,26 @@ def test_parses_minimal_pyproject(tmp_project: Path) -> None:
     ks = pp.tool.kivy_school
     assert ks.app_name == "minimal_app"
     assert ks.android is not None
-    assert ks.ios is not None
-    assert ks.macos is not None
+    assert ks.apple is not None
+    assert ks.apple.ios is not None
+    assert ks.apple.macos is not None
 
 
 def test_developer_team_defaults_to_none(tmp_project: Path) -> None:
     pp = PyProjectToml(str(tmp_project / "pyproject.toml"))
     ks = pp.tool.kivy_school
-    assert ks is not None
-    assert ks.ios is not None and ks.ios.developer_team is None
-    assert ks.macos is not None and ks.macos.developer_team is None
+    assert ks is not None and ks.apple is not None
+    assert ks.apple.ios is not None and ks.apple.ios.developer_team is None
+    assert ks.apple.macos is not None and ks.apple.macos.developer_team is None
 
 
 def test_developer_team_parsed(tmp_project_with_team: Path) -> None:
     pp = PyProjectToml(str(tmp_project_with_team / "pyproject.toml"))
     ks = pp.tool.kivy_school
-    assert ks is not None and ks.ios is not None and ks.macos is not None
-    assert ks.ios.developer_team == "ABC123XYZ"
-    assert ks.macos.developer_team == "ABC123XYZ"
+    assert ks is not None and ks.apple is not None
+    assert ks.apple.ios is not None and ks.apple.macos is not None
+    assert ks.apple.ios.developer_team == "ABC123XYZ"
+    assert ks.apple.macos.developer_team == "ABC123XYZ"
 
 
 def test_android_defaults(tmp_project: Path) -> None:

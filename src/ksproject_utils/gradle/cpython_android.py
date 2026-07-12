@@ -40,6 +40,14 @@ def android_triple(arch: str) -> str:
     return _TRIPLES[arch]
 
 
+def official_android_url(android_version: str, arch: str) -> str:
+    """python.org's official Android binary release (available from 3.14)."""
+    return (
+        f"https://www.python.org/ftp/python/{android_version}/"
+        f"python-{android_version}-{android_triple(arch)}.tar.gz"
+    )
+
+
 def android_prefix(
     ks_root: Path, arch: str, android_version: str = ANDROID_VERSION
 ) -> Path:
@@ -53,6 +61,12 @@ def android_prefix(
     )
 
 
+# Python's _ssl/_hashlib load libcrypto_python.so; the plain-named
+# lib/libcrypto.so is a build-time linking artifact and is deleted from the
+# prefix at the end of every install.
+_EXCLUDED_PREFIX_FILES = {"lib/libcrypto.so"}
+
+
 def install_cpython_android(
     ks_root: Path,
     archs: list[str],
@@ -62,59 +76,67 @@ def install_cpython_android(
     py_version: str = PY_VERSION,
     android_version: str = ANDROID_VERSION,
 ) -> None:
-    # Try the anaconda.org/kivyschool prebuilt first. Each ABI's wheel ships
-    # the full cross-build prefix (+ shared pure-py stdlib), so we just extract
-    # into the same path install_cpython_android() would otherwise produce.
+    # Try the anaconda.org/kivyschool prebuilt first, then python.org's
+    # official Android binary release (3.14+). Both ship a ready prefix, so
+    # we just extract into the same path the source cross-build produces.
     remaining = [
         a
         for a in archs
-        if not _try_install_prebuilt(ks_root, a, android_version, py_version)
-    ]
-    if not remaining:
-        return
-
-    cpython_dir = ks_root / f"Python-{android_version}"
-
-    if not cpython_dir.exists():
-        ks_root.mkdir(parents=True, exist_ok=True)
-        print(f"Downloading CPython {android_version} source...")
-        url = (
-            f"https://www.python.org/ftp/python/{android_version}"
-            f"/Python-{android_version}.tgz"
+        if not (
+            _try_install_prebuilt(ks_root, a, android_version, py_version)
+            or _try_install_official(ks_root, a, android_version, py_version)
         )
-        tar_path = ks_root / f"Python-{android_version}.tgz"
-        urllib.request.urlretrieve(url, tar_path)
-        with tarfile.open(tar_path) as tf:
-            tf.extractall(ks_root)
-        tar_path.unlink(missing_ok=True)
+    ]
+    if remaining:
+        cpython_dir = ks_root / f"Python-{android_version}"
 
-    env = os.environ.copy()
-    if sdk:
-        env["ANDROID_HOME"] = sdk
-    if ndk:
-        env["ANDROID_NDK_ROOT"] = ndk
-    if java:
-        env["JAVA_HOME"] = java
+        if not cpython_dir.exists():
+            ks_root.mkdir(parents=True, exist_ok=True)
+            print(f"Downloading CPython {android_version} source...")
+            url = (
+                f"https://www.python.org/ftp/python/{android_version}"
+                f"/Python-{android_version}.tgz"
+            )
+            tar_path = ks_root / f"Python-{android_version}.tgz"
+            urllib.request.urlretrieve(url, tar_path)
+            with tarfile.open(tar_path) as tf:
+                tf.extractall(ks_root)
+            tar_path.unlink(missing_ok=True)
 
-    # configure-build must run once before any configure-host
-    build_dir = cpython_dir / "cross-build" / "build"
-    if not build_dir.exists():
-        print("Configuring CPython build-machine interpreter...")
-        _run_android(["configure-build"], cpython_dir, env)
-        print("Building CPython build-machine interpreter...")
-        _run_android(["make-build"], cpython_dir, env)
+        env = os.environ.copy()
+        if sdk:
+            env["ANDROID_HOME"] = sdk
+        if ndk:
+            env["ANDROID_NDK_ROOT"] = ndk
+        if java:
+            env["JAVA_HOME"] = java
 
-    for arch in remaining:
-        triple = android_triple(arch)
-        prefix = cpython_dir / "cross-build" / triple / "prefix"
-        if (prefix / f"lib/libpython{py_version}.so").exists():
-            print(f"CPython {py_version} for {arch} already built")
-            continue
+        # configure-build must run once before any configure-host
+        build_dir = cpython_dir / "cross-build" / "build"
+        if not build_dir.exists():
+            print("Configuring CPython build-machine interpreter...")
+            _run_android(["configure-build"], cpython_dir, env)
+            print("Building CPython build-machine interpreter...")
+            _run_android(["make-build"], cpython_dir, env)
 
-        print(f"Building CPython {android_version} for {arch} ({triple})...")
-        _run_android(["configure-host", triple], cpython_dir, env)
-        _run_android(["make-host", triple], cpython_dir, env)
-        print(f"CPython {py_version} for {arch} built successfully")
+        for arch in remaining:
+            triple = android_triple(arch)
+            prefix = cpython_dir / "cross-build" / triple / "prefix"
+            if (prefix / f"lib/libpython{py_version}.so").exists():
+                print(f"CPython {py_version} for {arch} already built")
+                continue
+
+            print(f"Building CPython {android_version} for {arch} ({triple})...")
+            _run_android(["configure-host", triple], cpython_dir, env)
+            _run_android(["make-host", triple], cpython_dir, env)
+            print(f"CPython {py_version} for {arch} built successfully")
+
+    # Regardless of how the prefix got here (fresh install or an old cache),
+    # the excluded files must not exist after install.
+    for arch in archs:
+        prefix = android_prefix(ks_root, arch, android_version)
+        for excluded in _EXCLUDED_PREFIX_FILES:
+            (prefix / excluded).unlink(missing_ok=True)
 
 
 def _try_install_prebuilt(
@@ -199,6 +221,64 @@ def _try_install_prebuilt(
         return True
     except (urllib.error.URLError, zipfile.BadZipFile, OSError) as exc:
         print(f"  prebuilt: fetch failed for {arch}: {exc}")
+        return False
+
+
+def _try_install_official(
+    ks_root: Path,
+    arch: str,
+    android_version: str,
+    py_version: str,
+) -> bool:
+    """Download + extract python.org's official Android binary for ``arch``.
+
+    Available from CPython 3.14; the tarball's ``prefix/`` tree is the same
+    layout the source cross-build produces (libpython + ssl/crypto/sqlite,
+    stdlib, lib-dynload, headers), already stripped. Returns True on success,
+    False (e.g. 404 for versions without official binaries) so the caller can
+    fall back to building from source.
+    Honors ``KIVYSCHOOL_OFFICIAL_DISABLE=1`` to force-skip.
+    """
+    if os.environ.get("KIVYSCHOOL_OFFICIAL_DISABLE") == "1":
+        return False
+
+    prefix = android_prefix(ks_root, arch, android_version)
+    libpy = prefix / "lib" / f"libpython{py_version}.so"
+    if libpy.exists():
+        return True
+
+    url = official_android_url(android_version, arch)
+    cache_dir = ks_root / "official-cache"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    tar_cache = cache_dir / url.rsplit("/", 1)[-1]
+
+    try:
+        if not tar_cache.exists():
+            print(f"  official: fetching {url}")
+            urllib.request.urlretrieve(url, tar_cache)
+
+        prefix.mkdir(parents=True, exist_ok=True)
+        with tarfile.open(tar_cache) as tf:
+            members = []
+            for m in tf.getmembers():
+                # Member names look like "./prefix/lib/..." — keep only the
+                # prefix/ tree, re-rooted at the target dir.
+                name = m.name[2:] if m.name.startswith("./") else m.name
+                if not name.startswith("prefix/"):
+                    continue
+                m.name = name[len("prefix/"):]
+                if m.name:
+                    members.append(m)
+            tf.extractall(prefix, members=members, filter="data")
+
+        if not libpy.exists():
+            print(f"  official: extraction did not produce {libpy}")
+            return False
+        print(f"  official: installed CPython {android_version} for {arch}")
+        return True
+    except (urllib.error.URLError, tarfile.TarError, OSError) as exc:
+        print(f"  official: fetch failed for {arch}: {exc}")
+        tar_cache.unlink(missing_ok=True)
         return False
 
 
