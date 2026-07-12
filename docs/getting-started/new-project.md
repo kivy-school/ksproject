@@ -36,14 +36,14 @@ You need **Python 3.13+** and **[uv](https://docs.astral.sh/uv/)** installed on 
 ```bash
 uv init --package myapp --python 3.13
 cd myapp
-uv add git+https://github.com/kivy-school/ksproject --dev
+uv add ksproject --dev
 uv run ksproject init
 ```
 
 This does everything:
 
 1. **Creates a proper Python project** with `pyproject.toml` via `uv init`
-2. **Adds ksproject as a dev dependency** — local to this project, not installed globally
+2. **Adds ksproject as a dependency** — from PyPI, local to this project, not installed globally
 3. **`ksproject init`** appends `[tool.kivy-school]` configuration with commented defaults for Android, iOS, and macOS
 4. **Writes starter app sources** — a working Kivy app with a `.kv` layout file
 5. **Creates a `wheelhouse/`** directory (with a `.gitkeep`) for [local platform wheels](../wheelhouse/overview.md)
@@ -62,7 +62,7 @@ This does everything:
 ```bash
 uv init --package my-kivy-app --python 3.13
 cd my-kivy-app
-uv add git+https://github.com/kivy-school/ksproject --dev
+uv add ksproject --dev
 uv run ksproject init --name mykivyapp
 ```
 
@@ -222,7 +222,7 @@ You can also run `ksproject init` in an existing Python project that already has
 
 ```bash
 cd existing-project
-uv add git+https://github.com/kivy-school/ksproject --dev
+uv add ksproject --dev
 uv run ksproject init
 ```
 

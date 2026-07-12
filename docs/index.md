@@ -107,7 +107,7 @@ From zero to running on your phone in three commands.
 # 1. Create a new project
 uv init --package myapp --python 3.13
 cd myapp
-uv add git+https://github.com/kivy-school/ksproject --dev
+uv add ksproject --dev
 uv run ksproject init
 
 # 2. Build for Android (SDK/NDK auto-installed on first run)
