@@ -109,7 +109,7 @@ def test_android_emulator_unittests_pass(minimal_app: Path) -> None:
 
     # Always use ksproject's own adb (installed during android build).
     project = GradleProject(minimal_app)
-    pkg = project.builder.package_name
+    pkg = project.android_data.package_name
     adb = project.adb.binary  # str path for subprocess; project.adb (ADB object) for boot_and_wait
 
     # --- Find a running device/emulator, or create+boot the default AVD ---

@@ -310,7 +310,10 @@ class XcodeProject:
     
 
     def macos_build(self, variant: str = "debug") -> Path:
-        platforms = ["iOS", "macOS"]
+        platforms = [
+            #"iOS", 
+            "macOS"
+        ]
         just_created = not self.xcodeproj.exists()
         if just_created:
             self.generate(platforms=platforms)
@@ -321,7 +324,7 @@ class XcodeProject:
             apple = kivy_school.apple
             if apple:
                 self.platform_pre_build_script(apple.macos) # type: ignore
-        self.install_site_packages(platforms=["iOS", "macOS"])
+        self.install_site_packages(platforms=platforms)
         return self._xcodebuild("generic/platform=macOS", variant)
 
     # ------------------------------------------------------------------

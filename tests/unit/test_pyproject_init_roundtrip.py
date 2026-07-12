@@ -29,10 +29,11 @@ def test_default_toml_roundtrips(tmp_path: Path) -> None:
     assert ks.app_name == "Hello-World"
     assert ks.android is not None
     assert ks.android.package_name == "org.example.hello_world"
-    assert ks.ios is not None
-    assert ks.ios.bundle_id == "org.example.hello_world"
-    assert ks.macos is not None
-    assert ks.macos.bundle_id == "org.example.hello_world"
+    assert ks.apple is not None
+    assert ks.apple.ios is not None
+    assert ks.apple.ios.bundle_id == "org.example.hello_world"
+    assert ks.apple.macos is not None
+    assert ks.apple.macos.bundle_id == "org.example.hello_world"
 
 
 def test_default_android_uses_documented_versions(tmp_path: Path) -> None:

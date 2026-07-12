@@ -24,6 +24,7 @@ from pathlib import Path
 
 import pytest
 
+from ksproject_utils.tools import resolve_module_name
 from ksproject_utils.xcode.xcode_project import XcodeProject
 
 pytestmark = pytest.mark.apple
@@ -67,13 +68,13 @@ def test_ios_simulator_unittests_pass(minimal_app: Path) -> None:
     KSPROJECT_TEST=1, and assert the in-app suite prints a PASS sentinel."""
     _clear_deps(minimal_app)
     project = XcodeProject(minimal_app)
-    module = project.builder.module_name
+    module = resolve_module_name(project.pyproject.project.name)
 
     # --- Inject test-mode entry point before ios_build() generates the file ---
     # ksproject's _write_app() skips writing if app/__main__.py already exists.
     # We pre-create it with a KSPROJECT_TEST=1 branch; normal builds (where this
     # file doesn't pre-exist) get the plain ``module.main()`` template instead.
-    app_entry = project.builder.project_dir / "app" / "__main__.py"
+    app_entry = project.xcode_dir / "app" / "__main__.py"
     app_entry.parent.mkdir(parents=True, exist_ok=True)
     app_entry.write_text(textwrap.dedent(f"""\
         import os
@@ -94,7 +95,7 @@ def test_ios_simulator_unittests_pass(minimal_app: Path) -> None:
     """))
 
     app = project.ios_build(simulator=True)
-    bundle_id = project._bundle_id()
+    bundle_id = project._bundle_id(app)
 
     # --- Pick first available iOS simulator ---
     sims = [
