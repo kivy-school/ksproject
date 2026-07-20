@@ -1,6 +1,6 @@
 # ksproject
 
-**Kivy School Project Manager** — A cross-platform build tool for Kivy apps targeting Android (iOS/macOS, windows and linux soon).
+**Kivy School Project Manager** — A cross-platform build toolchain for Python apps targeting Android (iOS/macOS, windows and linux soon).
 
 `ksproject` generates a pure AGP (Android Gradle Plugin) Gradle project, downloads the Android SDK, NDK, and JDK completely on demand, and builds your APK, AAB, or AAR.
 
