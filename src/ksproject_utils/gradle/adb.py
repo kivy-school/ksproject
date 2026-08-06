@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -72,7 +73,10 @@ class ADB:
         if replace:
             args.append("-r")
         args.append(str(apk))
-        self._run(*args, capture=False)
+        result = self._run(*args)
+        if result.stdout:
+            sys.stdout.write(result.stdout)
+            sys.stdout.flush()
 
     def shell(self, serial: str, *args: str) -> str:
         result = self._run("-s", serial, "shell", *args)
