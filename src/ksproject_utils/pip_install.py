@@ -23,21 +23,26 @@ class PipInstaller:
         project_dir = Path(uv_src).resolve()
         if UV is None:
             raise Exception("no uv toolchain")
+        command = [
+            UV,
+            "pip",
+            "install",
+            uv_src,
+            "--python-platform",
+            platform.pip_platform,
+            "--index-strategy",
+            "unsafe-best-match",
+            "--target",
+            site_packages,
+        ]
+        # The target is reused between builds.  Without reinstalling local
+        # path packages, uv may keep a cached wheel when their version has not
+        # changed, leaving Android with stale development code.
+        for package_name in collect_local_package_names(project_dir):
+            command.extend(("--reinstall-package", package_name))
+
         try:
-            subprocess.check_call(
-                [
-                    UV,
-                    "pip",
-                    "install",
-                    uv_src,
-                    "--python-platform",
-                    platform.pip_platform,
-                    "--index-strategy",
-                    "unsafe-best-match",
-                    "--target",
-                    site_packages,
-                ]
-            )
+            subprocess.check_call(command)
         except subprocess.CalledProcessError as e:
             raise PipInstallError(f"Failed to install '{uv_src}': {e}")
 
@@ -103,6 +108,24 @@ def collect_local_paths(
                 result.extend(collect_local_paths(member_path, visited))
 
     return result
+
+
+def collect_local_package_names(project_dir: Path) -> list[str]:
+    """Return distribution names for the project and local path dependencies."""
+    package_names: list[str] = []
+    for package_dir in [project_dir, *collect_local_paths(project_dir)]:
+        pyproject = package_dir / "pyproject.toml"
+        if not pyproject.exists():
+            continue
+
+        with pyproject.open("rb") as f:
+            data = tomllib.load(f)
+
+        package_name = data.get("project", {}).get("name")
+        if package_name and package_name not in package_names:
+            package_names.append(package_name)
+
+    return package_names
 
 
 def _normalize(name: str) -> str:
