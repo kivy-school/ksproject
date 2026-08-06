@@ -122,6 +122,18 @@ entitlements = {{}}
 # post_build = "path/to/android_postbuild.py"
 """
 
+def _windows_keys(module_name: str) -> str:
+    return f"""\
+[tool.kivy-school.windows]
+# icon = "relative to pyproject"
+python_version = 3.13.5
+byte_compile_python = true
+# include_tkinter = false
+# require_admin = true
+# pre_build = "path/to/window_prebuild.py"
+# post_build = "path/to/windows_postbuild.py"
+"""
+
 
 class PyProjectInitKeys:
 
@@ -151,10 +163,14 @@ class PyProjectInitKeys:
     def macos_keys(self) -> str:
         return _macos_keys(self.module_name)
 
+    def windows_keys(self) -> str:
+        return _windows_keys(self.module_name)
+
     def output(self) -> str:
         return f"""\
 {self.main_keys()}
 {self.android_keys()}
 {self.ios_keys()}
 {self.macos_keys()}
+{self.windows_keys()}
 """
