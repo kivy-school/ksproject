@@ -9,7 +9,8 @@ from pathlib import Path
 
 from ksproject_utils.gradle.android_toolchain import AndroidToolchain
 from ksproject_utils.gradle.github_actions import write_playstore_workflow
-from ksproject_utils.gradle.gradle_project import GradleProject
+from ksproject_utils.gradle.gradle_project import GradleProject, GradleProjectError
+from ksproject_utils.gradle.target_selector import TargetSelectionCancelled
 from ksproject_utils.pyproject_toml import PyProjectToml
 
 
@@ -153,8 +154,8 @@ class GradleCommands:
         p_devices.set_defaults(func=self.devices)
 
         # --- RUN ---
-        p_run = asub.add_parser("run", help="Build, install, and launch")
-        target = p_run.add_mutually_exclusive_group(required=True)
+        p_run = asub.add_parser("run", help="Install and launch")
+        target = p_run.add_mutually_exclusive_group()
         target.add_argument("--uuid", help="adb serial of a device or running emulator")
         target.add_argument("--name", help="AVD name to boot")
         p_run.add_argument(
@@ -289,5 +290,12 @@ class GradleCommands:
 
     def run(self, args: argparse.Namespace) -> int:
         project = GradleProject(Path.cwd())
-        project.run(uuid=args.uuid, name=args.name, variant=args.variant)
+        try:
+            project.run(uuid=args.uuid, name=args.name, variant=args.variant)
+        except TargetSelectionCancelled:
+            print("Cancelled.")
+            return 0
+        except GradleProjectError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            return 1
         return 0

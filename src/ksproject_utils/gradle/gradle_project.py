@@ -28,6 +28,11 @@ from .android_toolchain import (
     AndroidToolchain,
 )
 from .collect_gradle_configs import MergedGradleConfig, collect_and_merge
+from .target_selector import (
+    TargetSelectionCancelled,
+    TargetSelectionError,
+    select_target,
+)
 
 from .cpython_android import (
     ANDROID_VERSION,
@@ -456,7 +461,7 @@ class GradleProject:
         name: str | None = None,
         variant: str = "debug",
     ) -> None:
-        if (uuid is None) == (name is None):
+        if uuid is not None and name is not None:
             raise GradleProjectError("run requires exactly one of uuid or name")
 
         if self.adb is None or self.emulator is None:
@@ -465,6 +470,19 @@ class GradleProject:
                 "install the toolchain, or set ANDROID_HOME / sdk_path in "
                 "[tool.kivy-school.android]."
             )
+
+        if uuid is None and name is None:
+            try:
+                target = select_target(self.devices())
+            except TargetSelectionCancelled:
+                raise
+            except TargetSelectionError as exc:
+                raise GradleProjectError(str(exc)) from exc
+
+            if target.get("kind") == "avd":
+                name = target["name"]
+            else:
+                uuid = target["serial"]
 
         apk = self.find_apk(variant)
 
