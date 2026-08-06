@@ -20,7 +20,7 @@ from ksp_bootstraps.platforms import (
     AndroidX86_64Platform,
 )
 from ..pyproject_toml import KivySchoolData, PyProjectToml
-from .adb import ADB
+from .adb import ADB, ADBError
 from .android_emulator import AndroidEmulator
 from .android_toolchain import (
     DEFAULT_API_VERSION,
@@ -475,7 +475,22 @@ class GradleProject:
             assert name is not None
             serial = self.emulator.boot_and_wait(name, self.adb)
 
-        self.adb.install(apk, serial)
+        try:
+            self.adb.install(apk, serial)
+        except ADBError as exc:
+            details = str(exc)
+            if "INSTALL_FAILED_VERSION_DOWNGRADE" in details:
+                package = self.android_data.package_name
+                raise GradleProjectError(
+                    "The APK has a lower Android version code than the version "
+                    f"already installed on {serial}. Uninstall the existing app "
+                    "and try again, or increment the app's versionCode before "
+                    "building:\n"
+                    f"  {self.adb.binary} -s {serial} uninstall {package}"
+                ) from exc
+            raise GradleProjectError(
+                f"Unable to install the APK on {serial}: {details}"
+            ) from exc
         self.adb.start_app(serial, self.android_data.package_name)
 
     # ------------------------------------------------------------------

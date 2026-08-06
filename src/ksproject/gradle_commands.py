@@ -7,9 +7,10 @@ import os
 import sys
 from pathlib import Path
 
+from ksproject_utils.gradle.adb import ADBError
 from ksproject_utils.gradle.android_toolchain import AndroidToolchain
 from ksproject_utils.gradle.github_actions import write_playstore_workflow
-from ksproject_utils.gradle.gradle_project import GradleProject
+from ksproject_utils.gradle.gradle_project import GradleProject, GradleProjectError
 from ksproject_utils.pyproject_toml import PyProjectToml
 
 
@@ -289,5 +290,12 @@ class GradleCommands:
 
     def run(self, args: argparse.Namespace) -> int:
         project = GradleProject(Path.cwd())
-        project.run(uuid=args.uuid, name=args.name, variant=args.variant)
+        try:
+            project.run(uuid=args.uuid, name=args.name, variant=args.variant)
+        except GradleProjectError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            return 1
+        except ADBError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            return 1
         return 0
