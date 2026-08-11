@@ -126,7 +126,7 @@ def _windows_keys(module_name: str) -> str:
     return f"""\
 [tool.kivy-school.windows]
 # icon = "relative to pyproject"
-python_version = 3.13.5
+python_version = "3.13.5"
 byte_compile_python = true
 # include_tkinter = false
 # require_admin = true
