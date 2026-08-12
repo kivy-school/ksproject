@@ -29,7 +29,7 @@ class MsvcProjectBuilder:
         self.app_name = kivy_school.app_name or pyproject.project.name
         self.package_name = (
             self.pyproject.project.name.strip().replace("-", "_").replace(" ", "_")
-        )
+        ).lower()
 
     def _resolve_and_convert_icon(self, dest_dir: Path) -> Path | None:
         """Finds the user's icon and ensures it is an .ico file for MSVC."""

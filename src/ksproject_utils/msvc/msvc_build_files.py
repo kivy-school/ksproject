@@ -66,20 +66,31 @@ class MsvcBuildFiles:
             )
             return
 
-        print(f"[ksproject] Cythonizing app module '{package_name}' to hide source...")
+        print(f"[ksproject] Cythonizing app module '{package_name}'\nObfuscating python source...")
 
         setup_py_path = site_packages_dir / "setup.py"
         setup_py_content = f"""
-from setuptools import setup
+import os
+from setuptools import setup, Extension
 from Cython.Build import cythonize
 from pathlib import Path
 
+os.environ["CL"] = "/utf-8" 
+
 package_name = "{package_name}"
-source_files = [str(p) for p in Path(package_name).rglob('*.py') if p.name not in ('__init__.py', '__main__.py')]
+extensions = []
+
+for p in Path(package_name).rglob('*.py'):
+    if p.name not in ('__init__.py', '__main__.py'):
+        rel_path = p.as_posix() 
+        module_name = rel_path.replace('.py', '').replace('/', '.')
+        extensions.append(Extension(module_name, [rel_path]))
 
 setup(
+    packages=[],
+    py_modules=[],
     ext_modules=cythonize(
-        source_files,
+        extensions,
         compiler_directives={{'language_level': '3', 'always_allow_keywords': True}},
         quiet=True
     )
@@ -88,10 +99,25 @@ setup(
         setup_py_path.write_text(setup_py_content, encoding="utf-8")
 
         import sys
+        import tempfile
+
+        short_temp_dir = Path(tempfile.gettempdir()) / "kspmsvcbuild"
+        short_lib_dir = Path(tempfile.gettempdir()) / "kspmsvclib"
+        short_temp_dir.mkdir(exist_ok=True)
+        short_lib_dir.mkdir(exist_ok=True)
 
         print("            Building C extensions (this may take a moment)...")
         result = subprocess.run(
-            [sys.executable, "setup.py", "build_ext", "--inplace"],
+            [
+                sys.executable, 
+                "setup.py", 
+                "build_ext", 
+                "--inplace", 
+                "--build-temp", 
+                str(short_temp_dir),
+                "--build-lib",
+                str(short_lib_dir)
+            ],
             cwd=site_packages_dir,
             capture_output=True,
             text=True,
@@ -99,6 +125,7 @@ setup(
 
         if result.returncode != 0:
             print("[ksproject] Error during Cythonization:")
+            print(result.stdout)
             print(result.stderr)
             setup_py_path.unlink(missing_ok=True)
             return
@@ -106,7 +133,8 @@ setup(
         print("            Cythonization successful. Scrubbing source files...")
 
         for py_file in app_dir.rglob("*.py"):
-            py_file.unlink(missing_ok=True)
+            if py_file.name not in ("__init__.py", "__main__.py"):
+                py_file.unlink(missing_ok=True)
 
         for c_file in app_dir.rglob("*.c"):
             c_file.unlink(missing_ok=True)
