@@ -457,8 +457,6 @@ class GradleProject:
                 "[tool.kivy-school.android]."
             )
 
-        apk = self.find_apk(variant)
-
         if uuid is not None:
             serial = uuid
             self.adb.wait_for_device(serial)
@@ -466,7 +464,35 @@ class GradleProject:
             assert name is not None
             serial = self.emulator.boot_and_wait(name, self.adb)
 
-        self.adb.install(apk, serial)
+        device_abis = self.adb.get_device_abis(serial)
+        print(f"[ksproject] Detected device ABIs: {', '.join(device_abis)}")
+
+        apks = self.find_apks(variant)
+        if not apks:
+            raise GradleProjectError(f"No {variant} APKs found. Build the project first.")
+
+        best_apk = None
+
+        for abi in device_abis:
+            gradle_flavor_name = abi.replace("-", "_") 
+            
+            for apk in apks:
+                if gradle_flavor_name in apk.name and "unsigned" not in apk.name:
+                    best_apk = apk
+                    break
+                elif gradle_flavor_name in apk.name:
+                    best_apk = apk
+                    
+            if best_apk:
+                print(f"[ksproject] Matched ABI '{abi}' -> Selected {best_apk.name}")
+                break
+
+        if not best_apk:
+            best_apk = apks[0]
+            print(f"[ksproject] No exact ABI match found. Falling back to: {best_apk.name}")
+
+        print(f"[ksproject] Installing {best_apk.name} on {serial}...")
+        self.adb.install(best_apk, serial)
         self.adb.start_app(serial, self.android_data.package_name)
 
     # ------------------------------------------------------------------
