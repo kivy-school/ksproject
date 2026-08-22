@@ -56,6 +56,9 @@ sdk = "{DEFAULT_SDK_VERSION}"
 ndk = "28c"
 ndk_api = 24
 
+# generate either a single unified apk for all archs or separate apks for every aarch
+universal_apk = true
+
 global_tools = true # Set to <false> to use project-local SDK/NDK (./.kivyschool); set to <true> to use shared/global versions (~/.kivyschool or global_tools_path)
 #global_tools_path = "~/.kivyschool" # Override root path when global_tools = true; ignored when global_tools = false
 
@@ -136,7 +139,9 @@ class PyProjectInitKeys:
     ]
 
     def __init__(self, project_name: str):
-        self.module_name = project_name.lower().replace("-", "_").replace(".", "_").replace(" ", "")
+        self.module_name = (
+            project_name.lower().replace("-", "_").replace(".", "_").replace(" ", "")
+        )
         self.app_name = project_name
 
     def main_keys(self) -> str:

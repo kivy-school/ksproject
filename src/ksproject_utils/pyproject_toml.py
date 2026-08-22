@@ -3,6 +3,7 @@ from pathlib import Path
 
 import toml
 
+
 class KivySchoolData:
 
     app_name: str | None
@@ -20,13 +21,13 @@ class KivySchoolData:
         # )
         self.apple = self.AppleData(
             self.AppleData.IosData(data["ios"]) if "ios" in data else None,
-            self.AppleData.MacosData(data["macos"]) if "macos" in data else None
+            self.AppleData.MacosData(data["macos"]) if "macos" in data else None,
         )
         self.android = (
             KivySchoolData.AndroidData(data["android"]) if "android" in data else None
         )
         self.bootstrap = data.get("bootstrap", "kivy")
-    
+
     class AppleData:
 
         def __init__(self, ios: "IosData | None", macos: "MacosData | None"):
@@ -54,8 +55,8 @@ class KivySchoolData:
                 self.site_frameworks = data.get("site_frameworks", [])
                 self.developer_team = data.get("developer_team")
                 self.minimum_deployment = data.get("minimum_deployment")
-                self.pre_build = Path(data.get("pre_build")) if "pre_build" in data else None # type: ignore
-                self.post_build = Path(data.get("post_build")) if "post_build" in data else None # type: ignore
+                self.pre_build = Path(data.get("pre_build")) if "pre_build" in data else None  # type: ignore
+                self.post_build = Path(data.get("post_build")) if "post_build" in data else None  # type: ignore
 
         class MacosData:
             bundle_id: str
@@ -76,10 +77,8 @@ class KivySchoolData:
                 self.developer_team = data.get("developer_team")
                 self.minimum_deployment = data.get("minimum_deployment")
                 self.archs = data.get("archs", ["arm64", "x86_64"])
-                self.pre_build = Path(data.get("pre_build")) if "pre_build" in data else None # type: ignore
-                self.post_build = Path(data.get("post_build")) if "post_build" in data else None # type: ignore
-
-    
+                self.pre_build = Path(data.get("pre_build")) if "pre_build" in data else None  # type: ignore
+                self.post_build = Path(data.get("post_build")) if "post_build" in data else None  # type: ignore
 
     class AndroidData:
         package_name: str
@@ -113,12 +112,11 @@ class KivySchoolData:
         post_build: Path | None
 
         byte_compile_python: bool
+        universal_apk: bool
 
         def __init__(self, data: dict):
             self.package_name = data["package_name"]
-            self.archs = [
-                self.Arch(a) for a in data.get("archs", [])
-            ]
+            self.archs = [self.Arch(a) for a in data.get("archs", [])]
             self.api = data.get("api")
             self.min_api = data.get("min_api")
             self.sdk = data.get("sdk")
@@ -155,17 +153,16 @@ class KivySchoolData:
                     else:
                         sources = [str(x) for x in item[1:]]
                     self.include_files.append((dest, sources))
-            self.services = [
-                self.ServiceData(s) for s in data.get("services", [])
-            ]
+            self.services = [self.ServiceData(s) for s in data.get("services", [])]
             self.version_code = data.get("version_code", 1)
             self.version_name = data.get("version_name", "1.0")
 
-            self.pre_build = Path(data.get("pre_build")) if "pre_build" in data else None # type: ignore
-            self.post_build = Path(data.get("post_build")) if "post_build" in data else None # type: ignore
+            self.pre_build = Path(data.get("pre_build")) if "pre_build" in data else None  # type: ignore
+            self.post_build = Path(data.get("post_build")) if "post_build" in data else None  # type: ignore
 
             self.byte_compile_python = bool(data.get("byte_compile_python", True))
-            
+            self.universal_apk = bool(data.get("universal_apk", True))
+
         def kivyschool_root(self, working_dir: Path) -> Path:
             """Root for kivy-school managed tools/caches.
 
@@ -177,11 +174,11 @@ class KivySchoolData:
             if self.global_tools_path is not None:
                 return self.global_tools_path
             return Path.home() / ".kivyschool"
-        
+
         class Arch(StrEnum):
             ARM64_V8A = "arm64-v8a"
             X86_64 = "x86_64"
-        
+
         class ServiceData:
             name: str
             entrypoint: str
@@ -207,8 +204,9 @@ class KivySchoolData:
                 self.notification_text = data.get(
                     "notification_text", "Background task active"
                 )
-                self.notification_icon = data.get("notification_icon", "stat_notify_sync")
-
+                self.notification_icon = data.get(
+                    "notification_icon", "stat_notify_sync"
+                )
 
 
 class ToolData:
