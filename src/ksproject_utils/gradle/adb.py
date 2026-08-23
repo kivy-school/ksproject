@@ -21,6 +21,19 @@ class ADB:
     # Internals
     # ------------------------------------------------------------------
 
+    def get_device_abis(self, serial: str) -> list[str]:
+        """Retrieve the list of supported ABIs for a specific device, ranked by preference."""
+
+        abilist = self.shell(serial, "getprop", "ro.product.cpu.abilist").strip()
+        if abilist:
+            return [abi.strip() for abi in abilist.split(",") if abi.strip()]
+
+        primary_abi = self.shell(serial, "getprop", "ro.product.cpu.abi").strip()
+        if primary_abi:
+            return [primary_abi]
+            
+        return []
+
     def _run(self, *args: str, capture: bool = True) -> subprocess.CompletedProcess:
         result = subprocess.run(
             [self.binary, *args],
@@ -86,11 +99,13 @@ class ADB:
     ) -> None:
         """Launches the default main activity for the given package."""
         self.shell(
-            serial, 
-            "monkey", 
-            "-p", package, 
-            "-c", "android.intent.category.LAUNCHER", 
-            "1"
+            serial,
+            "monkey",
+            "-p",
+            package,
+            "-c",
+            "android.intent.category.LAUNCHER",
+            "1",
         )
 
     def wait_for_device(self, serial: str, timeout: float = 60.0) -> None:

@@ -36,7 +36,7 @@ from .cpython_android import (
     install_cpython_android,
 )
 
-#from .gradle_project_builder import GradleProjectBuilder
+# from .gradle_project_builder import GradleProjectBuilder
 from ksp_bootstraps.bootstrap import BootstrapProtocol
 from ksp_bootstraps.bootstraps import get_bootstrap
 from ..python_version import read_python_version_pin
@@ -56,10 +56,15 @@ class GradleProjectError(Exception):
 class GradleProjectDelegate:
     working_dir: Path
     data: KivySchoolData.AndroidData
-    #bootstrap: BootstrapProtocol
+    # bootstrap: BootstrapProtocol
     toolchain: AndroidToolchain
 
-    def __init__(self, working_dir: Path, data: KivySchoolData.AndroidData, toolchain: AndroidToolchain) -> None:
+    def __init__(
+        self,
+        working_dir: Path,
+        data: KivySchoolData.AndroidData,
+        toolchain: AndroidToolchain,
+    ) -> None:
         self.working_dir = working_dir
         self.data = data
         self.toolchain = toolchain
@@ -77,29 +82,29 @@ class GradleProjectDelegate:
             py_version=self.py_version,
             android_version=self.android_py_version,
         )
-            
+
     def android_prefix(self, ks_root: Path, arch: str, android_version: str) -> Path:
         return android_prefix(ks_root, arch, android_version)
 
     @property
     def default_api_version(self) -> int:
         return DEFAULT_API_VERSION
-    
+
     @property
     def sdk_path(self) -> str: ...
-    
+
     @property
     def ndk_version(self) -> str:
         return self.toolchain.ndk_version
-    
+
     @property
     def ndk_path(self) -> str:
         return self.toolchain.ndk_path
-    
+
     @property
-    def java_path(self) -> str: 
+    def java_path(self) -> str:
         return self.toolchain.java_path
-    
+
     @property
     def android_py_version(self) -> str:
         return self.py_pin.resolve(ANDROID_VERSION)
@@ -112,7 +117,6 @@ class GradleProjectDelegate:
     def uv_py_version(self) -> str:
         """Exact version for `uv run --python` pins in generated scripts."""
         return self.py_pin.full_or(self.py_version)
-
 
 
 class GradleProject:
@@ -144,8 +148,6 @@ class GradleProject:
 
         self._toolchain = None
 
-
-
         # Determine SDK version from pyproject.toml for the emulator.
         # Prefer android.api, fall back to android.sdk, then the toolchain default.
         android_data = kivy_school.android
@@ -171,18 +173,14 @@ class GradleProject:
             # toolchain resolution (triggered by build).
             self.adb = None  # type: ignore[assignment]
             self.emulator = None  # type: ignore[assignment]
-        
-        #self.builder = GradleProjectBuilder(self.pyproject, project_path)
+
+        # self.builder = GradleProjectBuilder(self.pyproject, project_path)
         delegate = GradleProjectDelegate(
-            project_path,
-            kivy_school.android,
-            self.toolchain
+            project_path, kivy_school.android, self.toolchain
         )
 
         self.bootstrap = get_bootstrap(
-            name=kivy_school.bootstrap,
-            pyproject=self.pyproject,
-            delegate=delegate
+            name=kivy_school.bootstrap, pyproject=self.pyproject, delegate=delegate
         )
 
     @property
@@ -228,13 +226,13 @@ class GradleProject:
             aar=aar,
             extra_gradle_dependencies=extra_gradle_dependencies or [],
             extra_permissions=extra_permissions or [],
-            sdk_path=self.toolchain.sdk_path
+            sdk_path=self.toolchain.sdk_path,
         )
 
     def platform_pre_build_script(self):
-        
+
         script = self.android_data.pre_build
-        
+
         env = {**environ}
 
         if script:
@@ -243,16 +241,10 @@ class GradleProject:
             match script.suffix:
                 case ".py":
                     subprocess.run(
-                        ["uv", "run", str(script.absolute())],
-                        check=True,
-                        env=env
+                        ["uv", "run", str(script.absolute())], check=True, env=env
                     )
                 case _:
-                    subprocess.run(
-                        [str(script.absolute())],
-                        check=True,
-                        env=env
-                    )
+                    subprocess.run([str(script.absolute())], check=True, env=env)
 
     def install_site_packages(self) -> None:
         """Install the project (and its deps) into per-arch site_packages dirs."""
@@ -274,7 +266,7 @@ class GradleProject:
         aar: bool = False,
         bundle: bool = False,
         clean: bool = False,
-    ) -> Path:
+    ) -> list[Path]:
         if variant not in ("debug", "release"):
             raise GradleProjectError(
                 f"Unknown variant {variant!r}; expected 'debug' or 'release'"
@@ -285,7 +277,11 @@ class GradleProject:
         elif bundle:
             task = "bundleDebug" if variant == "debug" else "bundleRelease"
         else:
-            task = "assembleDebug" if variant == "debug" else "assembleRelease"
+            task = (
+                "assembleDebug"
+                if variant == "release"
+                else "assembleDebug" if variant == "debug" else "assembleRelease"
+            )
 
         env = os.environ.copy()
         env["JAVA_HOME"] = self.toolchain.java_path
@@ -303,56 +299,39 @@ class GradleProject:
             )
 
         args = [str(gradlew)]
-        args.append("clean")
+        if clean:
+            args.append("clean")
         args.append(task)
 
         cmd_str = " ".join(args[1:])
-        print(f"Build with: cd {self.gradle_dir} && {cmd_str}")
+        print(f"[ksproject] Running Gradle task: {cmd_str}")
         result = subprocess.run(args, cwd=self.gradle_dir, env=env, shell=use_shell)
         if result.returncode != 0:
             raise GradleProjectError(
                 f"./gradlew {cmd_str} exited with code {result.returncode}"
             )
 
+        artifacts: list[Path] = []
         if aar:
-            output = (
-                self.gradle_dir
-                / "app"
-                / "build"
-                / "outputs"
-                / "aar"
-                / f"app-{variant}.aar"
-            )
+            aar_dir = self.gradle_dir / "app" / "build" / "outputs" / "aar"
+            artifacts = list(aar_dir.rglob(f"*{variant}*.aar"))
         elif bundle:
-            output = (
-                self.gradle_dir
-                / "app"
-                / "build"
-                / "outputs"
-                / "bundle"
-                / variant
-                / f"app-{variant}.aab"
-            )
+            artifacts = self.find_bundles(variant)
         else:
-            output = (
-                self.gradle_dir
-                / "app"
-                / "build"
-                / "outputs"
-                / "apk"
-                / variant
-                / f"app-{variant}.apk"
-            )
+            artifacts = self.find_apks(variant)
 
-            if variant == "release" and not output.exists():
-                unsigned_output = output.with_name(f"app-{variant}-unsigned.apk")
-                if unsigned_output.exists():
-                    output = unsigned_output
+        if not artifacts:
+            raise GradleProjectError("Expected build artifacts were not produced.")
 
-        if not output.exists():
-            raise GradleProjectError(f"Expected build artifact not found at {output}")
+        if len(artifacts) > 1:
+            print(f"\n[ksproject] Found {len(artifacts)} artifacts:")
+            for art in artifacts:
+                print(f"  • {art.name} ({art.parent.name}) -> {art}")
+        else:
+            print(f"\n[ksproject] Found artifacts:")
+            print(f"  • {artifacts[0]}")
 
-        return output
+        return artifacts
 
     def build(
         self,
@@ -360,10 +339,9 @@ class GradleProject:
         aar: bool = False,
         bundle: bool = False,
         clean: bool = False,
-    ) -> Path:
-        
+    ) -> list[Path]:
+        """Run full pipeline: pip install -> collect configs -> generate -> assemble/bundle."""
         self.platform_pre_build_script()
-        """Run full pipeline: pip install → collect .gradle configs → generate → gradlew assemble/bundle."""
         self.install_site_packages()
         merged = self._collect_site_gradle_configs()
         self.generate(
@@ -403,52 +381,65 @@ class GradleProject:
             items.append({"name": name, "kind": "avd"})
         return items
 
+    def find_apks(
+        self, variant: str = "debug", unsigned_only: bool = False
+    ) -> list[Path]:
+        """Locate all existing APKs for the given variant across all flavor folders."""
+        apk_base_dir = self.gradle_dir / "app" / "build" / "outputs" / "apk"
+        if not apk_base_dir.exists():
+            return []
+
+        apks: list[Path] = []
+        for path in apk_base_dir.rglob(f"*{variant}*.apk"):
+            if unsigned_only:
+                if "-signed" not in path.name:
+                    apks.append(path)
+            else:
+                apks.append(path)
+
+        def sort_key(p: Path) -> int:
+            if "-signed" in p.name:
+                return 0
+            elif "-unsigned" in p.name:
+                return 2
+            return 1
+
+        return sorted(apks, key=sort_key)
+
     def find_apk(self, variant: str = "debug") -> Path:
-        """Locate an existing APK for the given variant without rebuilding."""
-        base_dir = self.gradle_dir / "app" / "build" / "outputs" / "apk" / variant
-
-        if variant == "release":
-            # Priority 1: Explicitly signed artifact (from our sign command)
-            signed_apk = base_dir / f"app-{variant}-signed.apk"
-            if signed_apk.exists():
-                return signed_apk
-
-            # Priority 2: Standard release artifact
-            standard_apk = base_dir / f"app-{variant}.apk"
-            if standard_apk.exists():
-                return standard_apk
-
-            # Priority 3: Explicitly unsigned artifact (default AGP output before signing)
-            unsigned_apk = base_dir / f"app-{variant}-unsigned.apk"
-            if unsigned_apk.exists():
-                return unsigned_apk
-
+        """Locate a single existing APK for commands like `run`."""
+        apks = self.find_apks(variant)
+        if not apks:
             raise GradleProjectError(
-                f"No release APK found in {base_dir}. Run 'ksproject android build release' first."
+                f"No {variant} APK found in {self.gradle_dir / 'app' / 'build' / 'outputs' / 'apk'}. "
+                "Run 'ksproject android build' first."
             )
-        else:
-            # Debug variant behaves normally
-            apk = base_dir / f"app-{variant}.apk"
-            if not apk.exists():
-                raise GradleProjectError(
-                    f"No APK found at {apk}. Run 'ksproject android build' first."
-                )
-            return apk
+        return apks[0]
+
+    def find_bundles(
+        self, variant: str = "release", unsigned_only: bool = False
+    ) -> list[Path]:
+        """Locate all existing AABs for the given variant."""
+        bundle_base_dir = self.gradle_dir / "app" / "build" / "outputs" / "bundle"
+        if not bundle_base_dir.exists():
+            return []
+
+        bundles: list[Path] = []
+        for path in bundle_base_dir.rglob(f"*{variant}*.aab"):
+            if unsigned_only:
+                if "-signed" not in path.name:
+                    bundles.append(path)
+            else:
+                bundles.append(path)
+
+        return sorted(bundles)
 
     def find_bundle(self, variant: str = "release") -> Path:
-        """Locate an existing AAB for the given variant without rebuilding."""
-        bundle_path = (
-            self.gradle_dir
-            / "app"
-            / "build"
-            / "outputs"
-            / "bundle"
-            / variant
-            / f"app-{variant}.aab"
-        )
-        if not bundle_path.exists():
-            raise GradleProjectError(f"No App Bundle found at {bundle_path}.")
-        return bundle_path
+        """Locate a single existing App Bundle."""
+        bundles = self.find_bundles(variant)
+        if not bundles:
+            raise GradleProjectError(f"No {variant} App Bundle found.")
+        return bundles[0]
 
     def run(
         self,
@@ -466,8 +457,6 @@ class GradleProject:
                 "[tool.kivy-school.android]."
             )
 
-        apk = self.find_apk(variant)
-
         if uuid is not None:
             serial = uuid
             self.adb.wait_for_device(serial)
@@ -475,7 +464,35 @@ class GradleProject:
             assert name is not None
             serial = self.emulator.boot_and_wait(name, self.adb)
 
-        self.adb.install(apk, serial)
+        device_abis = self.adb.get_device_abis(serial)
+        print(f"[ksproject] Detected device ABIs: {', '.join(device_abis)}")
+
+        apks = self.find_apks(variant)
+        if not apks:
+            raise GradleProjectError(f"No {variant} APKs found. Build the project first.")
+
+        best_apk = None
+
+        for abi in device_abis:
+            gradle_flavor_name = abi.replace("-", "_") 
+            
+            for apk in apks:
+                if gradle_flavor_name in apk.name and "unsigned" not in apk.name:
+                    best_apk = apk
+                    break
+                elif gradle_flavor_name in apk.name:
+                    best_apk = apk
+                    
+            if best_apk:
+                print(f"[ksproject] Matched ABI '{abi}' -> Selected {best_apk.name}")
+                break
+
+        if not best_apk:
+            best_apk = apks[0]
+            print(f"[ksproject] No exact ABI match found. Falling back to: {best_apk.name}")
+
+        print(f"[ksproject] Installing {best_apk.name} on {serial}...")
+        self.adb.install(best_apk, serial)
         self.adb.start_app(serial, self.android_data.package_name)
 
     # ------------------------------------------------------------------
@@ -562,23 +579,35 @@ class GradleProject:
         keypass: str | None = None,
         variant: str = "release",
         bundle: bool = False,
-    ) -> Path:
-        """Finds the compiled project artifact based on flags and signs it."""
-        artifact_path = self.find_bundle(variant) if bundle else self.find_apk(variant)
+    ) -> list[Path]:
+        """Finds all compiled artifacts for the variant and signs each one."""
+        keystore_path = Path(keystore).resolve()
+        signed_artifacts: list[Path] = []
 
-        suffix = artifact_path.suffix.lower()
-        if suffix == ".apk":
-            return self._sign_apk(
-                artifact_path, Path(keystore), storepass, keyalias, keypass
-            )
-        elif suffix == ".aab":
-            return self._sign_aab(
-                artifact_path, Path(keystore), storepass, keyalias, keypass
-            )
+        if bundle:
+            raw_targets = self.find_bundles(variant, unsigned_only=True)
+            if not raw_targets:
+                raise GradleProjectError(f"No unsigned {variant} AABs found to sign.")
+            print(f"[ksproject] Signing {len(raw_targets)} App Bundle(s)...")
+            for target in raw_targets:
+                signed = self._sign_aab(
+                    target, keystore_path, storepass, keyalias, keypass
+                )
+                signed_artifacts.append(signed)
+                print(f"  [✓] Signed AAB: {signed.name}")
         else:
-            raise GradleProjectError(
-                f"Unsupported artifact extension for signing: {suffix}"
-            )
+            raw_targets = self.find_apks(variant, unsigned_only=True)
+            if not raw_targets:
+                raise GradleProjectError(f"No unsigned {variant} APKs found to sign.")
+            print(f"[ksproject] Signing {len(raw_targets)} APK(s)...")
+            for target in raw_targets:
+                signed = self._sign_apk(
+                    target, keystore_path, storepass, keyalias, keypass
+                )
+                signed_artifacts.append(signed)
+                print(f"  [✓] Signed APK: {signed.name}")
+
+        return signed_artifacts
 
     def _sign_apk(
         self,

@@ -195,15 +195,6 @@ class GradleCommands:
         output = project.build(
             args.variant, aar=args.aar, bundle=args.bundle, clean=args.clean
         )
-
-        if args.aar:
-            label = "AAR"
-        elif args.bundle:
-            label = "AAB"
-        else:
-            label = "APK"
-
-        print(f"{label}: {output}")
         return 0
 
     def sign(self, args: argparse.Namespace) -> int:
