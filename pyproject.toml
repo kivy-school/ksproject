@@ -1,6 +1,6 @@
 [project]
 name = "ksproject"
-version = "0.0.1.post0"
+version = "0.0.2"
 description = "Compile python apps for Android and iOS."
 readme = "README.md"
 authors = [
@@ -11,7 +11,7 @@ requires-python = ">=3.13"
 dependencies = [
     "toml>=0.10.2",
     "pyyaml>=6.0",
-    "ksp-bootstraps<0.1.0",
+    "ksp-bootstraps<0.2.0",
 ]
 
 [project.scripts]

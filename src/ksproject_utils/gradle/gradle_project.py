@@ -328,8 +328,7 @@ class GradleProject:
             for art in artifacts:
                 print(f"  • {art.name} ({art.parent.name}) -> {art}")
         else:
-            print(f"\n[ksproject] Found artifacts:")
-            print(f"  • {artifacts[0]}")
+            print(f"APK: {artifacts[0]}")
 
         return artifacts
 
