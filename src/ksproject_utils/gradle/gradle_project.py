@@ -127,7 +127,7 @@ class GradleProject:
     bootstrap: BootstrapProtocol
     pyproject: PyProjectToml
 
-    def __init__(self, project_path: Path):
+    def __init__(self, project_path: Path = Path.cwd()) -> None:
         project_path = Path(project_path).resolve()
         if not (project_path / "pyproject.toml").is_file():
             raise GradleProjectError(f"No pyproject.toml found at {project_path}")
