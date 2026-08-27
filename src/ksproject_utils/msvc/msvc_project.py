@@ -135,7 +135,7 @@ class MsvcProject:
         py_ver = self.windows_data.python_version or "3.13.5"
         py_dll_ver = py_ver.replace(".", "")[:3]
 
-        cmd = f"""call "{vcvars}" && cd /d "{self.build_dir}" && rc.exe resources.rc && cl.exe main.c resources.res /I"{python_include}" /link /LIBPATH:"{python_libs}" python3.lib user32.lib delayimp.lib /DELAYLOAD:python3.dll /SUBSYSTEM:{subsystem} {manifest_flag} /OUT:"{output_exe}" """
+        cmd = f"""call "{vcvars}" && cd /d "{self.build_dir}" && rc.exe resources.rc && cl.exe main.c resources.res /I"{python_include}" /link /LIBPATH:"{python_libs}" python{py_dll_ver}.lib python3.lib user32.lib delayimp.lib /DELAYLOAD:python{py_dll_ver}.dll /DELAYLOAD:python3.dll /SUBSYSTEM:{subsystem} {manifest_flag} /OUT:"{output_exe}" """
 
         print(f"\nBuild with: {cmd.strip()}\n")
         use_shell = sys.platform == "win32"

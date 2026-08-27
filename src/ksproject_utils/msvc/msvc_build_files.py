@@ -8,6 +8,7 @@ import shutil
 import urllib.request
 import zipfile
 from pathlib import Path
+import hashlib
 
 
 class MsvcBuildError(Exception):
@@ -66,7 +67,9 @@ class MsvcBuildFiles:
             )
             return
 
-        print(f"[ksproject] Cythonizing app module '{package_name}'\nObfuscating python source...")
+        print(
+            f"[ksproject] Cythonizing app module '{package_name}'\nObfuscating python source..."
+        )
 
         setup_py_path = site_packages_dir / "setup.py"
         setup_py_content = f"""
@@ -109,14 +112,14 @@ setup(
         print("            Building C extensions (this may take a moment)...")
         result = subprocess.run(
             [
-                sys.executable, 
-                "setup.py", 
-                "build_ext", 
-                "--inplace", 
-                "--build-temp", 
+                sys.executable,
+                "setup.py",
+                "build_ext",
+                "--inplace",
+                "--build-temp",
                 str(short_temp_dir),
                 "--build-lib",
-                str(short_lib_dir)
+                str(short_lib_dir),
             ],
             cwd=site_packages_dir,
             capture_output=True,
@@ -325,6 +328,7 @@ setup(
 
         py_dll_ver = python_version.replace(".", "")[:3]
         py_zip = f"python{py_dll_ver}.zip"
+        package_name_hash = hashlib.sha256(package_name.encode("utf-8")).hexdigest()
 
         content = f"""\
 #define PY_SSIZE_T_CLEAN
@@ -376,7 +380,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     sprintf_s(zipPath, MAX_PATH, "%s%s_payload.zip", tempPath, "{package_name}");
 
     char extractDir[MAX_PATH];
-    sprintf_s(extractDir, MAX_PATH, "%s%s_env", tempPath, "{package_name}");
+    sprintf_s(extractDir, MAX_PATH, "%s%s_env", tempPath, "{package_name_hash}");
 
     ExtractPayload(zipPath);
 
@@ -385,12 +389,18 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     RunCommandSilent(extractCmd);
 
-    SetDllDirectoryA(extractDir);
+    wchar_t wExtractDir[MAX_PATH];
+    size_t converted_ext;
+    mbstowcs_s(&converted_ext, wExtractDir, MAX_PATH, extractDir, _TRUNCATE);
 
     wchar_t libsDir[MAX_PATH];
     swprintf_s(libsDir, MAX_PATH, L"%hs\\\\site-packages\\\\libs", extractDir);
+    
     SetDefaultDllDirectories(LOAD_LIBRARY_SEARCH_DEFAULT_DIRS | LOAD_LIBRARY_SEARCH_USER_DIRS);
-    AddDllDirectory(libsDir);
+    
+    // Capture the cookies so we can remove them later
+    DLL_DIRECTORY_COOKIE extractCookie = AddDllDirectory(wExtractDir); 
+    DLL_DIRECTORY_COOKIE libsCookie = AddDllDirectory(libsDir);     
 
     char pyPath[2048];
     sprintf_s(pyPath, 2048, "%s\\\\{py_zip};%s;%s\\\\site-packages;%s\\\\{package_name}", extractDir, extractDir, extractDir, extractDir);
@@ -453,6 +463,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     Py_DECREF(runpy);
 
     Py_FinalizeEx();
+
+    if (extractCookie) {{
+        RemoveDllDirectory(extractCookie);
+    }}
+    if (libsCookie) {{
+        RemoveDllDirectory(libsCookie);
+    }}
+
     return 0;
 }}
 
