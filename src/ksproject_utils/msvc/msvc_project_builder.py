@@ -73,18 +73,14 @@ class MsvcProjectBuilder:
         site-packages/libs folder so they get packaged into the monolithic zip.
         """
         venv_dir = self.working_dir / ".venv"
-        share_dir = venv_dir / "share"
-
-        if not share_dir.exists():
-            return
 
         libs_dir = site_packages_dir / "libs"
         libs_dir.mkdir(parents=True, exist_ok=True)
 
-        print(f"[ksproject] Scanning {share_dir} for required DLLs...")
+        print(f"[ksproject] Scanning {venv_dir} for required DLLs...")
         dll_count = 0
 
-        for dll_file in share_dir.rglob("*.dll"):
+        for dll_file in venv_dir.rglob("*.dll"):
             dest_file = libs_dir / dll_file.name
 
             if not dest_file.exists():
