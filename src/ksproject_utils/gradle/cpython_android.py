@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 import tarfile
 import urllib.error
+import urllib.parse
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -15,13 +17,16 @@ from pathlib import Path
 ANDROID_VERSION = "3.13.8"
 PY_VERSION = "3.13"
 
-# Anaconda channel hosting prebuilt libpython-<ver>-<rev>-py3-none-android_*.whl
+# PEP 503 index hosting prebuilt libpython-<ver>-<rev>-py3-none-android_*.whl.
+# A "/simple" URL is walked to the libpython project page and the wheel link is
+# read from it; any other URL is treated as a directory to join the wheel name
+# onto (e.g. KIVYSCHOOL_PREBUILT_INDEX=https://pypi.kivyschool.com/packages/).
 PREBUILT_INDEX_URL = os.environ.get(
     "KIVYSCHOOL_PREBUILT_INDEX",
-    "https://pypi.anaconda.org/kivyschool/simple/libpython/",
+    "https://pypi.kivyschool.com/simple/",
 )
 PREBUILT_BUILD_TAG = os.environ.get("KIVYSCHOOL_PREBUILT_BUILD", "0")
-PREBUILT_API = int(os.environ.get("KIVYSCHOOL_PREBUILT_API", "21"))
+PREBUILT_API = int(os.environ.get("KIVYSCHOOL_PREBUILT_API", "24"))
 
 
 _TRIPLES = {
@@ -30,8 +35,46 @@ _TRIPLES = {
 }
 
 
+# pypi.kivyschool.com sits behind a CDN that answers urllib's default
+# "Python-urllib/x.y" User-Agent with 403, so every fetch here sends its own.
+_USER_AGENT = "ksproject (+https://github.com/kivyschool)"
+
+
 class CPythonBuildError(Exception):
     pass
+
+
+def _urlopen(url: str):
+    return urllib.request.urlopen(
+        urllib.request.Request(url, headers={"User-Agent": _USER_AGENT})
+    )
+
+
+def _download(url: str, dst: Path) -> None:
+    """urlretrieve with a User-Agent, downloading via a .part sidecar so an
+    interrupted transfer never leaves a truncated file in the cache."""
+    tmp = dst.with_name(dst.name + ".part")
+    try:
+        with _urlopen(url) as resp, open(tmp, "wb") as f:
+            shutil.copyfileobj(resp, f)
+        tmp.replace(dst)
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+def _resolve_wheel_url(index_url: str, wheel_name: str) -> str:
+    """Find ``wheel_name`` in ``index_url``, following PEP 503 if it is one."""
+    base = index_url if index_url.endswith("/") else index_url + "/"
+    if "/simple/" not in base and not base.rstrip("/").endswith("/simple"):
+        return base + wheel_name
+
+    project = base if base.rstrip("/").endswith("libpython") else base + "libpython/"
+    with _urlopen(project) as resp:
+        html = resp.read().decode("utf-8", "replace")
+    for href in re.findall(r'href="([^"]+)"', html):
+        if href.split("#", 1)[0].rstrip("/").rsplit("/", 1)[-1] == wheel_name:
+            return urllib.parse.urljoin(project, href)
+    raise FileNotFoundError(f"{wheel_name} not listed at {project}")
 
 
 def android_triple(arch: str) -> str:
@@ -76,7 +119,7 @@ def install_cpython_android(
     py_version: str = PY_VERSION,
     android_version: str = ANDROID_VERSION,
 ) -> None:
-    # Try the anaconda.org/kivyschool prebuilt first, then python.org's
+    # Try the pypi.kivyschool.com prebuilt first, then python.org's
     # official Android binary release (3.14+). Both ship a ready prefix, so
     # we just extract into the same path the source cross-build produces.
     remaining = [
@@ -98,7 +141,7 @@ def install_cpython_android(
                 f"/Python-{android_version}.tgz"
             )
             tar_path = ks_root / f"Python-{android_version}.tgz"
-            urllib.request.urlretrieve(url, tar_path)
+            _download(url, tar_path)
             with tarfile.open(tar_path) as tf:
                 tf.extractall(ks_root)
             tar_path.unlink(missing_ok=True)
@@ -169,8 +212,6 @@ def _try_install_prebuilt(
         f"libpython-{android_version}-{PREBUILT_BUILD_TAG}-py3-none-"
         f"android_{PREBUILT_API}_{arch.replace('-', '_')}.whl"
     )
-    wheel_url = PREBUILT_INDEX_URL.rstrip("/") + f"/{android_version}/" + wheel_name
-
     cache_dir = ks_root / "prebuilt-cache"
     cache_dir.mkdir(parents=True, exist_ok=True)
     wheel_cache = cache_dir / wheel_name
@@ -184,8 +225,9 @@ def _try_install_prebuilt(
             print(f"  prebuilt: using local wheel {src}")
             wheel_cache = src
         elif not wheel_cache.exists():
+            wheel_url = _resolve_wheel_url(PREBUILT_INDEX_URL, wheel_name)
             print(f"  prebuilt: fetching {wheel_url}")
-            urllib.request.urlretrieve(wheel_url, wheel_cache)
+            _download(wheel_url, wheel_cache)
 
         with zipfile.ZipFile(wheel_cache) as zf:
             names = zf.namelist()
@@ -255,7 +297,7 @@ def _try_install_official(
     try:
         if not tar_cache.exists():
             print(f"  official: fetching {url}")
-            urllib.request.urlretrieve(url, tar_cache)
+            _download(url, tar_cache)
 
         prefix.mkdir(parents=True, exist_ok=True)
         with tarfile.open(tar_cache) as tf:
