@@ -19,6 +19,8 @@ from ksp_bootstraps.platforms import (
     AndroidPlatform,
     AndroidX86_64Platform,
 )
+from ksp_bootstraps.gradle.android_manifest_template import ANDROID_MANIFEST
+from ksp_bootstraps.gradle.build_gradle_template import BUILD_GRADLE
 from ..pyproject_toml import KivySchoolData, PyProjectToml
 from .adb import ADB
 from .android_emulator import AndroidEmulator
@@ -260,6 +262,39 @@ class GradleProject:
                 site_packages=platform.site_packages,
             )
 
+    def generate_templates(self, force: bool = False) -> None:
+        """Generate or regenerate Android project template files.
+
+        Args:
+            force: If True, overwrite existing template files.
+        """
+        self._ensure_android_manifest(force=force)
+        self._ensure_build_gradle_template(force=force)
+
+    def _ensure_android_manifest(self, force: bool = False) -> None:
+        tmpl_path = self.project_path / "AndroidManifest.tmpl.xml"
+        if force or not tmpl_path.exists():
+            tmpl_path.write_text(
+                self.default_android_manifest_template(), encoding="utf-8"
+            )
+            print(f"[ksproject] {'Overwrote' if force else 'Generated'} {tmpl_path.name}")
+        else:
+            print(f"[ksproject] {tmpl_path.name} already exists. Use --force to overwrite.")
+
+    def default_android_manifest_template(self) -> str:
+        return ANDROID_MANIFEST
+
+    def _ensure_build_gradle_template(self, force: bool = False) -> None:
+        tmpl_path = self.project_path / "build.tmpl.gradle.kts"
+        if force or not tmpl_path.exists():
+            tmpl_path.write_text(self.default_build_gradle_template(), encoding="utf-8")
+            print(f"[ksproject] {'Overwrote' if force else 'Generated'} {tmpl_path.name}")
+        else:
+            print(f"[ksproject] {tmpl_path.name} already exists. Use --force to overwrite.")
+
+    def default_build_gradle_template(self) -> str:
+        return BUILD_GRADLE
+
     def gradle_assemble(
         self,
         variant: str = "debug",
@@ -468,27 +503,31 @@ class GradleProject:
 
         apks = self.find_apks(variant)
         if not apks:
-            raise GradleProjectError(f"No {variant} APKs found. Build the project first.")
+            raise GradleProjectError(
+                f"No {variant} APKs found. Build the project first."
+            )
 
         best_apk = None
 
         for abi in device_abis:
-            gradle_flavor_name = abi.replace("-", "_") 
-            
+            gradle_flavor_name = abi.replace("-", "_")
+
             for apk in apks:
                 if gradle_flavor_name in apk.name and "unsigned" not in apk.name:
                     best_apk = apk
                     break
                 elif gradle_flavor_name in apk.name:
                     best_apk = apk
-                    
+
             if best_apk:
                 print(f"[ksproject] Matched ABI '{abi}' -> Selected {best_apk.name}")
                 break
 
         if not best_apk:
             best_apk = apks[0]
-            print(f"[ksproject] No exact ABI match found. Falling back to: {best_apk.name}")
+            print(
+                f"[ksproject] No exact ABI match found. Falling back to: {best_apk.name}"
+            )
 
         print(f"[ksproject] Installing {best_apk.name} on {serial}...")
         self.adb.install(best_apk, serial)
