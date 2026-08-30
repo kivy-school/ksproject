@@ -1,17 +1,18 @@
 [project]
 name = "ksproject"
-version = "0.0.2"
+version = "0.0.3"
 description = "Compile python apps for Android and iOS."
 readme = "README.md"
 authors = [
-    { name = "kivyschool" }
+    { name = "kivyschool" },
+    {name = "Kartavya Shukla", email = "novfensec@protonmail.com"}
 ]
 urls = { "Homepage" = "https://kivy-school.github.io/ksproject" }
 requires-python = ">=3.13"
 dependencies = [
     "toml>=0.10.2",
     "pyyaml>=6.0",
-    "ksp-bootstraps<0.2.0",
+    "ksp-bootstraps==0.0.3",
 ]
 
 [project.scripts]
