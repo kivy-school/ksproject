@@ -277,9 +277,13 @@ class GradleProject:
             tmpl_path.write_text(
                 self.default_android_manifest_template(), encoding="utf-8"
             )
-            print(f"[ksproject] {'Overwrote' if force else 'Generated'} {tmpl_path.name}")
+            print(
+                f"[ksproject] {'Overwrote' if force else 'Generated'} {tmpl_path.name}"
+            )
         else:
-            print(f"[ksproject] {tmpl_path.name} already exists. Use --force to overwrite.")
+            print(
+                f"[ksproject] {tmpl_path.name} already exists. Use --force to overwrite."
+            )
 
     def default_android_manifest_template(self) -> str:
         return ANDROID_MANIFEST
@@ -288,9 +292,13 @@ class GradleProject:
         tmpl_path = self.project_path / "build.tmpl.gradle.kts"
         if force or not tmpl_path.exists():
             tmpl_path.write_text(self.default_build_gradle_template(), encoding="utf-8")
-            print(f"[ksproject] {'Overwrote' if force else 'Generated'} {tmpl_path.name}")
+            print(
+                f"[ksproject] {'Overwrote' if force else 'Generated'} {tmpl_path.name}"
+            )
         else:
-            print(f"[ksproject] {tmpl_path.name} already exists. Use --force to overwrite.")
+            print(
+                f"[ksproject] {tmpl_path.name} already exists. Use --force to overwrite."
+            )
 
     def default_build_gradle_template(self) -> str:
         return BUILD_GRADLE
@@ -363,8 +371,7 @@ class GradleProject:
             for art in artifacts:
                 print(f"  • {art.name} ({art.parent.name}) -> {art}")
         else:
-            print(f"APK: {artifacts[0]}")
-
+            print(f"\n[ksproject] Found artifact: {artifacts[0]}")
         return artifacts
 
     def build(
