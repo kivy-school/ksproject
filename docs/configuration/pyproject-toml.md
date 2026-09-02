@@ -287,8 +287,7 @@ find-links = ["./wheelhouse"]
 
 [tool.uv.pip]
 extra-index-url = [
-    "https://pypi-index.psychowaspx.workers.dev/simple",
-    "https://pypi.anaconda.org/kivyschool/simple",
+    "https://pypi.kivyschool.com/simple"
 ]
 find-links = ["./wheelhouse"]
 ```
