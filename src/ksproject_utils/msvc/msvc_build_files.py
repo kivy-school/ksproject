@@ -151,27 +151,26 @@ setup(
         print("[ksproject] Source code hidden successfully.")
 
     @staticmethod
-    def create_payload_zip(
+    def prepare_payload(
         package_name: str,
         build_dir: Path,
-        site_packages_dir: Path,
         env_dir: Path,
         python_version: str,
         optimize: bool = True,
+        fmt: str = "standalone"
     ) -> Path:
-        payload_path = build_dir / "payload.zip"
         staging_dir = build_dir / "payload_staging"
 
-        print("[ksproject] Staging files for monolithic payload...")
+        print("[ksproject] Staging files for payload optimization...")
         if staging_dir.exists():
             shutil.rmtree(staging_dir)
-        staging_dir.mkdir(parents=True)
+        
+        # Copy the entire provisioned --prefix environment
+        shutil.copytree(env_dir, staging_dir)
 
-        staged_sp = staging_dir / "site-packages"
-        if site_packages_dir.exists():
-            shutil.copytree(site_packages_dir, staged_sp)
-
-        MsvcBuildFiles.cythonize_app_module(staged_sp, package_name)
+        staged_sp = staging_dir / "Lib" / "site-packages"
+        if staged_sp.exists():
+            MsvcBuildFiles.cythonize_app_module(staged_sp, package_name)
 
         if optimize:
             print(
@@ -237,10 +236,9 @@ setup(
             ".mypy_cache",
             ".pytest_cache",
             "__pycache__",
-            "bin",
             "unittest",
-            "share",
             "demos",
+            "scripts",
         }
 
         for root, dirs, files in os.walk(staging_dir, topdown=False):
@@ -260,16 +258,17 @@ setup(
                     except:
                         pass
 
+        if fmt == "directory":
+            # For directory format, we rename staging_dir to env and we're done
+            final_env_dir = build_dir / "env"
+            if final_env_dir.exists():
+                shutil.rmtree(final_env_dir)
+            staging_dir.rename(final_env_dir)
+            return final_env_dir
+
+        payload_path = build_dir / "payload.zip"
         print("[ksproject] Assembling optimized zip archive...")
         with zipfile.ZipFile(payload_path, "w", zipfile.ZIP_DEFLATED) as zf:
-
-            if env_dir.exists():
-                for root, _, files in os.walk(env_dir):
-                    for file in files:
-                        file_path = Path(root) / file
-                        arcname = file_path.relative_to(env_dir)
-                        zf.write(file_path, arcname)
-
             for root, _, files in os.walk(staging_dir):
                 for file in files:
                     file_path = Path(root) / file
@@ -281,12 +280,14 @@ setup(
     @staticmethod
     def write_resources_rc(
         build_dir: Path,
-        payload_path: Path,
+        payload_path: Path | None = None,
         icon_path: Path | None = None,
         require_admin: bool = False,
     ) -> None:
         """Writes the MSVC resource script (.rc) and UAC manifest."""
-        rc_content = f'101 RCDATA "{payload_path.absolute().as_posix()}"\n'
+        rc_content = ""
+        if payload_path and payload_path.is_file():
+            rc_content += f'101 RCDATA "{payload_path.absolute().as_posix()}"\n'
 
         if icon_path and icon_path.exists():
             rc_content += f'IDI_ICON1 ICON "{icon_path.absolute().as_posix()}"\n'
@@ -337,6 +338,7 @@ setup(
 #include <stdio.h>
 #include <stdlib.h>
 
+#ifndef KSP_FORMAT_DIRECTORY
 void ExtractPayload(const char* zipPath) {{
     HRSRC hRes = FindResource(NULL, MAKEINTRESOURCE(101), RT_RCDATA); 
     if (!hRes) return;
@@ -369,17 +371,27 @@ void RunCommandSilent(const char* cmd) {{
         CloseHandle(pi.hThread);
     }}
 }}
+#endif
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {{
     SetProcessDPIAware();
 
+    char extractDir[MAX_PATH];
+
+#ifdef KSP_FORMAT_DIRECTORY
+    GetModuleFileNameA(NULL, extractDir, MAX_PATH);
+    char *lastSlash = strrchr(extractDir, '\\\\');
+    if (lastSlash) {{
+        *lastSlash = '\\0';
+    }}
+    strcat_s(extractDir, MAX_PATH, "\\\\env");
+#else
     char tempPath[MAX_PATH];
     GetTempPathA(MAX_PATH, tempPath);
 
     char zipPath[MAX_PATH];
     sprintf_s(zipPath, MAX_PATH, "%s%s_payload.zip", tempPath, "{package_name}");
 
-    char extractDir[MAX_PATH];
     sprintf_s(extractDir, MAX_PATH, "%s%s_env", tempPath, "{package_name_hash}");
 
     ExtractPayload(zipPath);
@@ -388,13 +400,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     sprintf_s(extractCmd, 1024, "mkdir \\"%s\\" 2>nul & tar -xf \\"%s\\" -C \\"%s\\"", extractDir, zipPath, extractDir);
 
     RunCommandSilent(extractCmd);
+#endif
 
     wchar_t wExtractDir[MAX_PATH];
     size_t converted_ext;
     mbstowcs_s(&converted_ext, wExtractDir, MAX_PATH, extractDir, _TRUNCATE);
 
     wchar_t libsDir[MAX_PATH];
-    swprintf_s(libsDir, MAX_PATH, L"%hs\\\\site-packages\\\\libs", extractDir);
+    swprintf_s(libsDir, MAX_PATH, L"%hs\\\\Lib\\\\site-packages\\\\libs", extractDir);
     
     SetDefaultDllDirectories(LOAD_LIBRARY_SEARCH_DEFAULT_DIRS | LOAD_LIBRARY_SEARCH_USER_DIRS);
     
@@ -403,37 +416,49 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     DLL_DIRECTORY_COOKIE libsCookie = AddDllDirectory(libsDir);     
 
     char pyPath[2048];
-    sprintf_s(pyPath, 2048, "%s\\\\{py_zip};%s;%s\\\\site-packages;%s\\\\{package_name}", extractDir, extractDir, extractDir, extractDir);
+    sprintf_s(pyPath, 2048, "%s\\\\{py_zip};%s;%s\\\\Lib\\\\site-packages;%s\\\\Lib\\\\site-packages\\\\{package_name}", extractDir, extractDir, extractDir, extractDir);
     
     wchar_t wPyPath[2048];
     size_t converted;
     mbstowcs_s(&converted, wPyPath, 2048, pyPath, _TRUNCATE);
     Py_SetPath(wPyPath);
+    
+    // Set Environment Variables Natively
+    SetEnvironmentVariableA("KIVY_DEPS_ROOT", extractDir);
+    
+    char pathEnv[8192];
+    if (GetEnvironmentVariableA("PATH", pathEnv, sizeof(pathEnv))) {{
+        char newPath[8192];
+        sprintf_s(newPath, 8192, "%s;%s", extractDir, pathEnv);
+        SetEnvironmentVariableA("PATH", newPath);
+    }} else {{
+        SetEnvironmentVariableA("PATH", extractDir);
+    }}
+    
+    char tclRoot[MAX_PATH];
+    sprintf_s(tclRoot, MAX_PATH, "%s\\\\tcl", extractDir);
+    if (GetFileAttributesA(tclRoot) != INVALID_FILE_ATTRIBUTES) {{
+        char tclLib[MAX_PATH];
+        sprintf_s(tclLib, MAX_PATH, "%s\\\\tcl8.6", tclRoot); // Approximate, you might want to glob natively if it varies
+        SetEnvironmentVariableA("TCL_LIBRARY", tclLib);
+        
+        char tkLib[MAX_PATH];
+        sprintf_s(tkLib, MAX_PATH, "%s\\\\tk8.6", tclRoot);
+        SetEnvironmentVariableA("TK_LIBRARY", tkLib);
+    }}
 
     Py_Initialize();
 
-    char dllCmd[2048];
-    sprintf_s(dllCmd, 2048, 
-        "import os, sys\\n"
-        "env_dir = r'''%s'''\\n"
-        "sys.prefix = os.path.join(env_dir, 'site-packages')\\n"
+    char sysSetupCmd[1024];
+    sprintf_s(sysSetupCmd, 1024, 
+        "import sys, os\\n"
+        "sys.prefix = r'''%s'''\\n"
         "sys.exec_prefix = sys.prefix\\n"
-        "os.environ['KIVY_DEPS_ROOT'] = sys.prefix\\n"
-        "libs_dir = os.path.join(sys.prefix, 'libs')\\n"
-        "if hasattr(os, 'add_dll_directory'):\\n"
-        "    if os.path.exists(libs_dir):\\n"
-        "        os.add_dll_directory(libs_dir)\\n"
-        "    os.add_dll_directory(env_dir)\\n"
-        "os.environ['PATH'] = env_dir + os.pathsep + os.environ.get('PATH', '')\\n"
-        "tcl_root = os.path.join(env_dir, 'tcl')\\n"
-        "if os.path.exists(tcl_root):\\n"
-        "    for d in os.listdir(tcl_root):\\n"
-        "        d_path = os.path.join(tcl_root, d)\\n"
-        "        if os.path.isdir(d_path):\\n"
-        "            if d.startswith('tcl'): os.environ['TCL_LIBRARY'] = d_path\\n"
-        "            elif d.startswith('tk'): os.environ['TK_LIBRARY'] = d_path\\n", 
+        "libs_dir = os.path.join(sys.prefix, 'Lib', 'site-packages', 'libs')\\n"
+        "if hasattr(os, 'add_dll_directory') and os.path.exists(libs_dir):\\n"
+        "    os.add_dll_directory(libs_dir)\\n", 
         extractDir);
-    PyRun_SimpleString(dllCmd);
+    PyRun_SimpleString(sysSetupCmd);
     
     PyObject *runpy = PyImport_ImportModule("runpy");
     if (!runpy) {{

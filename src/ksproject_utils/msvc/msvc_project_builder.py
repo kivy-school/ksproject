@@ -66,30 +66,32 @@ class MsvcProjectBuilder:
         )
         return dest_ico
 
-    def _copy_venv_dlls(self, site_packages_dir: Path) -> None:
+    def _collect_site_packages_dlls(self, site_packages_dir: Path) -> None:
         """
-        Scans the active virtual environment (.venv) created by uv
-        and copies required DLLs (like Kivy's SDL2/GLEW) into the
-        site-packages/libs folder so they get packaged into the monolithic zip.
+        Scans the newly provisioned site-packages directory for required DLLs 
+        and copies them into the site-packages/libs folder.
+        This ensures they are packaged into the monolithic zip and easily found by 
+        the Windows DLL loader.
         """
-        venv_dir = self.working_dir / ".venv"
-
         libs_dir = site_packages_dir / "libs"
         libs_dir.mkdir(parents=True, exist_ok=True)
 
-        print(f"[ksproject] Scanning {venv_dir} for required DLLs...")
+        print(f"[ksproject] Scanning {site_packages_dir} for required DLLs...")
         dll_count = 0
 
-        for dll_file in venv_dir.rglob("*.dll"):
-            dest_file = libs_dir / dll_file.name
+        for dll_file in list(site_packages_dir.rglob("*.dll")):
+            # Prevent copying a DLL onto itself
+            if libs_dir in dll_file.parents:
+                continue
 
+            dest_file = libs_dir / dll_file.name
             if not dest_file.exists():
                 shutil.copy2(dll_file, dest_file)
-                print(f"  -> Copied: {dll_file.name}")
+                print(f"  -> Collected DLL: {dll_file.name}")
                 dll_count += 1
 
         if dll_count > 0:
-            print(f"[ksproject] Zipping {dll_count} native DLLs into payload...")
+            print(f"[ksproject] Collected {dll_count} native DLLs into libs directory.")
 
     def _inject_tkinter(self, env_dir: Path, site_packages_dir: Path) -> None:
         """Rips the Tkinter standard library and TCL runtime from the host Python and injects them."""
@@ -121,48 +123,90 @@ class MsvcProjectBuilder:
             for f in dlls_dir.glob("zlib*.dll"):
                 shutil.copy2(f, env_dir / f.name)
 
-    def generate(self, variant: str = "release") -> None:
+    def generate(self, fmt: str = "standalone", variant: str = "release") -> None:
         dist_dir = self.working_dir / "project_dist" / "windows"
         dist_dir.mkdir(parents=True, exist_ok=True)
 
-        exe_path = dist_dir / f"{self.package_name}.exe"
-        if exe_path.exists():
-            try:
-                exe_path.unlink()
-                print(f"[ksproject] Removed old build: {exe_path.name}")
-            except PermissionError:
-                print(f"\n[ksproject] ERROR: Cannot delete '{exe_path.name}'.")
-                print("[ksproject] Windows says the file is in use. Is the app still running?")
-                print("[ksproject] Please close the app and try building again.\n")
-                import sys
-                sys.exit(1)
+        if fmt != "payload":
+            exe_path = dist_dir / f"{self.package_name}.exe"
+            if exe_path.exists():
+                try:
+                    exe_path.unlink()
+                    print(f"[ksproject] Removed old build: {exe_path.name}")
+                except PermissionError:
+                    print(f"\n[ksproject] ERROR: Cannot delete '{exe_path.name}'.")
+                    print("[ksproject] Windows says the file is in use. Is the app still running?")
+                    print("[ksproject] Please close the app and try building again.\n")
+                    import sys
+                    sys.exit(1)
 
-        py_version = self.windows.python_version or "3.11.5"
-        optimize = True if variant == "release" else self.windows.byte_compile_python
+        py_version = self.windows.python_version or "3.13.5"
+        optimize = True if variant == "release" else getattr(self.windows, "byte_compile_python", False)
 
-        env_dir = MsvcBuildFiles.provision_embeddable_python(dist_dir, py_version)
+        env_dir = dist_dir / "windows_env"
         icon_path = self._resolve_and_convert_icon(dist_dir)
 
-        site_packages_dir = (
-            self.working_dir / "project_dist" / "windows" / "site_packages" / "windows"
-        )
+        # In the new pip --prefix installation, site-packages is inside env_dir
+        site_packages_dir = env_dir / "Lib" / "site-packages"
 
-        self._copy_venv_dlls(site_packages_dir)
-        if self.windows.include_tkinter:
-            self._inject_tkinter(env_dir, site_packages_dir)
-        payload_path = MsvcBuildFiles.create_payload_zip(
+        if site_packages_dir.exists():
+            self._collect_site_packages_dlls(site_packages_dir)
+            if getattr(self.windows, "include_tkinter", False):
+                self._inject_tkinter(env_dir, site_packages_dir)
+        
+        payload_path = MsvcBuildFiles.prepare_payload(
             self.package_name,
             dist_dir,
-            site_packages_dir,
             env_dir,
             python_version=py_version,
             optimize=optimize,
+            fmt=fmt
         )
 
-        req_admin = self.windows.require_admin
+        req_admin = getattr(self.windows, "require_admin", False)
 
+        if fmt == "payload":
+            print("[ksproject] Generating metadata.toml for payload...")
+            metadata_path = dist_dir / "metadata.toml"
+            project_data = self.pyproject.data.get("project", {})
+            authors = project_data.get("authors", [])
+            author = authors[0].get("name", "") if authors else ""
+            desc = project_data.get("description", "")
+            version = project_data.get("version", "1.0.0")
+            incl_tk = "true" if getattr(self.windows, "include_tkinter", False) else "false"
+            
+            metadata_content = f"""[app]
+name = "{self.app_name}"
+version = "{version}"
+description = "{desc}"
+author = "{author}"
+entrypoint = "{self.package_name}"
+
+[environment]
+python_version = "{py_version}"
+architecture = "amd64"
+include_tkinter = {incl_tk}
+
+[installer]
+install_dir = "%PROGRAMFILES%\\\\{self.package_name}"
+extract_dir = "."
+create_desktop_shortcut = true
+create_start_menu_shortcut = true
+privacy_agreement_required = false
+license_file = "LICENSE.txt"
+require_admin = {"true" if req_admin else "false"}
+
+[[installer.registry_keys]]
+root = "HKLM"
+key = "Software\\\\{self.package_name}"
+value_name = "InstallPath"
+value_type = "REG_SZ"
+value_data = "{{install_dir}}"
+"""
+            metadata_path.write_text(metadata_content, encoding="utf-8")
+        
         MsvcBuildFiles.write_main_c(dist_dir, self.package_name, py_version)
-        MsvcBuildFiles.write_resources_rc(dist_dir, payload_path, icon_path, req_admin)
+        MsvcBuildFiles.write_resources_rc(dist_dir, payload_path if fmt == "standalone" else None, icon_path, req_admin)
 
         if self.windows and hasattr(self.windows, "include_files"):
             for dest_str, sources in self.windows.include_files:

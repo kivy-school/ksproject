@@ -61,22 +61,31 @@ class MsvcProject:
                 case _:
                     subprocess.run([str(script.absolute())], check=True, env=env)
 
-    def install_site_packages(self) -> None:
-        """Installs the project and its deps into the MSVC site_packages dir via uv."""
-        platform = WindowsX86_64Platform(str(self.project_path))
-        Path(platform.site_packages).mkdir(parents=True, exist_ok=True)
+    def install_to_embedded_env(self) -> Path:
+        """Downloads embeddable Python and installs the project and deps into it via uv --prefix."""
+        from .msvc_build_files import MsvcBuildFiles
+        py_version = self.windows_data.python_version or "3.13.5"
+        env_dir = MsvcBuildFiles.provision_embeddable_python(self.build_dir, py_version)
 
-        PipInstaller.install(
-            uv_src=str(self.project_path),
-            platform=platform,
-            site_packages=platform.site_packages,
+        print("[ksproject] Installing dependencies into embedded environment...")
+        from ..tools import get_uv
+        subprocess.check_call(
+            [
+                get_uv(),
+                "pip",
+                "install",
+                str(self.project_path),
+                "--prefix",
+                str(env_dir),
+            ]
         )
+        return env_dir
 
-    def generate(self, *args) -> None:
-        """Write MSVC files, download python, and zip payload."""
-        self.builder.generate(*args)
+    def generate(self, fmt: str = "standalone", variant: str = "release") -> None:
+        """Write MSVC files, modify the python env, and optionally zip payload."""
+        self.builder.generate(fmt, variant)
 
-    def msvc_assemble(self, variant: str = "release", clean: bool = False) -> Path:
+    def msvc_assemble(self, fmt: str = "standalone", variant: str = "release", clean: bool = False) -> Path | None:
         """Locates the local Visual Studio compiler, grabs host Python headers, and links the executable."""
         import sysconfig
         import time
@@ -131,11 +140,13 @@ class MsvcProject:
         )
 
         subsystem = "WINDOWS" if variant == "release" else "CONSOLE"
+        
+        format_macro = "/D KSP_FORMAT_DIRECTORY" if fmt in ("directory", "payload") else "/D KSP_FORMAT_STANDALONE"
 
         py_ver = self.windows_data.python_version or "3.13.5"
         py_dll_ver = py_ver.replace(".", "")[:3]
 
-        cmd = f"""call "{vcvars}" && cd /d "{self.build_dir}" && rc.exe resources.rc && cl.exe main.c resources.res /I"{python_include}" /link /LIBPATH:"{python_libs}" python{py_dll_ver}.lib python3.lib user32.lib delayimp.lib /DELAYLOAD:python{py_dll_ver}.dll /DELAYLOAD:python3.dll /SUBSYSTEM:{subsystem} {manifest_flag} /OUT:"{output_exe}" """
+        cmd = f"""call "{vcvars}" && cd /d "{self.build_dir}" && rc.exe resources.rc && cl.exe main.c resources.res {format_macro} /I"{python_include}" /link /LIBPATH:"{python_libs}" python{py_dll_ver}.lib python3.lib user32.lib delayimp.lib /DELAYLOAD:python{py_dll_ver}.dll /DELAYLOAD:python3.dll /SUBSYSTEM:{subsystem} {manifest_flag} /OUT:"{output_exe}" """
 
         print(f"\nBuild with: {cmd.strip()}\n")
         use_shell = sys.platform == "win32"
@@ -162,12 +173,12 @@ class MsvcProject:
 
         return exe_path
 
-    def build(self, variant: str = "release", clean: bool = False) -> Path:
+    def build(self, fmt: str = "standalone", variant: str = "release", clean: bool = False) -> Path:
         """Run full pipeline: pre-build -> pip install -> generate -> msvc compile."""
         self.platform_pre_build_script()
-        self.install_site_packages()
-        self.generate(variant)
-        return self.msvc_assemble(variant, clean=clean)
+        self.install_to_embedded_env()
+        self.generate(fmt, variant)
+        return self.msvc_assemble(fmt, variant, clean=clean)
 
     def run(self) -> None:
         """Executes the newly compiled Windows binary."""

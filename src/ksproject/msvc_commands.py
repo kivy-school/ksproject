@@ -25,6 +25,12 @@ class MsvcCommands:
             help="Target variant (debug keeps console open, release hides it)",
         )
         p_build.add_argument(
+            "--format",
+            choices=["directory", "standalone", "payload"],
+            default="standalone",
+            help="Build format (directory, standalone, or payload)",
+        )
+        p_build.add_argument(
             "--clean",
             action="store_true",
             help="Perform a clean build",
@@ -38,7 +44,7 @@ class MsvcCommands:
     def build(self, args: argparse.Namespace) -> int:
         try:
             project = MsvcProject(Path.cwd())
-            output = project.build(variant=args.variant, clean=args.clean)
+            output = project.build(fmt=args.format, variant=args.variant, clean=args.clean)
             print(f"EXECUTABLE at: {output}")
             return 0
         except Exception as e:
