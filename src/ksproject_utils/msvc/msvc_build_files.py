@@ -448,6 +448,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     }}
 
     Py_Initialize();
+    PySys_SetArgvEx(__argc, __wargv, 0);
 
     char sysSetupCmd[1024];
     sprintf_s(sysSetupCmd, 1024, 
