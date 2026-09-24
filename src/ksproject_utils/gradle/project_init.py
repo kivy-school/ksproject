@@ -3,6 +3,7 @@ from pathlib import Path
 from ksp_bootstraps.gradle.android_manifest_template import ANDROID_MANIFEST
 from ksp_bootstraps.gradle.build_gradle_template import BUILD_GRADLE
 
+
 class GradleProjectInit:
 
     root: Path
@@ -30,7 +31,7 @@ class GradleProjectInit:
 
     def default_android_manifest_template(self) -> str:
         return ANDROID_MANIFEST
-    
+
     def _ensure_build_gradle_template(self) -> None:
         tmpl_path = self.root / "build.tmpl.gradle.kts"
         if not tmpl_path.exists():
@@ -38,7 +39,7 @@ class GradleProjectInit:
 
     def default_build_gradle_template(self) -> str:
         return BUILD_GRADLE
-    
+
     def _ensure_base_dirs(self) -> None:
         (self.root / ".java").mkdir(exist_ok=True)
         services_dir = self.root / "src" / self.module_name / "services"

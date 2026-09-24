@@ -43,6 +43,7 @@ class KSProjectCLI:
         self._gradle.register(sub)
         self._apple.register(sub)
 
+        self.register_plugins(sub)
 
         return parser
 
@@ -62,6 +63,11 @@ class KSProjectCLI:
         args = self.parser.parse_args(argv)
         return args.func(args) or 0
 
+
+    def register_plugins(self, sub: argparse._SubParsersAction) -> None:
+        from ksproject_utils.plugin import load_plugins
+        for plugin in load_plugins():
+            plugin.register(sub)
 
 def main() -> None:
     sys.exit(KSProjectCLI().run())

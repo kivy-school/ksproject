@@ -3,6 +3,7 @@
 This downloads the Android SDK/NDK toolchain on first run (ksproject manages
 that itself) and produces a real APK from the ``minimal_app`` fixture.
 """
+
 from __future__ import annotations
 
 import os
@@ -76,10 +77,20 @@ def test_android_build_produces_apk(minimal_app: Path) -> None:
     lines, returncode = _stream(proc)
     output = "".join(lines)
     assert returncode == 0, f"ksproject android build failed:\n{output}"
-    apk_line = next((l for l in lines if l.startswith("APK:")), None)
-    assert apk_line is not None, f"No APK: line in stdout:\n{output}"
-    apk = Path(apk_line.split("APK:", 1)[1].strip())
-    assert apk.exists(), f"APK reported but not on disk: {apk}"
+
+    apk_paths: list[Path] = []
+    for line in lines:
+        line = line.strip()
+        if line.startswith("[ksproject] Found artifact:"):
+            path_str = line.split("[ksproject] Found artifact:", 1)[1].strip()
+            apk_paths.append(Path(path_str))
+        elif line.startswith("•") and "->" in line:
+            path_str = line.split("->", 1)[1].strip()
+            apk_paths.append(Path(path_str))
+
+    assert apk_paths, f"No APK paths found in stdout:\n{output}"
+    for apk in apk_paths:
+        assert apk.exists(), f"APK reported but not on disk: {apk}"
 
 
 @pytest.mark.skip(reason="Temporarily disabling Android emulator runtime e2e in CI")
@@ -91,6 +102,7 @@ def test_android_emulator_unittests_pass(minimal_app: Path) -> None:
         pytest.skip("Android emulator test requires Linux with KVM")
     if not _linux_has_kvm_accel():
         pytest.skip("Android emulator test requires /dev/kvm and vmx/svm CPU flags")
+
     # --- Build ---
     proc = subprocess.Popen(
         [_ksproject(), "android", "build"],
@@ -103,14 +115,27 @@ def test_android_emulator_unittests_pass(minimal_app: Path) -> None:
     build_lines, rc = _stream(proc)
     build_output = "".join(build_lines)
     assert rc == 0, f"android build failed:\n{build_output}"
-    apk_line = next((l for l in build_lines if l.startswith("APK:")), None)
-    assert apk_line is not None
-    apk = Path(apk_line.split("APK:", 1)[1].strip())
+
+    apk_paths: list[Path] = []
+    for line in build_lines:
+        line = line.strip()
+        if line.startswith("[ksproject] Found artifact:"):
+            path_str = line.split("[ksproject] Found artifact:", 1)[1].strip()
+            apk_paths.append(Path(path_str))
+        elif line.startswith("•") and "->" in line:
+            path_str = line.split("->", 1)[1].strip()
+            apk_paths.append(Path(path_str))
+
+    assert apk_paths, f"No APK paths found in stdout:\n{build_output}"
+    # Pick the first artifact outputted to install
+    apk = apk_paths[0]
 
     # Always use ksproject's own adb (installed during android build).
     project = GradleProject(minimal_app)
     pkg = project.android_data.package_name
-    adb = project.adb.binary  # str path for subprocess; project.adb (ADB object) for boot_and_wait
+    adb = (
+        project.adb.binary
+    )  # str path for subprocess; project.adb (ADB object) for boot_and_wait
 
     # --- Find a running device/emulator, or create+boot the default AVD ---
     r = subprocess.run([adb, "devices", "-l"], capture_output=True, text=True)
@@ -159,9 +184,16 @@ def test_android_emulator_unittests_pass(minimal_app: Path) -> None:
         }
         create = subprocess.run(
             [
-                project.emulator.avdmanager, "create", "avd",
-                "-n", DEFAULT_AVD_NAME, "-k", system_image,
-                "-d", DEFAULT_AVD_DEVICE, "-f",
+                project.emulator.avdmanager,
+                "create",
+                "avd",
+                "-n",
+                DEFAULT_AVD_NAME,
+                "-k",
+                system_image,
+                "-d",
+                DEFAULT_AVD_DEVICE,
+                "-f",
             ],
             input="no\n",
             env=avd_env,
@@ -212,8 +244,7 @@ def test_android_emulator_unittests_pass(minimal_app: Path) -> None:
     # --- Clear logcat, launch ---
     subprocess.run([adb, "-s", serial, "logcat", "-c"], check=True)
     launch = subprocess.run(
-        [adb, "-s", serial, "shell", "am", "start", "-S",
-         "-n", f"{pkg}/.MainActivity"],
+        [adb, "-s", serial, "shell", "am", "start", "-S", "-n", f"{pkg}/.MainActivity"],
         capture_output=True,
         text=True,
         check=True,
@@ -271,4 +302,3 @@ def test_android_emulator_unittests_pass(minimal_app: Path) -> None:
         )
 
     assert sentinel_result == 0, "In-app tests did not PASS"
-

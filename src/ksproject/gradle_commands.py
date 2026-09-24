@@ -19,6 +19,18 @@ class GradleCommands:
         android = sub.add_parser("android", help="Android / Gradle commands")
         asub = android.add_subparsers(dest="command", required=True)
 
+        # --- GENERATE TEMPLATES ---
+        p_generate = asub.add_parser(
+            "generate-templates",
+            help="Generate or regenerate Android project template files",
+        )
+        p_generate.add_argument(
+            "--force",
+            action="store_true",
+            help="Force overwrite existing template files",
+        )
+        p_generate.set_defaults(func=self.generate_templates)
+
         # --- BUILD ---
         p_build = asub.add_parser("build", help="Build an APK, AAR, or AAB")
         p_build.add_argument(
@@ -164,6 +176,16 @@ class GradleCommands:
         )
         p_run.set_defaults(func=self.run)
 
+    def generate_templates(self, args: argparse.Namespace) -> int:
+        project = GradleProject(Path.cwd())
+
+        # This assumes your GradleProject class has a generate_templates method implemented.
+        # It passes the force flag if you need to handle overwriting logic.
+        project.generate_templates(force=args.force)
+
+        print("Templates regenerated successfully.")
+        return 0
+
     def get_path(self, args: argparse.Namespace) -> int:
         pyproject = PyProjectToml(str(Path.cwd() / "pyproject.toml"))
         android = (
@@ -195,15 +217,6 @@ class GradleCommands:
         output = project.build(
             args.variant, aar=args.aar, bundle=args.bundle, clean=args.clean
         )
-
-        if args.aar:
-            label = "AAR"
-        elif args.bundle:
-            label = "AAB"
-        else:
-            label = "APK"
-
-        print(f"{label}: {output}")
         return 0
 
     def sign(self, args: argparse.Namespace) -> int:
