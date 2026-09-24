@@ -11,6 +11,7 @@ import subprocess
 import sys
 from pathlib import Path
 from os import environ
+from shutil import rmtree
 
 from ..pip_install import PipInstaller
 from ksp_bootstraps.platforms import (
@@ -254,13 +255,17 @@ class GradleProject:
                         env=env
                     )
 
-    def install_site_packages(self) -> None:
+    def install_site_packages(self, clean: bool = False) -> None:
         """Install the project (and its deps) into per-arch site_packages dirs."""
         for arch in self.android_data.archs:
             cls = _ARCH_TO_PLATFORM_CLS.get(arch)
             if cls is None:
                 raise GradleProjectError(f"No AndroidPlatform mapping for arch {arch}")
             platform = cls(str(self.project_path))
+            
+            if clean:
+                rmtree(platform.site_packages, ignore_errors=True)
+            
             Path(platform.site_packages).mkdir(parents=True, exist_ok=True)
             PipInstaller.install(
                 uv_src=str(self.project_path),
@@ -364,7 +369,7 @@ class GradleProject:
         
         self.platform_pre_build_script()
         """Run full pipeline: pip install → collect .gradle configs → generate → gradlew assemble/bundle."""
-        self.install_site_packages()
+        self.install_site_packages(clean=clean)
         merged = self._collect_site_gradle_configs()
         self.generate(
             aar=aar,
